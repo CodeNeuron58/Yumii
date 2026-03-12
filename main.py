@@ -6,7 +6,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from typing import TypedDict, List
+from typing import TypedDict, List, Annotated
+import operator
 from langgraph.graph import StateGraph, END
 
 from Yumi_Hears.pipeline import AudioPipeline
@@ -39,10 +40,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 class MainState(TypedDict):
-    input: str
-    response: str
-    expression: str
-    motion: str
+    input: Annotated[str, operator.add]
+    response: Annotated[str, operator.add]
+    expression: Annotated[str, lambda x, y: y if y is not None else x]
+    motion: Annotated[str, lambda x, y: y if y is not None else x]
     session_id: str
 
 
@@ -58,7 +59,7 @@ session_id = "yumi_session_1"
 def listen_node(state: MainState):
     # This call blocks until speech is heard
     text = pipeline.run_cycle()
-    return {"input": text}
+    return {"input": text, "expression": "normal", "motion": "idle"}
     
 def think_node(state: MainState):
     print(f"User (Audio): {state['input']}")
@@ -72,14 +73,16 @@ def think_node(state: MainState):
     # we provide safe fallbacks ("normal" for expression, "idle" for motion).
     return {
         "response": result["response"],
-        "expression": result.get("expression", "normal"),
-        "motion": result.get("motion", "idle")
+        "expression": result["expression"] if result.get("expression") else "normal",
+        "motion": result["motion"] if result.get("motion") else "idle"
     }
     
 def speak_node(state: MainState):
     response_text = state["response"]
-    expression = state["expression"]
-    motion = state["motion"]
+    expression = state.get("expression", "LOST")
+    motion = state.get("motion", "LOST")
+    
+    print(f"\nDEBUG: Flow to speak node! raw expr={expression}, raw mot={motion}\n")
     
     print(f"Yumi: {response_text}")
     print(f"[{expression} | {motion}]")
