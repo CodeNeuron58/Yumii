@@ -15,7 +15,7 @@ class YumiSpeaker:
         self.client = ElevenLabs(api_key=api_key)
         
         # Constants for requested voice
-        self.model_id = "eleven_turbo_v2_5"
+        self.model_id = "eleven_multilingual_v2"
         self.voice_id = "HEhcSPjZtkJJ6iMEEKLW" # Adam pre-made voice
 
     def speak(self, text: str, play_local: bool = False):
@@ -38,7 +38,6 @@ class YumiSpeaker:
                     similarity_boost=1.0,
                     style=0.0,
                     use_speaker_boost=True,
-                    speed=1.0,
                 ),
             )
             
