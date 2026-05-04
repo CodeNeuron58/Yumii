@@ -10,7 +10,7 @@ wheels/
 .venv
 .env
 
-testing models/
+trash
 10an_culture_t01.2048/
 motions/
 10an_culture_t01.moc3

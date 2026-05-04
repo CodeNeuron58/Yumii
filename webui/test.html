@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Live2D Motion Tester</title>
+    <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/6.5.2/browser/pixi.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/cubism4.min.js"></script>
+    <style>
+        body { background: #111; color: white; display: flex; font-family: sans-serif; }
+        #controls { width: 300px; padding: 20px; z-index: 10; background: rgba(0,0,0,0.8); height: 100vh; overflow-y: auto;}
+        canvas { position: absolute; left: 300px; top: 0; }
+        button { display: block; width: 100%; margin: 5px 0; padding: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h3>Expressions (Faces)</h3>
+        <button onclick="play('face_smile_01')">face_smile_01</button>
+        <button onclick="play('face_angry_01')">face_angry_01</button>
+        <button onclick="play('face_sad_01')">face_sad_01</button>
+        
+        <h3>Combined Motions</h3>
+        <button onclick="play('w-happy-nod01')">w-happy-nod01</button>
+        <button onclick="play('w-normal-angry01')">w-normal-angry01</button>
+        <button onclick="play('w-cute-shy01')">w-cute-shy01</button>
+
+        <h3>Base Motions</h3>
+        <button onclick="play('w-normal-idle01')">w-normal-idle01</button>
+        <button onclick="play('w-normal-nod01')">w-normal-nod01</button>
+
+        <h3>Expression Params</h3>
+        <button onclick="setParam('ParamMouthOpenY', 1)">Mouth Open</button>
+        <button onclick="setParam('ParamEyeLOpen', 0)">Eye L Close</button>
+        <button onclick="setParam('ParamEyeROpen', 0)">Eye R Close</button>
+        
+        <hr>
+        <button onclick="listGroups()" style="background: #44f; color: white;">List All Loaded Groups</button>
+        <div id="log" style="font-size: 11px; margin-top: 10px; color: #aaa;"></div>
+    </div>
+    <script>
+        const app = new PIXI.Application({ width: 1200, height: 1000, transparent: true });
+        document.body.appendChild(app.view);
+        let model;
+
+        function log(msg) {
+            document.getElementById('log').innerHTML += msg + '<br>';
+        }
+
+        async function init() {
+            model = await PIXI.live2d.Live2DModel.from("../10an_culture_t01.model3.json");
+            app.stage.addChild(model);
+            model.scale.set(0.3);
+            model.x = 200;
+            model.y = 100;
+
+            const FACE_FALLBACKS = [
+                "face_smile_01", "face_angry_01", "face_sad_01", 
+                "face_surprise_01", "face_scared_01", "face_shy_01"
+            ];
+            
+            for (let group of FACE_FALLBACKS) {
+                if (!model.internalModel.motionManager.motionGroups[group]) {
+                    model.internalModel.motionManager.motionGroups[group] = [{ file: `motions/${group}.motion3.json` }];
+                }
+            }
+
+            model.motion("w-cool-posenod03");
+            log("Loaded cleanly.");
+        }
+
+        function play(name) {
+            log("Playing: " + name);
+            try {
+                model.motion(name);
+            } catch(e) { log("Err: " + e.message); }
+        }
+
+        function listGroups() {
+            log(Object.keys(model.internalModel.motionManager.motionGroups).join(', '));
+        }
+
+        function setParam(id, val) {
+            model.internalModel.coreModel.setParameterValueById(id, val);
+            log(`Set ${id} to ${val}`);
+        }
+
+        init();
+    </script>
+</body>
+</html>
