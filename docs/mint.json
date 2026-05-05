@@ -1,0 +1,41 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Yumi",
+  "logo": {
+    "dark": "https://raw.githubusercontent.com/mintlify/themes/main/prism/logo-dark.svg",
+    "light": "https://raw.githubusercontent.com/mintlify/themes/main/prism/logo-light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#D946EF",
+    "light": "#FDF4FF",
+    "dark": "#4A044E",
+    "anchors": {
+      "from": "#D946EF",
+      "to": "#F472B6"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/yourusername/yumi"
+    }
+  ],
+  "topbarCtaButton": {
+    "type": "github",
+    "url": "https://github.com/yourusername/yumi"
+  },
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/yourusername/yumi",
+    "twitter": "https://twitter.com/yourusername"
+  }
+}

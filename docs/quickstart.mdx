@@ -1,0 +1,70 @@
+---
+title: "Quickstart"
+description: "Give Yumi her senses and wake her up in under 2 minutes."
+---
+
+## Prerequisites
+
+Before meeting Yumi, ensure you have the following installed on your machine:
+
+- **Python 3.12+**
+- **A modern web browser** (Chrome, Edge, Firefox)
+- **Microphone access** enabled on your system.
+
+---
+
+## 1. Installation
+
+First, clone the Yumi repository to your local machine and navigate into the directory.
+
+```bash
+git clone https://github.com/yourusername/yumi.git
+cd yumi
+```
+
+Install the dependencies. We recommend using `uv` or `pip`:
+
+```bash
+pip install -r requirements.txt
+# OR
+uv sync
+```
+
+## 2. Attunement (First-Time Setup)
+
+Yumi needs an LLM to think and a Text-to-Speech provider to speak. 
+
+Run the interactive dashboard:
+
+```bash
+yumi
+```
+
+Since this is your first time, Yumi will automatically guide you through her **Attunement** process. You will be prompted to provide:
+
+1. **LLM API Key** (We highly recommend [Groq](https://console.groq.com/) for its blazing fast speed).
+2. **TTS API Key** (We recommend [ElevenLabs](https://elevenlabs.io/) for lifelike expression).
+
+<Info>
+  Keys are stored securely in your local environment. They are never transmitted anywhere except directly to the providers you chose.
+</Info>
+
+## 3. Waking Her Up
+
+Once configured, simply select **"🌸 Wake Yumi Up"** from the main dashboard menu (or run `yumi wake-up`).
+
+1. The backend server will initialize on port `8000`.
+2. A browser tab will automatically open to `http://localhost:8000/webui/index.html`.
+3. Allow microphone permissions if prompted.
+4. Say hello! 
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="I get a KMP_DUPLICATE_LIB_OK error">
+    This is common on Windows with `faster-whisper`. The Yumi CLI automatically attempts to patch this by setting the environment variable internally, but if it persists, ensure you don't have conflicting OpenMP libraries installed.
+  </Accordion>
+  <Accordion title="She isn't responding to my voice">
+    Check the terminal output. If you don't see `[Voice Activity Detected]`, your microphone might be muted or not set as the default system input device.
+  </Accordion>
+</AccordionGroup>

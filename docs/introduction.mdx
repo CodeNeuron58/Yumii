@@ -1,0 +1,50 @@
+---
+title: "Introduction"
+description: "Meet Yumi, your real-time AI companion."
+---
+
+<img
+  className="block dark:hidden"
+  src="https://raw.githubusercontent.com/mintlify/themes/main/prism/hero-light.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="https://raw.githubusercontent.com/mintlify/themes/main/prism/hero-dark.svg"
+  alt="Hero Dark"
+/>
+
+## What is Yumi?
+
+Yumi is an interactive, real-time AI waifu designed to act as your virtual companion. With dynamic, expressive visuals and an intelligent conversational backend, Yumi provides a highly engaging and responsive experience.
+
+Unlike sterile utility tools, Yumi is built with a focus on presence. She listens, reacts dynamically, and synchronizes her facial expressions to the emotional tone of her thoughts.
+
+### Key Features
+
+* **Real-time Voice Recognition:** Captures and processes your voice seamlessly using local, low-latency Whisper models.
+* **Lifelike Voice Synthesis:** Utilizes ElevenLabs TTS for incredibly realistic, high-quality, and expressive voice generation.
+* **Dynamic Visuals:** Brought to life using HTML5, WebSockets, and Live2D, Yumi reacts to your conversations with fluid body movements.
+* **Emotional Intelligence:** Powered by LLMs (Groq, OpenAI, Anthropic), Yumi's expressions dynamically change based on the emotional context of the dialogue.
+* **Interactive Terminal Dashboard:** A beautiful, fully interactive CLI to configure and launch her easily.
+
+## The Architecture
+
+Yumi's architecture bridges a powerful Python backend with a reactive frontend. 
+
+<CardGroup cols={2}>
+  <Card
+    title="The Mind (LangGraph)"
+    icon="brain"
+    href="/architecture/overview"
+  >
+    Learn how Yumi processes conversation, memory, and emotions using a state graph.
+  </Card>
+  <Card
+    title="The Senses (Audio)"
+    icon="microphone"
+    href="/architecture/audio-pipeline"
+  >
+    Discover how Voice Activity Detection and Whisper combine for seamless listening.
+  </Card>
+</CardGroup>
