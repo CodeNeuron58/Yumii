@@ -16,6 +16,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.14.0",
     "python-dotenv>=1.0.1",
+    "questionary>=2.0.1",
     "rich>=15.0.0",
     "sounddevice>=0.5.5",
     "typecast-python>=0.1.6",
