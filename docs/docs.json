@@ -10,11 +10,7 @@
   "colors": {
     "primary": "#D946EF",
     "light": "#FDF4FF",
-    "dark": "#4A044E",
-    "anchors": {
-      "from": "#D946EF",
-      "to": "#F472B6"
-    }
+    "dark": "#4A044E"
   },
   "topbarLinks": [
     {
@@ -26,15 +22,17 @@
     "type": "github",
     "url": "https://github.com/yourusername/yumi"
   },
-  "navigation": [
-    {
-      "group": "Getting Started",
-      "pages": [
-        "introduction",
-        "quickstart"
-      ]
-    }
-  ],
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "quickstart"
+        ]
+      }
+    ]
+  },
   "footerSocials": {
     "github": "https://github.com/yourusername/yumi",
     "twitter": "https://twitter.com/yourusername"
