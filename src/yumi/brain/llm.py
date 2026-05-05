@@ -2,10 +2,7 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 import os
-
-from dotenv import load_dotenv
-load_dotenv()
-
+from src.yumi.core.config import settings
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 prompt_path = os.path.join(current_dir, "prompts", "personality.txt")
@@ -33,7 +30,8 @@ class YumiResponse(BaseModel):
 # Initialize the LLM with structured output bounds
 base_llm = ChatGroq(
     model="llama-3.3-70b-versatile",
-    temperature=0.7
+    temperature=0.7,
+    api_key=settings.groq_api_key
 )
 
 # Apply Pydantic schema

@@ -1,18 +1,12 @@
-import os
-from dotenv import load_dotenv
 import base64
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
+from src.yumi.core.config import settings
 
 class YumiSpeaker:
     def __init__(self):
-        load_dotenv()
-        api_key = os.getenv("ELEVENLABS_API_KEY")
-        if not api_key:
-            raise ValueError("ELEVENLABS_API_KEY not found in environment variables.")
-        
         # Initialize client
-        self.client = ElevenLabs(api_key=api_key)
+        self.client = ElevenLabs(api_key=settings.elevenlabs_api_key)
         
         # Constants for requested voice
         self.model_id = "eleven_multilingual_v2"
