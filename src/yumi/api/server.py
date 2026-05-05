@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List
 
-from src.yumi.engine.graph import build_graph
+from yumi.engine.graph import build_graph
 
 app = FastAPI()
 

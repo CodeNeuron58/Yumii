@@ -1,7 +1,7 @@
 import base64
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
-from src.yumi.core.config import settings
+from yumi.core.config import settings
 
 class YumiSpeaker:
     def __init__(self):

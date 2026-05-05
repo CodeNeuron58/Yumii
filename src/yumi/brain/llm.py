@@ -2,7 +2,7 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 import os
-from src.yumi.core.config import settings
+from yumi.core.config import settings
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 prompt_path = os.path.join(current_dir, "prompts", "personality.txt")

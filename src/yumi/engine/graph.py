@@ -2,9 +2,9 @@ from typing import TypedDict, Annotated, Callable
 import operator
 from langgraph.graph import StateGraph, END
 
-from src.yumi.audio.stt import AudioPipeline
-from src.yumi.tts.speaker import YumiSpeaker
-from src.yumi.brain.nodes import chat_node
+from yumi.audio.stt import AudioPipeline
+from yumi.tts.speaker import YumiSpeaker
+from yumi.brain.nodes import chat_node
 
 class MainState(TypedDict):
     input: Annotated[str, operator.add]
