@@ -1,6 +1,6 @@
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from yumi.brain.memory.chat_history import get_session_history
-from yumi.brain.llm import chain
+from yumi.agent.memory.chat_history import get_session_history
+from yumi.agent.llm import chain
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.messages import AIMessage
 

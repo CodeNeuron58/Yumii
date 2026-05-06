@@ -1,17 +1,10 @@
-from typing import TypedDict, Annotated, Callable
-import operator
+from typing import Callable
 from langgraph.graph import StateGraph, END
 
 from yumi.audio.stt import AudioPipeline
 from yumi.tts.speaker import YumiSpeaker
-from yumi.brain.nodes import chat_node
-
-class MainState(TypedDict):
-    input: Annotated[str, operator.add]
-    response: Annotated[str, operator.add]
-    expression: Annotated[str, lambda x, y: y if y is not None else x]
-    motion: Annotated[str, lambda x, y: y if y is not None else x]
-    session_id: str
+from yumi.agent.nodes import chat_node
+from yumi.agent.state import MainState
 
 def build_graph(broadcast_callback: Callable):
     print("Initializing Yumi Audio Pipeline...")
