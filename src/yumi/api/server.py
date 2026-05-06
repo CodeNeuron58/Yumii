@@ -85,5 +85,9 @@ async def startup_event():
 
 # Mount the static files pointing to the root directory
 # This ensures that http://localhost:8000/webui/index.html still resolves to webui/index.html
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-app.mount("/", StaticFiles(directory=project_root, html=True), name="static")
+package_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+webui_dir = os.path.join(package_root, "webui")
+avatar_dir = os.path.join(package_root, "Yumi_Avatar")
+
+app.mount("/Yumi_Avatar", StaticFiles(directory=avatar_dir), name="avatar")
+app.mount("/", StaticFiles(directory=webui_dir, html=True), name="static")

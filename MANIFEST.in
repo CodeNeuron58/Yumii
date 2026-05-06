@@ -1,0 +1,2 @@
+recursive-include src/yumi/webui *
+recursive-include src/yumi/Yumi_Avatar *
