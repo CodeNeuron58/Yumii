@@ -1,5 +1,6 @@
 from typing import Callable
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import InMemorySaver
 
 from yumi.audio.stt import AudioPipeline
 from yumi.tts.speaker import YumiSpeaker
@@ -20,15 +21,17 @@ def build_graph(broadcast_callback: Callable):
         
     def think_node(state: MainState):
         print(f"User (Audio): {state['input']}")
-        # Invoke the LLM which returns {response, expression, motion}
+        # Invoke the LLM which returns {response, expression, motion, messages}
         result = chat_node({
             "input": state["input"],
+            "messages": state.get("messages", []),
             "session_id": state["session_id"]
         })
         return {
             "response": result["response"],
             "expression": result["expression"] if result.get("expression") else "normal",
-            "motion": result["motion"] if result.get("motion") else "idle"
+            "motion": result["motion"] if result.get("motion") else "idle",
+            "messages": result.get("messages", [])
         }
         
     def speak_node(state: MainState):
@@ -86,4 +89,6 @@ def build_graph(broadcast_callback: Callable):
     workflow.add_edge("think", "speak")
     workflow.add_edge("speak", END)
 
-    return workflow.compile()
+    # Use InMemorySaver for checkpointing/conversation memory
+    saver = InMemorySaver()
+    return workflow.compile(checkpointer=saver)

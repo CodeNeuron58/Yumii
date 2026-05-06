@@ -65,15 +65,18 @@ async def agent_loop():
     while True:
         try:
             # We run the synchronous graph invocation in a threadpool so it doesn't block the FastAPI async event loop
+            # Config with thread_id is required for InMemorySaver checkpointing
             await asyncio.to_thread(
                 graph_app.invoke,
                 {
-                    "input": "", 
-                    "response": "", 
+                    "input": "",
+                    "response": "",
                     "expression": "",
                     "motion": "",
+                    "messages": [],
                     "session_id": session_id
-                }
+                },
+                config={"configurable": {"thread_id": session_id}}
             )
         except Exception as e:
             print(f"Agent Loop Error: {e}")

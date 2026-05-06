@@ -1,9 +1,10 @@
 from typing import TypedDict, Annotated
-import operator
+from langgraph.graph import add_messages
 
 class MainState(TypedDict):
-    input: Annotated[str, operator.add]
-    response: Annotated[str, operator.add]
-    expression: Annotated[str, lambda x, y: y if y is not None else x]
-    motion: Annotated[str, lambda x, y: y if y is not None else x]
+    messages: Annotated[list, add_messages]  # Conversation history for LLM
+    input: str
+    response: str
+    expression: str
+    motion: str
     session_id: str
