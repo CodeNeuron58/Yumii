@@ -276,7 +276,7 @@ def wake_up():
     clear_screen()
     def open_browser():
         time.sleep(2)
-        webbrowser.open("http://localhost:8000/webui/index.html")
+        webbrowser.open("http://localhost:8000/")
         
     threading.Thread(target=open_browser, daemon=True).start()
     

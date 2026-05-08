@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List
 
-from yumi.engine.graph import build_graph
+from yumi.agent.graph import build_graph
 
 app = FastAPI()
 
@@ -65,15 +65,18 @@ async def agent_loop():
     while True:
         try:
             # We run the synchronous graph invocation in a threadpool so it doesn't block the FastAPI async event loop
+            # Config with thread_id is required for InMemorySaver checkpointing
             await asyncio.to_thread(
                 graph_app.invoke,
                 {
-                    "input": "", 
-                    "response": "", 
+                    "input": "",
+                    "response": "",
                     "expression": "",
                     "motion": "",
+                    "messages": [],
                     "session_id": session_id
-                }
+                },
+                config={"configurable": {"thread_id": session_id}}
             )
         except Exception as e:
             print(f"Agent Loop Error: {e}")
@@ -85,5 +88,9 @@ async def startup_event():
 
 # Mount the static files pointing to the root directory
 # This ensures that http://localhost:8000/webui/index.html still resolves to webui/index.html
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-app.mount("/", StaticFiles(directory=project_root, html=True), name="static")
+package_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+webui_dir = os.path.join(package_root, "webui")
+avatar_dir = os.path.join(package_root, "Yumi_Avatar")
+
+app.mount("/Yumi_Avatar", StaticFiles(directory=avatar_dir), name="avatar")
+app.mount("/", StaticFiles(directory=webui_dir, html=True), name="static")

@@ -1,17 +1,11 @@
-from typing import TypedDict, Annotated, Callable
-import operator
+from typing import Callable
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import InMemorySaver
 
 from yumi.audio.stt import AudioPipeline
 from yumi.tts.speaker import YumiSpeaker
-from yumi.brain.nodes import chat_node
-
-class MainState(TypedDict):
-    input: Annotated[str, operator.add]
-    response: Annotated[str, operator.add]
-    expression: Annotated[str, lambda x, y: y if y is not None else x]
-    motion: Annotated[str, lambda x, y: y if y is not None else x]
-    session_id: str
+from yumi.agent.nodes import chat_node
+from yumi.agent.state import MainState
 
 def build_graph(broadcast_callback: Callable):
     print("Initializing Yumi Audio Pipeline...")
@@ -27,15 +21,17 @@ def build_graph(broadcast_callback: Callable):
         
     def think_node(state: MainState):
         print(f"User (Audio): {state['input']}")
-        # Invoke the LLM which returns {response, expression, motion}
+        # Invoke the LLM which returns {response, expression, motion, messages}
         result = chat_node({
             "input": state["input"],
+            "messages": state.get("messages", []),
             "session_id": state["session_id"]
         })
         return {
             "response": result["response"],
             "expression": result["expression"] if result.get("expression") else "normal",
-            "motion": result["motion"] if result.get("motion") else "idle"
+            "motion": result["motion"] if result.get("motion") else "idle",
+            "messages": result.get("messages", [])
         }
         
     def speak_node(state: MainState):
@@ -93,4 +89,6 @@ def build_graph(broadcast_callback: Callable):
     workflow.add_edge("think", "speak")
     workflow.add_edge("speak", END)
 
-    return workflow.compile()
+    # Use InMemorySaver for checkpointing/conversation memory
+    saver = InMemorySaver()
+    return workflow.compile(checkpointer=saver)
