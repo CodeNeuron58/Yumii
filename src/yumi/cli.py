@@ -13,6 +13,7 @@ import sys
 from typing import Optional
 
 from yumi.core.global_config import update_global_config, load_global_config
+from yumi.agent.personality_manager import personality_manager, PERSONALITY_TYPE
 
 app = typer.Typer(help="Yumi - Your AI Companion", invoke_without_command=True)
 console = Console()
@@ -75,10 +76,12 @@ def dashboard():
     # Status Panel
     groq_status = "🟢" if config.get("GROQ_API_KEY") else "🔴"
     eleven_status = "🟢" if config.get("ELEVENLABS_API_KEY") else "🔴"
+    personality = config.get("PERSONALITY", "caring")
     
     status_text = f"""
   Mind (LLM):  {groq_status}  [dim]{mask_key(config.get('GROQ_API_KEY', ''))}[/dim]
   Voice (TTS): {eleven_status}  [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
+  Personality: [magenta]{personality}[/magenta]
 """
     console.print(Panel(status_text, title="[bold magenta]🌸 Yumi Dashboard 🌸[/bold magenta]", border_style="magenta", expand=False))
     console.print()
@@ -88,6 +91,7 @@ def dashboard():
         choices=[
             questionary.Choice("🌸 Wake Yumi Up", value="wake"),
             questionary.Choice("⚙️  Configure Senses", value="config"),
+            questionary.Choice("💕 Change Personality", value="personality"),
             questionary.Choice("📖 The Vision", value="vision"),
             questionary.Choice("❌ Let her sleep (Exit)", value="exit"),
         ],
@@ -98,6 +102,8 @@ def dashboard():
         wake_up()
     elif choice == "config":
         models()
+    elif choice == "personality":
+        change_personality()
     elif choice == "vision":
         show_story()
     else:
@@ -192,6 +198,53 @@ def attune():
     )
     console.print(success_msg)
     time.sleep(1.5)
+    dashboard()
+
+def change_personality():
+    """
+    Change Yumi's personality.
+    """
+    clear_screen()
+    config = load_global_config()
+    current_personality = config.get("PERSONALITY", "caring")
+    
+    console.print(Panel(
+        f"Current Personality: [bold magenta]{current_personality}[/bold magenta]",
+        title="[bold cyan]💕 Personality Settings 💕[/bold cyan]",
+        border_style="cyan",
+        expand=False
+    ))
+    console.print()
+    
+    personalities = personality_manager.list_personalities()
+    
+    choice = questionary.select(
+        "Choose Yumi's new personality:",
+        choices=[
+            questionary.Choice(f"[magenta]caring[/magenta] - {personalities['caring']}", value="caring"),
+            questionary.Choice(f"[magenta]tsundere[/magenta] - {personalities['tsundere']}", value="tsundere"),
+            questionary.Choice(f"[magenta]genki[/magenta] - {personalities['genki']}", value="genki"),
+            questionary.Choice(f"[magenta]kuudere[/magenta] - {personalities['kuudere']}", value="kuudere"),
+            questionary.Choice(f"[magenta]yandere[/magenta] - {personalities['yandere']}", value="yandere"),
+            questionary.Choice(f"[magenta]dandere[/magenta] - {personalities['dandere']}", value="dandere"),
+            questionary.Separator(),
+            questionary.Choice("⬅️  Back to Dashboard", value="back"),
+        ],
+        qmark="💕"
+    ).ask()
+    
+    if choice == "back":
+        dashboard()
+        return
+    
+    if choice and choice != current_personality:
+        update_global_config("PERSONALITY", choice)
+        console.print(f"\n[green]✅ Personality changed to [bold]{choice}[/bold]![/green]")
+        time.sleep(1.5)
+    elif choice == current_personality:
+        console.print(f"\n[yellow]⚠️  {choice} is already the active personality.[/yellow]")
+        time.sleep(1.5)
+    
     dashboard()
 
 @app.command()
