@@ -4,11 +4,10 @@ from pydantic import BaseModel, Field
 import os
 from yumi.core.config import settings
 from yumi.tools import tools
+from yumi.agent.personality_manager import personality_manager
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-prompt_path = os.path.join(current_dir, "prompts", "personality.txt")
-with open(prompt_path) as f:
-    personality = f.read()
+# Load personality dynamically from global config
+personality = personality_manager.get_current_personality_prompt()
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", personality),

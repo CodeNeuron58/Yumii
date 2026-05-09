@@ -13,7 +13,8 @@ for key, value in _global_config.items():
 class Settings(BaseSettings):
     elevenlabs_api_key: str = Field(..., env='ELEVENLABS_API_KEY')
     groq_api_key: str = Field(..., env='GROQ_API_KEY')
-    
+    personality: str = Field(default="caring", env='PERSONALITY')
+
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
 settings = Settings()
