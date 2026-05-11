@@ -1,8 +1,6 @@
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
-from yumi.agent.llm import chain, llm_structured, prompt
-from yumi.tools import tools
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from yumi.agent.llm import agent
 from yumi.agent.personality_manager import personality_manager
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
     """Check if user wants to switch personality. Returns (is_switch, new_personality)."""
@@ -19,100 +17,82 @@ def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
 
 def chat_node(state):
     user_input = state["input"]
-    messages = state.get("messages", [])
+    history = state.get("messages", [])
 
-    # Check for personality switch
+    # 1. Check for personality switch
     is_switch, new_personality = check_personality_switch(user_input)
     if is_switch:
         from yumi.core.global_config import update_global_config
         update_global_config("PERSONALITY", new_personality)
-        
-        # Reload personality and update prompt
-        new_personality_prompt = personality_manager.load_personality(new_personality)
-        new_prompt = ChatPromptTemplate.from_messages([
-            ("system", new_personality_prompt),
-            MessagesPlaceholder(variable_name="history"),
-            ("human", "{input}")
-        ])
-        
-        # Acknowledge personality switch (using new personality)
-        from langchain_core.messages import SystemMessage
-        import json
-        structured_response = llm_structured.invoke(new_prompt.format_messages(
-            history=[SystemMessage(content="The user just asked you to switch personalities. Acknowledge this change briefly and warmly in your new personality style.")],
-            input="Acknowledge the personality change"
-        ))
-        
-        return {
-            "response": structured_response.response_text,
-            "expression": structured_response.expression,
-            "motion": structured_response.motion,
-            "messages": []  # Don't add personality switch to message history
-        }
+        # We rewrite the user input so the LLM explicitly acknowledges the switch naturally
+        user_input = f"I want you to become {new_personality}. Acknowledge this personality switch warmly in your new style."
 
-    # Invoke the chain with tools bound
-    response = chain.invoke({
-        "input": user_input,
-        "history": messages
-    })
+    # 2. Inject current personality as SystemMessage on EVERY turn
+    # This solves the "Broken Personality Persistence" bug by ensuring
+    # the LLM always has the correct prompt even after a switch.
+    current_personality_prompt = personality_manager.get_current_personality_prompt()
+    
+    # Add an explicit instruction to prevent tool-calling hallucinations where the LLM tries
+    # to output its final structured response at the same time it calls a data-fetching tool.
+    system_instruction = (
+        current_personality_prompt + 
+        "\n\nCRITICAL INSTRUCTION: If you need to use a tool to get information (like checking the time), "
+        "you MUST ONLY call that tool and wait for the result. Do NOT generate your final YumiResponse "
+        "or answer until you have received the tool's output."
+    )
+    
+    system_message = SystemMessage(content=system_instruction)
 
-    # Check if LLM wants to use tools
-    if hasattr(response, 'tool_calls') and response.tool_calls:
-        print(f"[Tool Call] LLM wants to use: {[tc['name'] for tc in response.tool_calls]}")
-        
-        # Execute each tool call
-        tool_messages = []
-        for tool_call in response.tool_calls:
-            tool_name = tool_call["name"]
-            tool_args = tool_call["args"]
-            
-            # Find and execute the tool
-            for tool in tools:
-                if tool.name == tool_name:
-                    result = tool.invoke(tool_args)
-                    print(f"[Tool Result] {tool_name}: {result}")
-                    tool_messages.append(
-                        ToolMessage(content=result, tool_call_id=tool_call["id"])
-                    )
-                    break
-        
-        # Feed tool results back to LLM and get structured response
-        # Build message history with tool calls and results
-        full_messages = messages + [
-            HumanMessage(content=user_input),
-            response,  # AIMessage with tool_calls
-            *tool_messages
-        ]
-        
-        # Get structured response after tool use
-        structured_response = llm_structured.invoke(prompt.format_messages(
-            history=messages,
-            input=f"Based on the tool results, respond to: {user_input}. Tool results: {[tm.content for tm in tool_messages]}"
-        ))
-        
-        return {
-            "response": structured_response.response_text,
-            "expression": structured_response.expression,
-            "motion": structured_response.motion,
-            "messages": [
-                HumanMessage(content=user_input),
-                AIMessage(content=structured_response.response_text)
-            ]
-        }
+    # 3. Prepare the input payload
+    new_human_message = HumanMessage(content=user_input)
+    input_messages = [system_message] + history + [new_human_message]
 
-    # No tool calls - get structured response directly
-    # Re-invoke with structured output
-    structured_response = llm_structured.invoke(prompt.format_messages(
-        history=messages,
-        input=user_input
-    ))
+    print(f"DEBUG: Invoking agent with {len(input_messages)} messages (including system prompt).")
+
+    # 4. Invoke the unified agent (handles tools & structured output natively)
+    # This solves the "Redundant LLM Calls" bottleneck.
+    result = agent.invoke({"messages": input_messages})
+
+    # Extract the structured response and the new messages generated by the agent
+    structured_response = result.get("structured_response")
+    
+    if structured_response is None:
+        # Fallback in case structured output fails
+        print("ERROR: structured_response was None. Falling back to default.")
+        class Fallback:
+            pass
+        structured_response = Fallback()
+        structured_response.response_text = "I'm having trouble processing that right now."
+        structured_response.expression = "sad"
+        structured_response.motion = "idle"
+
+    # The agent returns all messages (including what we gave it).
+    # We only want to return the newly generated messages to be appended to state history.
+    # The newly generated messages are everything after our `input_messages`.
+    new_agent_messages = result["messages"][len(input_messages):]
+    
+    # Wait, the history in `MainState` doesn't have the current `user_input` yet.
+    # So we must return the `new_human_message` PLUS whatever the agent generated.
+    # Wait, in the older version, we returned the HumanMessage and AIMessage.
+    # Because `MainState` uses `add_messages` reducer, returning a list of messages appends them.
+    # However, if the `new_agent_messages` contains the ToolMessage with the structured response,
+    # we don't necessarily want that raw ToolMessage cluttering the LLM's future context as an AI turn.
+    # Let's see... if it used tools, we want the Tool history. If it just structured the output, 
+    # it generates an AIMessage with a tool_call, and a ToolMessage with the structured JSON.
+    # Feeding this back to the LLM next turn might confuse it because the "final answer" is in a ToolMessage.
+    
+    # LangChain's `create_agent` docs state that when using structured output via tools, 
+    # the structured data is captured in `structured_response`.
+    # It's cleaner to just append a standard AIMessage with the text to the history, 
+    # discarding the complex tool-call trace of the structured output tool itself.
+    # If the agent used OTHER tools (like get_time), we *do* want those.
+    # For now, to keep history clean and avoid LLM confusion with its own structured output tool calls:
+    
+    messages_to_append = [new_human_message, AIMessage(content=structured_response.response_text)]
 
     return {
         "response": structured_response.response_text,
-        "expression": structured_response.expression,
-        "motion": structured_response.motion,
-        "messages": [
-            HumanMessage(content=user_input),
-            AIMessage(content=structured_response.response_text)
-        ]
+        "expression": getattr(structured_response, 'expression', 'normal'),
+        "motion": getattr(structured_response, 'motion', 'idle'),
+        "messages": messages_to_append
     }
