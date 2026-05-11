@@ -10,6 +10,6 @@ wheels/
 .venv
 .env
 
-trash
+Trash/
 Yumi_Avatar/
 src/yumi/webui/test.html
