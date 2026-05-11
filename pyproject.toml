@@ -9,6 +9,7 @@ dependencies = [
     "elevenlabs>=2.38.1",
     "fastapi>=0.135.1",
     "faster-whisper>=1.2.1",
+    "langchain>=1.2.18",
     "langchain-core>=1.2.17",
     "langchain-groq>=1.1.2",
     "langgraph>=1.0.10",
