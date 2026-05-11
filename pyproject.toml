@@ -19,7 +19,6 @@ dependencies = [
     "questionary>=2.0.1",
     "rich>=15.0.0",
     "sounddevice>=0.5.5",
-    "typecast-python>=0.1.6",
     "typer>=0.25.1",
     "uvicorn>=0.41.0",
     "webrtcvad-wheels>=2.0.14",
