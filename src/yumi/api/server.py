@@ -21,6 +21,9 @@ app.add_middleware(
 # Global clients to broadcast to UI
 active_connections: List[WebSocket] = []
 
+# Store the main event loop for thread-safe operations
+main_loop = None
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -47,7 +50,11 @@ def sync_broadcast(payload: dict):
             active_connections.remove(dead)
             
     try:
-        asyncio.run(broadcast())
+        if main_loop:
+            asyncio.run_coroutine_threadsafe(broadcast(), main_loop)
+        else:
+            # Fallback if loop is not yet captured (should not happen in production)
+            asyncio.run(broadcast())
     except Exception as e:
         print(f"Failed to broadcast WS: {e}")
 
@@ -84,6 +91,8 @@ async def agent_loop():
 
 @app.on_event("startup")
 async def startup_event():
+    global main_loop
+    main_loop = asyncio.get_running_loop()
     asyncio.create_task(agent_loop())
 
 # Mount the static files pointing to the root directory
