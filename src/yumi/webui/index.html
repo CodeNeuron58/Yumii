@@ -108,33 +108,34 @@
     </div>
 
     <script>
-        const modelUrl = "/Yumi_Avatar/10an_culture_t01.model3.json";
+        const modelUrl = "/Yumi_Avatar/huohuo.model3.json";
         let live2dModel = null;
         let audioContext = null;
         let analyser = null;
         let socket = null;
 
-        // --- EMOTION/MOTION HANDLING (Step 4) ---
-        // Instead of hardcoded face/body mappings that override each other, we map the LLM's
-        // "expression" string into one of the 4 native style "prefixes" that the Live2D model supports.
-        const STYLE_PREFIXES = {
-            "smile": "happy",
-            "angry": "normal", // Some angry motions are under "normal"
-            "sad": "normal",   // Normal sad
-            "surprise": "cute",// Cute surprise motions
-            "scared": "normal",
-            "shy": "cute",
-            "normal": "normal"
+        // --- EMOTION/MOTION HANDLING ---
+        // Map LLM expressions to available huohuo expressions
+        const EXPRESSION_MAP = {
+            "smile": "baozhen",
+            "angry": "angry",
+            "sad": "cry",
+            "surprise": "baozhen",
+            "scared": "cry",
+            "shy": "qizi1",
+            "normal": null
         };
         
-        // Face fallbacks if a combined body motion doesn't exist
-        const FACE_FALLBACKS = {
-            "smile": "face_smile_01",
-            "angry": "face_angry_01",
-            "sad": "face_sad_01",
-            "surprise": "face_surprise_01",
-            "scared": "face_scared_01",
-            "shy": "face_shy_01"
+        // Map LLM motions to available huohuo motions
+        const MOTION_MAP = {
+            "nod": "nod",
+            "shakehead": "shakehead",
+            "tilthead": "nod",
+            "fidget": "idle",
+            "forward": "idle",
+            "lookaway": "shakehead",
+            "greeting": "happy",
+            "idle": "idle"
         };
 
         // --- PixiJS & Live2D Setup ---
@@ -156,14 +157,6 @@
                 live2dModel = await PIXI.live2d.Live2DModel.from(modelUrl);
                 app.stage.addChild(live2dModel);
 
-                // We dynamically initialize face fallbacks in the motion manager, as 
-                // the raw files are now exposed natively in the model file but lack explicit Groups.
-                for (let key in FACE_FALLBACKS) {
-                    const group = FACE_FALLBACKS[key];
-                    if (!live2dModel.internalModel.motionManager.motionGroups[group]) {
-                        live2dModel.internalModel.motionManager.motionGroups[group] = [{ file: `motions/${group}.motion3.json` }];
-                    }
-                }
                 const unscaledWidth = live2dModel.internalModel.width;
                 const unscaledHeight = live2dModel.internalModel.height;
                 const scaleX = window.innerWidth / unscaledWidth;
@@ -189,7 +182,7 @@
 
                 // Play initial startup motion
                 try {
-                    live2dModel.motion("w-cool-posenod03");
+                    live2dModel.motion("idle");
                 } catch (e) {
                     console.error("Failed to play startup motion:", e);
                 }
@@ -219,75 +212,28 @@
                 document.getElementById('subtitle').innerText = data.text;
                 document.getElementById('ui-layer').style.opacity = 1;
 
-                // --- EMOTION/MOTION HANDLING (Step 5) ---
-                // We combine the expression (e.g., "smile") and motion (e.g., "nod") into a single sequence if possible.
-                // Priority 1: Play a combined sequence (e.g., "w-happy-nod01") 
-                // Priority 2: Play the fallback expression ONLY (e.g., "face_smile_01")
-                // Priority 3: Play a normal motion (e.g., "w-normal-nod01")
-                
+                // --- EMOTION/MOTION HANDLING ---
                 let rawExp = data.expression?.toLowerCase() || "normal";
                 let rawMot = data.motion?.toLowerCase() || "idle";
                 
-                let style = STYLE_PREFIXES[rawExp] || "normal";
+                // Map to available expressions and motions
+                const expression = EXPRESSION_MAP[rawExp];
+                const motion = MOTION_MAP[rawMot] || "idle";
                 
-                // Construct the combined name. Live2D names use e.g. "w-happy-nod01" or "w-normal-angry01"
-                let combinedMotionName = `w-${style}-${rawMot}01`;
+                document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nExpression: ${expression || 'none'}\nMotion: ${motion}`;
                 
-                // Exception handling since some emotions are mapped as primary body actions in this model:
-                if (rawMot === "idle" && rawExp !== "normal") {
-                     combinedMotionName = `w-${style}-${rawExp}01`;
-                }
-
                 try {
-                    // Try to play the combined motion natively defined in the model JSON
-                    if (live2dModel.internalModel.motionManager.motionGroups[combinedMotionName]) {
-                        console.log(`Playing combined motion: ${combinedMotionName}`);
-                        document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nPlaying COMBINED: ${combinedMotionName}`;
-                        live2dModel.motion(combinedMotionName);
-                    } 
-                    // Fallback to standalone face expression if the combined group does not exist
-                    else if (FACE_FALLBACKS[rawExp]) {
-                        console.log(`Fallback: Playing face motion ${FACE_FALLBACKS[rawExp]}`);
-                        
-                        // We do NOT play a body motion here by default, because it overrides the face.
-                        // However, some body motions like "lookaway" or "fidget" only exist in "normal"
-                        if (rawMot === "lookaway" || rawMot === "fidget" || rawMot === "greeting") {
-                             let normalMotion = `w-normal-${rawMot}01`;
-                             
-                             if (live2dModel.internalModel.motionManager.motionGroups[normalMotion]) {
-                                 // To get the face to stick, we play the body motion first, then the face
-                                 document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nMissing combo ${combinedMotionName}!\nFallback BODY: ${normalMotion}\nFallback FACE: ${FACE_FALLBACKS[rawExp]}`;
-                                 
-                                 // Play body first, wait ~100ms, then force face to override the top layer
-                                 live2dModel.motion(normalMotion);
-                                 setTimeout(() => live2dModel.motion(FACE_FALLBACKS[rawExp]), 150);
-                             } else {
-                                 document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nMissing combo ${combinedMotionName}!\nFallback EXPRESSION ONLY: ${FACE_FALLBACKS[rawExp]}`;
-                                 live2dModel.motion(FACE_FALLBACKS[rawExp]);
-                             }
-                        } 
-                        else if (rawMot !== "idle" && rawMot !== "normal") {
-                             document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nMissing combo ${combinedMotionName}!\nFallback EXPRESSION: ${FACE_FALLBACKS[rawExp]}\n(Body motion skipped to preserve face)`;
-                             live2dModel.motion(FACE_FALLBACKS[rawExp]);
-                        } else {
-                             document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nMissing combo ${combinedMotionName}!\nFallback EXPRESSION ONLY: ${FACE_FALLBACKS[rawExp]}`;
-                             live2dModel.motion(FACE_FALLBACKS[rawExp]);
-                        }
+                    // Play expression if available
+                    if (expression && live2dModel.internalModel.expressionManager) {
+                        live2dModel.expression(expression);
                     }
-                    // Final fallback: play generic normal motion
-                    else if (rawMot !== "idle") {
-                         let normalMotion = `w-normal-${rawMot}01`;
-                         if (live2dModel.internalModel.motionManager.motionGroups[normalMotion]) {
-                             document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nPlaying FALLBACK MOTION: ${normalMotion}`;
-                             live2dModel.motion(normalMotion);
-                         } else {
-                             document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nAll motions missing!`;
-                         }
-                    } else {
-                         document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nNo valid motions to play... idle loop.`;
+                    
+                    // Play motion
+                    if (motion) {
+                        live2dModel.motion(motion);
                     }
                 } catch (e) { 
-                    console.error("Motion error:", e);
+                    console.error("Motion/Expression error:", e);
                     document.getElementById('debug-info').innerText += `\nError: ${e.message}`;
                 }
 
