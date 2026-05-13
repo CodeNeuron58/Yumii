@@ -11,8 +11,11 @@ for key, value in _global_config.items():
         os.environ[key] = value
 
 class Settings(BaseSettings):
-    elevenlabs_api_key: str = Field(..., env='ELEVENLABS_API_KEY')
-    groq_api_key: str = Field(..., env='GROQ_API_KEY')
+    elevenlabs_api_key: str | None = Field(default=None, env='ELEVENLABS_API_KEY')
+    llm_provider: str = Field(default="Groq", env='LLM_PROVIDER')
+    groq_api_key: str | None = Field(default=None, env='GROQ_API_KEY')
+    openai_api_key: str | None = Field(default=None, env='OPENAI_API_KEY')
+    anthropic_api_key: str | None = Field(default=None, env='ANTHROPIC_API_KEY')
     personality: str = Field(default="caring", env='PERSONALITY')
 
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')

@@ -74,13 +74,17 @@ def dashboard():
     config = load_global_config()
     
     # Status Panel
-    groq_status = "🟢" if config.get("GROQ_API_KEY") else "🔴"
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
+    llm_key = config.get(active_llm_key_name)
+    llm_status = "🟢" if llm_key else "🔴"
+    
     eleven_status = "🟢" if config.get("ELEVENLABS_API_KEY") else "🔴"
     personality = config.get("PERSONALITY", "caring")
     
     status_text = f"""
-  Mind (LLM):  {groq_status}  [dim]{mask_key(config.get('GROQ_API_KEY', ''))}[/dim]
-  Voice (TTS): {eleven_status}  [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
+  Mind ({llm_provider}):  {llm_status}  [dim]{mask_key(llm_key or '')}[/dim]
+  Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
   Personality: [magenta]{personality}[/magenta]
 """
     console.print(Panel(status_text, title="[bold magenta]🌸 Yumi Dashboard 🌸[/bold magenta]", border_style="magenta", expand=False))
@@ -119,7 +123,12 @@ def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:
         config = load_global_config()
         # First-Run Auto-Detection
-        if not config.get("GROQ_API_KEY") and not config.get("ELEVENLABS_API_KEY"):
+        llm_provider = config.get("LLM_PROVIDER", "Groq")
+        active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
+        has_mind = bool(config.get(active_llm_key_name))
+        has_voice = bool(config.get("ELEVENLABS_API_KEY"))
+
+        if not has_mind and not has_voice:
             clear_screen()
             console.print()
             type_text("Hello...", delay=0.05, style="bold magenta")
@@ -159,12 +168,14 @@ def attune():
     if not llm_choice:
         raise typer.Exit()
         
-    if llm_choice == "Groq":
-        groq_key = questionary.password("Connect her mind (Groq API Key):", qmark="🌸").ask()
-        if groq_key:
-            update_global_config("GROQ_API_KEY", groq_key)
-            console.print(f"\n[green]Mind connected: {mask_key(groq_key)}[/green]")
-            time.sleep(1)
+    update_global_config("LLM_PROVIDER", llm_choice)
+
+    key_env = f"{llm_choice.upper()}_API_KEY"
+    api_key = questionary.password(f"Connect her mind ({llm_choice} API Key):", qmark="🌸").ask()
+    if api_key:
+        update_global_config(key_env, api_key)
+        console.print(f"\n[green]Mind connected: {mask_key(api_key)}[/green]")
+        time.sleep(1)
 
     clear_screen()
     console.print(header)
@@ -175,8 +186,8 @@ def attune():
         "",
         choices=[
             questionary.Choice("ElevenLabs (Most expressive and lifelike)", value="ElevenLabs"),
-            questionary.Choice("Kokoro (Runs locally, fast, private)", value="Kokoro"),
-            questionary.Choice("System (Basic OS voice fallback)", value="System"),
+            questionary.Choice("Kokoro (Runs locally, fast, private) - Coming Soon", value="Kokoro", disabled="Coming Soon"),
+            questionary.Choice("System (Basic OS voice fallback) - Coming Soon", value="System", disabled="Coming Soon"),
         ],
         qmark="🌸"
     ).ask()
@@ -255,8 +266,12 @@ def models():
     clear_screen()
     config = load_global_config()
     
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
+    llm_key = config.get(active_llm_key_name)
+
     current_state = f"""
-  Mind (LLM):  [magenta]Groq[/magenta]  | Key: [dim]{mask_key(config.get('GROQ_API_KEY', ''))}[/dim]
+  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | Key: [dim]{mask_key(llm_key or '')}[/dim]
   Voice (TTS): [magenta]ElevenLabs[/magenta] | Key: [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
 """
     console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
@@ -274,14 +289,26 @@ def models():
         qmark="🌸"
     ).ask()
     
-    if llm_choice == "Groq":
-        groq_key = questionary.password("New Groq API Key (leave blank to cancel):", qmark="🌸").ask()
-        if groq_key:
-            update_global_config("GROQ_API_KEY", groq_key)
-            console.print(f"\n[green]Mind updated: {mask_key(groq_key)}[/green]")
+    if llm_choice:
+        update_global_config("LLM_PROVIDER", llm_choice)
+        key_env = f"{llm_choice.upper()}_API_KEY"
+        api_key = questionary.password(f"New {llm_choice} API Key (leave blank to cancel):", qmark="🌸").ask()
+        if api_key:
+            update_global_config(key_env, api_key)
+            console.print(f"\n[green]Mind updated: {mask_key(api_key)}[/green]")
             time.sleep(1)
 
     clear_screen()
+    # Reload config
+    config = load_global_config()
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
+    llm_key = config.get(active_llm_key_name)
+
+    current_state = f"""
+  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | Key: [dim]{mask_key(llm_key or '')}[/dim]
+  Voice (TTS): [magenta]ElevenLabs[/magenta] | Key: [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
+"""
     console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
     console.print()
 
@@ -290,8 +317,8 @@ def models():
         "",
         choices=[
             questionary.Choice("ElevenLabs", value="ElevenLabs"),
-            questionary.Choice("Kokoro (Local)", value="Kokoro"),
-            questionary.Choice("System", value="System"),
+            questionary.Choice("Kokoro (Local) - Coming Soon", value="Kokoro", disabled="Coming Soon"),
+            questionary.Choice("System - Coming Soon", value="System", disabled="Coming Soon"),
             questionary.Choice("Keep Current", value=None)
         ],
         qmark="🌸"
@@ -315,7 +342,12 @@ def wake_up():
     Wake Yumi up and start the interaction.
     """
     config = load_global_config()
-    if not config.get("GROQ_API_KEY"):
+    
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
+    llm_key = config.get(active_llm_key_name)
+
+    if not llm_key:
         clear_screen()
         console.print(Panel("[bold red]⚠️ Yumi is missing her senses.[/bold red]", border_style="red", expand=False))
         console.print()

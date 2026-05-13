@@ -11,5 +11,5 @@ wheels/
 .env
 
 Trash/
-Yumi_Avatar/
+src/yumi/Yumi_Avatar/
 src/yumi/webui/test.html
