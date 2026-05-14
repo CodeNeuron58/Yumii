@@ -19,7 +19,7 @@ class YumiSpeaker:
         if not text:
             return None, 0.0
 
-        print(f"Synthesizing voice with ElevenLabs...")
+        print("Synthesizing voice with ElevenLabs...")
         try:
             # Convert text to speech
             response_chunks = self.client.text_to_speech.convert(

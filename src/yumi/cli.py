@@ -2,7 +2,6 @@ import typer
 import questionary
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
 from rich.align import Align
 import webbrowser
 import os
@@ -10,10 +9,9 @@ import time
 import threading
 import uvicorn
 import sys
-from typing import Optional
 
 from yumi.core.global_config import update_global_config, load_global_config
-from yumi.agent.personality_manager import personality_manager, PERSONALITY_TYPE
+from yumi.agent.personality_manager import personality_manager
 
 app = typer.Typer(help="Yumi - Your AI Companion", invoke_without_command=True)
 console = Console()

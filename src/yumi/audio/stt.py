@@ -2,7 +2,6 @@ import sounddevice as sd
 import numpy as np
 import webrtcvad
 import collections
-import wave
 from faster_whisper import WhisperModel
 
 # Configuration
