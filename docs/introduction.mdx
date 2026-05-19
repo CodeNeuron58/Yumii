@@ -1,7 +1,11 @@
 ---
-title: "Introduction"
-description: "Meet Yumi, your real-time AI companion."
+title: "Yumi"
+sidebarTitle: "Overview"
 ---
+
+<div style={{ display: 'inline-block', border: '1px solid #22c55e', color: '#22c55e', padding: '2px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: 'bold', marginBottom: '16px', marginTop: '16px' }}>OVERVIEW</div>
+
+Real-time <span style={{color: '#22c55e'}}>AI companion</span> for terminal-native interaction.
 
 <img
   className="block"
@@ -9,13 +13,44 @@ description: "Meet Yumi, your real-time AI companion."
   alt="Yumi Hero"
 />
 
+<CardGroup cols={4}>
+  <Card
+    title="Get Started"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Install Yumi locally and launch your companion.
+  </Card>
+  <Card
+    title="Voice Setup"
+    icon="waveform-lines"
+    href="/guides/voice-setup"
+  >
+    Configure Voice Activity Detection and TTS.
+  </Card>
+  <Card
+    title="Personalities"
+    icon="face-smile"
+    href="/guides/personalities"
+  >
+    Explore Yumi's personas and emotional tones.
+  </Card>
+  <Card
+    title="Architecture"
+    icon="cube"
+    href="/core-concepts/architecture"
+  >
+    Understand how Yumi's system is built.
+  </Card>
+</CardGroup>
+
 ## What is Yumi?
 
 Yumi is an interactive, real-time AI waifu designed to act as your virtual companion. With dynamic, expressive visuals and an intelligent conversational backend, Yumi provides a highly engaging and responsive experience.
 
 Unlike sterile utility tools, Yumi is built with a focus on presence. She listens, reacts dynamically, and synchronizes her facial expressions to the emotional tone of her thoughts.
 
-### Key Features
+## Key Features
 
 * **Real-time Voice Recognition:** Captures and processes your voice seamlessly using local, low-latency Whisper models.
 * **Lifelike Voice Synthesis:** Utilizes ElevenLabs TTS for incredibly realistic, high-quality, and expressive voice generation.
@@ -26,20 +61,3 @@ Unlike sterile utility tools, Yumi is built with a focus on presence. She listen
 ## The Architecture
 
 Yumi's architecture bridges a powerful Python backend with a reactive frontend. 
-
-<CardGroup cols={2}>
-  <Card
-    title="The Mind (LangGraph)"
-    icon="brain"
-    href="/architecture/overview"
-  >
-    Learn how Yumi processes conversation, memory, and emotions using a state graph.
-  </Card>
-  <Card
-    title="The Senses (Audio)"
-    icon="microphone"
-    href="/architecture/audio-pipeline"
-  >
-    Discover how Voice Activity Detection and Whisper combine for seamless listening.
-  </Card>
-</CardGroup>

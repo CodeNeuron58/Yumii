@@ -3,14 +3,14 @@
   "name": "Yumi",
   "theme": "mint",
   "logo": {
-    "dark": "https://raw.githubusercontent.com/mintlify/themes/main/prism/logo-dark.svg",
-    "light": "https://raw.githubusercontent.com/mintlify/themes/main/prism/logo-light.svg"
+    "dark": "/images/yumi-nav.png",
+    "light": "/images/yumi-nav.png"
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#D946EF",
+    "primary": "#22c55e",
     "light": "#FDF4FF",
-    "dark": "#4A044E"
+    "dark": "#18181b"
   },
   "topbarLinks": [
     {
@@ -30,11 +30,37 @@
           "introduction",
           "quickstart"
         ]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "core-concepts/what-is-yumi",
+          "core-concepts/key-features",
+          "core-concepts/architecture"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/installation",
+          "guides/configuration",
+          "guides/personalities",
+          "guides/voice-setup"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/cli",
+          "reference/api",
+          "reference/events",
+          "reference/environments"
+        ]
       }
     ]
   },
   "footerSocials": {
     "github": "https://github.com/yourusername/yumi",
-    "twitter": "https://twitter.com/yourusername"
+    "discord": "https://discord.gg/yourdiscord"
   }
 }
