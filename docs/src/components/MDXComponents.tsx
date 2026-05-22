@@ -2,8 +2,10 @@ import { MDXRemoteProps } from 'next-mdx-remote/rsc';
 import { Info, AlertCircle, AlertTriangle, ChevronRight, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { CinematicHero } from './CinematicHero';
 
 export const mdxComponents: MDXRemoteProps['components'] = {
+  CinematicHero: () => <CinematicHero />,
   Info: ({ children }) => (
     <div className="my-6 p-4 rounded-xl bg-yumi-green/10 border border-yumi-green/30 text-[#C9D1D9] shadow-sm">
       <div className="flex items-start gap-3">
