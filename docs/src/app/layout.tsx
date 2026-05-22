@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { NavigationSidebar } from "@/components/NavigationSidebar";
 import { TableOfContents } from "@/components/TableOfContents";
 import { PageTransition } from "@/components/PageTransition";
 
-const inter = Inter({ subsets: ["latin"] });
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "Yumi Documentation",
@@ -20,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen flex flex-col antialiased bg-docs-bg text-docs-text`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen flex flex-col antialiased bg-docs-bg text-[#C9D1D9]`}>
         <Header />
 
         <div className="flex-1 flex max-w-[1600px] mx-auto w-full relative">

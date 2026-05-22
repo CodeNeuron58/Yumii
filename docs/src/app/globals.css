@@ -2,12 +2,29 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  
   --color-docs-bg: #0D1117;
   --color-docs-sidebar: #090C10;
   --color-docs-border: #30363d;
   --color-yumi-green: #4ADE80;
   --color-yumi-green-dim: rgba(74, 222, 128, 0.1);
   --color-docs-text-muted: #8B949E;
+}
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.04em;
+  }
+  
+  h1 {
+    letter-spacing: -0.05em;
+  }
+  
+  code, pre, kbd, samp {
+    font-family: var(--font-mono);
+  }
 }
 
 body {

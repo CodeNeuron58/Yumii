@@ -35,7 +35,7 @@ export function Header() {
               type="text"
             />
             <div className="absolute inset-y-0 right-3 flex items-center">
-              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-semibold text-docs-text-muted border border-docs-border rounded bg-docs-bg">
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-mono font-semibold text-docs-text-muted border border-docs-border rounded bg-docs-bg">
                 Ctrl K
               </kbd>
             </div>
