@@ -13,3 +13,6 @@ wheels/
 Trash/
 src/yumi/Yumi_Avatar/
 src/yumi/webui/test.html
+
+# Old docs backup
+docs-old/
