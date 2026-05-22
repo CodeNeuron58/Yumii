@@ -1,6 +1,7 @@
 import { MDXRemoteProps } from 'next-mdx-remote/rsc';
 import { Info, AlertCircle, AlertTriangle, ChevronRight, FileText } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export const mdxComponents: MDXRemoteProps['components'] = {
   Info: ({ children }) => (
@@ -76,7 +77,7 @@ export const mdxComponents: MDXRemoteProps['components'] = {
     </details>
   ),
   img: (props) => (
-    <img {...props} alt={props.alt || "Documentation image"} className="rounded-xl border border-[#30363d] my-8 w-full object-cover shadow-sm" />
+    <img {...props} alt={props.alt || "Documentation image"} className={cn("rounded-xl border border-[#30363d] my-8 w-full object-cover shadow-sm", props.className)} />
   ),
   a: (props) => {
     const isInternal = props.href?.startsWith('/') || props.href?.startsWith('#');
