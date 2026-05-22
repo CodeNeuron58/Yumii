@@ -6,26 +6,7 @@ import { Terminal, Layers, ArrowRight, Sparkles, Activity, Shield, Cpu } from "l
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen flex flex-col items-center overflow-hidden bg-docs-bg">
-      {/* 
-        =========================================
-        PHASE 1 & 2: ATMOSPHERIC BACKGROUND EFFECTS
-        =========================================
-      */}
-      <div className="absolute inset-0 z-0 pointer-events-none flex justify-center">
-        {/* 1. Subtle Grid Overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_10%,#000_40%,transparent_100%)]"></div>
-        
-        {/* 2. Grain/Noise Texture for Depth */}
-        <div 
-          className="absolute inset-0 opacity-[0.03] mix-blend-overlay" 
-          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}
-        ></div>
-
-        {/* 3. Radial Green Glow */}
-        <div className="absolute top-0 w-full max-w-3xl h-[600px] bg-yumi-green/5 blur-[120px] rounded-full translate-y-[-20%]"></div>
-      </div>
-
+    <div className="relative flex flex-col items-center">
       <article className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-32">
         {/* 
           =========================================
