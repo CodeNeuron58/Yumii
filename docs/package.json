@@ -1,34 +1,29 @@
 {
-  "name": "docs-v2",
+  "name": "quirky-euclid",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint"
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "framer-motion": "^12.39.0",
     "gray-matter": "^4.0.3",
-    "lucide-react": "^1.16.0",
-    "next": "16.2.6",
-    "next-mdx-remote": "^6.0.0",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "rehype-slug": "^6.0.0",
-    "tailwind-merge": "^3.6.0"
+    "lucide-react": "^0.395.0",
+    "next": "14.2.4",
+    "next-mdx-remote": "^5.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "sonner": "^2.0.7"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@tailwindcss/typography": "^0.5.19",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.6",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@types/node": "^20.14.9",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.4",
+    "typescript": "^5.4.5"
   }
 }

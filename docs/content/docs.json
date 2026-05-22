@@ -1,0 +1,83 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Yumi",
+  "theme": "maple",
+  "fonts": {
+    "family": "Geist",
+    "heading": {
+      "family": "Geist"
+    },
+    "body": {
+      "family": "Geist"
+    },
+    "mono": {
+      "family": "Geist Mono"
+    }
+  },
+  "styling": {
+    "css": ["style.css"]
+  },
+  "logo": {
+    "dark": "/images/yumi-nav.png",
+    "light": "/images/yumi-nav.png"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#22c55e",
+    "light": "#ffffff",
+    "dark": "#0d1117"
+  },
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/yourusername/yumi"
+    },
+    {
+      "name": "Discord",
+      "icon": "discord",
+      "url": "https://discord.gg/yourdiscord"
+    }
+  ],
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "core-concepts/what-is-yumi",
+          "core-concepts/key-features",
+          "core-concepts/architecture"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/installation",
+          "guides/configuration",
+          "guides/personalities",
+          "guides/voice-setup"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/cli",
+          "reference/api",
+          "reference/events",
+          "reference/environments"
+        ]
+      }
+    ]
+  },
+  "footerSocials": {
+    "github": "https://github.com/yourusername/yumi",
+    "discord": "https://discord.gg/yourdiscord"
+  }
+}

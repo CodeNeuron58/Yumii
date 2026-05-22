@@ -16,3 +16,6 @@ src/yumi/webui/test.html
 
 # Old docs backup
 docs-old/
+
+# Documentation Journey
+docs/thought_process.md
