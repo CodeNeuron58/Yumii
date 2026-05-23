@@ -36,10 +36,9 @@ def build_graph(broadcast_callback: Callable):
         
     def speak_node(state: MainState):
         response_text = state["response"]
-        expression = state.get("expression", "LOST")
-        motion = state.get("motion", "LOST")
-        
-        print(f"\nDEBUG: Flow to speak node! raw expr={expression}, raw mot={motion}\n")
+        expression = state.get("expression", "normal")
+        motion = state.get("motion", "idle")
+
         print(f"Yumi: {response_text}")
         print(f"[{expression} | {motion}]")
         
