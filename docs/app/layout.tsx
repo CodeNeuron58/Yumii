@@ -3,7 +3,7 @@ import "../style.css";
 import ThemeToggle from "./ThemeToggle";
 import DiscordLink from "./DiscordLink";
 import { Toaster } from 'sonner';
-import Link from "next/link";
+
 
 export const metadata: Metadata = {
   title: "Yumi Documentation",
@@ -25,13 +25,13 @@ export default function RootLayout({
       <body>
         <div className="app-container">
           <header className="top-nav">
-            <Link href="/" className="logo" style={{ textDecoration: 'none' }}>
+            <a href="https://yumii-six.vercel.app/" className="logo" style={{ textDecoration: 'none' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect width="24" height="24" rx="6" fill="#4ade80"/>
                 <path d="M7 12L12 7L17 12H7Z" fill="#121212"/>
               </svg>
               <span>Yumi</span>
-            </Link>
+            </a>
             <div className="search-bar">
               <button className="search-input">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
