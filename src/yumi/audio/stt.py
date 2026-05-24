@@ -164,11 +164,12 @@ class AudioPipeline:
                 indata = audio_q.get()
                 audio_f32 = indata.flatten()          # float32, -1..1
 
-                # ── Gate 1: RMS energy ──────────────────────────────────
-                # If the frame is nearly silent, skip VAD entirely.
-                if rms_energy(audio_f32) < RMS_ENERGY_GATE:
-                    if not triggered:
-                        pre_buffer.append((float_to_pcm16(audio_f32), False))
+                # ── Gate 1: RMS energy (pre-trigger only) ─────────────────
+                # Skip near-silent frames ONLY before speech has started.
+                # Once triggered, we record EVERYTHING — dropping quiet frames
+                # during speech creates holes in the audio that break Whisper.
+                if not triggered and rms_energy(audio_f32) < RMS_ENERGY_GATE:
+                    pre_buffer.append((float_to_pcm16(audio_f32), False))
                     continue
 
                 # ── Gate 2: Silero VAD ──────────────────────────────────
@@ -226,10 +227,10 @@ class AudioPipeline:
 
         segments, info = self.model.transcribe(
             audio_float,
-            beam_size=5,
-            # Explicitly tell Whisper not to hallucinate on silence
+            # beam_size=1 (greedy) is 3-5x faster than beam_size=5 on CPU
+            # with negligible accuracy loss for clean speech. Latency matters.
+            beam_size=1,
             condition_on_previous_text=False,
-            # Suppress common Whisper hallucinations on noise
             suppress_blank=True,
             no_speech_threshold=NO_SPEECH_PROB_THRESHOLD,
         )
