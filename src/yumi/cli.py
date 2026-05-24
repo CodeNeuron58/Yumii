@@ -11,6 +11,9 @@ import uvicorn
 import sys
 
 from yumi.core.global_config import update_global_config, load_global_config
+from yumi.core.credential_store import (
+    get_credential, save_credential, is_set, keychain_name,
+)
 from yumi.agent.personality_manager import personality_manager
 
 app = typer.Typer(help="Yumi - Your AI Companion", invoke_without_command=True)
@@ -70,32 +73,39 @@ def show_story():
 def dashboard():
     clear_screen()
     config = load_global_config()
-    
-    # Status Panel
-    llm_provider = config.get("LLM_PROVIDER", "Groq")
-    active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
-    llm_key = config.get(active_llm_key_name)
-    llm_status = "🟢" if llm_key else "🔴"
 
-    eleven_key = config.get("ELEVENLABS_API_KEY")
-    voice_id   = config.get("ELEVENLABS_VOICE_ID")
-    # 🟢 = key + voice ID ready | 🟡 = key set but voice ID missing | 🔴 = no key
+    # Preferences live in config.json; secrets come from the OS keychain.
+    llm_provider       = config.get("LLM_PROVIDER", "Groq")
+    active_key_name    = f"{llm_provider.upper()}_API_KEY"
+    llm_key            = get_credential(active_key_name)
+    llm_status         = "🔐 Keychain" if llm_key else "🔴 Not set"
+
+    eleven_key  = get_credential("ELEVENLABS_API_KEY")
+    voice_id    = get_credential("ELEVENLABS_VOICE_ID")
     if eleven_key and voice_id:
-        eleven_status = "🟢"
-        voice_line = f"Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(eleven_key)}[/dim]  Voice ID: [dim]{voice_id[:6]}...[/dim]"
+        eleven_status = "🔐 Keychain"
+        voice_line = (
+            f"Voice (ElevenLabs): {eleven_status}  "
+            f"[dim]{mask_key(eleven_key)}[/dim]  "
+            f"Voice ID: [dim]{voice_id[:6]}...[/dim]"
+        )
     elif eleven_key:
-        eleven_status = "🟡"
-        voice_line = f"Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(eleven_key)}[/dim]  [yellow]Voice ID not set — go to ⚙️ Configure Senses[/yellow]"
+        eleven_status = "🟡 Keychain"
+        voice_line = (
+            f"Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(eleven_key)}[/dim]  "
+            f"[yellow]Voice ID not set — go to ⚙️ Configure Senses[/yellow]"
+        )
     else:
-        eleven_status = "🔴"
-        voice_line = f"Voice (ElevenLabs): {eleven_status}  [dim]Not configured[/dim]"
+        voice_line = "Voice (ElevenLabs): 🔴  [dim]Not configured[/dim]"
 
     personality = config.get("PERSONALITY", "caring")
+    kcn         = keychain_name()
 
     status_text = f"""
   Mind ({llm_provider}):  {llm_status}  [dim]{mask_key(llm_key or '')}[/dim]
   {voice_line}
-  Personality: [magenta]{personality}[/magenta]
+  Personality:  [magenta]{personality}[/magenta]
+  Keychain:     [dim]{kcn}[/dim]
 """
     console.print(Panel(status_text, title="[bold magenta]🌸 Yumi Dashboard 🌸[/bold magenta]", border_style="magenta", expand=False))
     console.print()
@@ -131,12 +141,10 @@ def main(ctx: typer.Context):
     Yumi - More than just code, a companion.
     """
     if ctx.invoked_subcommand is None:
-        config = load_global_config()
-        # First-Run Auto-Detection
-        llm_provider = config.get("LLM_PROVIDER", "Groq")
-        active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
-        has_mind = bool(config.get(active_llm_key_name))
-        has_voice = bool(config.get("ELEVENLABS_API_KEY"))
+        config          = load_global_config()
+        llm_provider    = config.get("LLM_PROVIDER", "Groq")
+        has_mind        = is_set(f"{llm_provider.upper()}_API_KEY")
+        has_voice       = is_set("ELEVENLABS_API_KEY")
 
         if not has_mind and not has_voice:
             clear_screen()
@@ -183,8 +191,8 @@ def attune():
     key_env = f"{llm_choice.upper()}_API_KEY"
     api_key = questionary.password(f"Connect her mind ({llm_choice} API Key):", qmark="🌸").ask()
     if api_key:
-        update_global_config(key_env, api_key)
-        console.print(f"\n[green]Mind connected: {mask_key(api_key)}[/green]")
+        save_credential(key_env, api_key)
+        console.print(f"\n[🔐] [green]Mind secured in {keychain_name()}: {mask_key(api_key)}[/green]")
         time.sleep(1)
 
     clear_screen()
@@ -208,8 +216,8 @@ def attune():
     if tts_choice == "ElevenLabs":
         elevenlabs_key = questionary.password("Give her a voice (ElevenLabs API Key):", qmark="🌸").ask()
         if elevenlabs_key:
-            update_global_config("ELEVENLABS_API_KEY", elevenlabs_key)
-            console.print(f"\n[green]Voice granted: {mask_key(elevenlabs_key)}[/green]")
+            save_credential("ELEVENLABS_API_KEY", elevenlabs_key)
+            console.print(f"\n[🔐] [green]Voice secured in {keychain_name()}: {mask_key(elevenlabs_key)}[/green]")
             time.sleep(1)
 
         console.print()
@@ -220,8 +228,8 @@ def attune():
             qmark="🌸"
         ).ask()
         if voice_id and voice_id.strip():
-            update_global_config("ELEVENLABS_VOICE_ID", voice_id.strip())
-            console.print(f"\n[green]Voice ID saved ✅[/green]")
+            save_credential("ELEVENLABS_VOICE_ID", voice_id.strip())
+            console.print(f"\n[🔐] [green]Voice ID secured in {keychain_name()} ✅[/green]")
             time.sleep(1)
 
     clear_screen()
@@ -288,13 +296,15 @@ def models():
     clear_screen()
     config = load_global_config()
     
-    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    llm_provider        = config.get("LLM_PROVIDER", "Groq")
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
-    llm_key = config.get(active_llm_key_name)
+    llm_key             = get_credential(active_llm_key_name)
+    kcn                 = keychain_name()
 
     current_state = f"""
-  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | Key: [dim]{mask_key(llm_key or '')}[/dim]
-  Voice (TTS): [magenta]ElevenLabs[/magenta] | Key: [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
+  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | 🔐 {mask_key(llm_key or '')}
+  Voice (TTS): [magenta]ElevenLabs[/magenta] | 🔐 {mask_key(get_credential('ELEVENLABS_API_KEY') or '')}
+  Keychain: [dim]{kcn}[/dim]
 """
     console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
     console.print()
@@ -314,24 +324,24 @@ def models():
     if llm_choice:
         update_global_config("LLM_PROVIDER", llm_choice)
         key_env = f"{llm_choice.upper()}_API_KEY"
-        api_key = questionary.password(f"New {llm_choice} API Key (leave blank to cancel):", qmark="🌸").ask()
+        api_key = questionary.password(f"New {llm_choice} API Key (leave blank to keep current):", qmark="🌸").ask()
         if api_key:
-            update_global_config(key_env, api_key)
-            console.print(f"\n[green]Mind updated: {mask_key(api_key)}[/green]")
+            save_credential(key_env, api_key)
+            console.print(f"\n[🔐] [green]Mind secured: {mask_key(api_key)}[/green]")
             time.sleep(1)
 
     clear_screen()
-    # Reload config
-    config = load_global_config()
-    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    config              = load_global_config()
+    llm_provider        = config.get("LLM_PROVIDER", "Groq")
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
-    llm_key = config.get(active_llm_key_name)
-    voice_id = config.get("ELEVENLABS_VOICE_ID", "")
+    llm_key             = get_credential(active_llm_key_name)
+    voice_id            = get_credential("ELEVENLABS_VOICE_ID") or ""
 
     current_state = f"""
-  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | Key: [dim]{mask_key(llm_key or '')}[/dim]
-  Voice (TTS): [magenta]ElevenLabs[/magenta] | Key: [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
+  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | 🔐 {mask_key(llm_key or '')}
+  Voice (TTS): [magenta]ElevenLabs[/magenta] | 🔐 {mask_key(get_credential('ELEVENLABS_API_KEY') or '')}
   Voice ID:    [magenta]{voice_id[:6] + '...' if voice_id else '[yellow]Not set[/yellow]'}[/magenta]
+  Keychain: [dim]{kcn}[/dim]
 """
     console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
     console.print()
@@ -351,8 +361,8 @@ def models():
     if tts_choice == "ElevenLabs":
         elevenlabs_key = questionary.password("New ElevenLabs API Key (leave blank to keep current):", qmark="🌸").ask()
         if elevenlabs_key:
-            update_global_config("ELEVENLABS_API_KEY", elevenlabs_key)
-            console.print(f"\n[green]Voice updated: {mask_key(elevenlabs_key)}[/green]")
+            save_credential("ELEVENLABS_API_KEY", elevenlabs_key)
+            console.print(f"\n[🔐] [green]Voice secured: {mask_key(elevenlabs_key)}[/green]")
             time.sleep(1)
 
         console.print()
@@ -363,8 +373,8 @@ def models():
             qmark="🌸"
         ).ask()
         if new_voice_id and new_voice_id.strip():
-            update_global_config("ELEVENLABS_VOICE_ID", new_voice_id.strip())
-            console.print(f"\n[green]Voice ID updated ✅[/green]")
+            save_credential("ELEVENLABS_VOICE_ID", new_voice_id.strip())
+            console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
             time.sleep(1)
 
     clear_screen()
@@ -377,11 +387,9 @@ def wake_up():
     """
     Wake Yumi up and start the interaction.
     """
-    config = load_global_config()
-    
-    llm_provider = config.get("LLM_PROVIDER", "Groq")
-    active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
-    llm_key = config.get(active_llm_key_name)
+    config          = load_global_config()
+    llm_provider    = config.get("LLM_PROVIDER", "Groq")
+    llm_key         = get_credential(f"{llm_provider.upper()}_API_KEY")
 
     if not llm_key:
         clear_screen()
