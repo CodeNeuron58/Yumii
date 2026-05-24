@@ -76,13 +76,25 @@ def dashboard():
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
     llm_key = config.get(active_llm_key_name)
     llm_status = "🟢" if llm_key else "🔴"
-    
-    eleven_status = "🟢" if config.get("ELEVENLABS_API_KEY") else "🔴"
+
+    eleven_key = config.get("ELEVENLABS_API_KEY")
+    voice_id   = config.get("ELEVENLABS_VOICE_ID")
+    # 🟢 = key + voice ID ready | 🟡 = key set but voice ID missing | 🔴 = no key
+    if eleven_key and voice_id:
+        eleven_status = "🟢"
+        voice_line = f"Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(eleven_key)}[/dim]  Voice ID: [dim]{voice_id[:6]}...[/dim]"
+    elif eleven_key:
+        eleven_status = "🟡"
+        voice_line = f"Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(eleven_key)}[/dim]  [yellow]Voice ID not set — go to ⚙️ Configure Senses[/yellow]"
+    else:
+        eleven_status = "🔴"
+        voice_line = f"Voice (ElevenLabs): {eleven_status}  [dim]Not configured[/dim]"
+
     personality = config.get("PERSONALITY", "caring")
-    
+
     status_text = f"""
   Mind ({llm_provider}):  {llm_status}  [dim]{mask_key(llm_key or '')}[/dim]
-  Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
+  {voice_line}
   Personality: [magenta]{personality}[/magenta]
 """
     console.print(Panel(status_text, title="[bold magenta]🌸 Yumi Dashboard 🌸[/bold magenta]", border_style="magenta", expand=False))
@@ -200,6 +212,18 @@ def attune():
             console.print(f"\n[green]Voice granted: {mask_key(elevenlabs_key)}[/green]")
             time.sleep(1)
 
+        console.print()
+        console.print("[dim]Find Voice IDs at: https://elevenlabs.io/voice-library[/dim]")
+        console.print("[dim]A Voice ID looks like: 21m00Tcm4TlvDq8ikWAM[/dim]")
+        voice_id = questionary.text(
+            "Enter your ElevenLabs Voice ID:",
+            qmark="🌸"
+        ).ask()
+        if voice_id and voice_id.strip():
+            update_global_config("ELEVENLABS_VOICE_ID", voice_id.strip())
+            console.print(f"\n[green]Voice ID saved ✅[/green]")
+            time.sleep(1)
+
     clear_screen()
     success_msg = Panel(
         Align.center("[bold green]✅ Attunement complete![/bold green]\n\nYumi is ready to wake up."),
@@ -302,10 +326,12 @@ def models():
     llm_provider = config.get("LLM_PROVIDER", "Groq")
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
     llm_key = config.get(active_llm_key_name)
+    voice_id = config.get("ELEVENLABS_VOICE_ID", "")
 
     current_state = f"""
   Mind (LLM):  [magenta]{llm_provider}[/magenta]  | Key: [dim]{mask_key(llm_key or '')}[/dim]
   Voice (TTS): [magenta]ElevenLabs[/magenta] | Key: [dim]{mask_key(config.get('ELEVENLABS_API_KEY', ''))}[/dim]
+  Voice ID:    [magenta]{voice_id[:6] + '...' if voice_id else '[yellow]Not set[/yellow]'}[/magenta]
 """
     console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
     console.print()
@@ -321,12 +347,24 @@ def models():
         ],
         qmark="🌸"
     ).ask()
-    
+
     if tts_choice == "ElevenLabs":
-        elevenlabs_key = questionary.password("New ElevenLabs API Key (leave blank to cancel):", qmark="🌸").ask()
+        elevenlabs_key = questionary.password("New ElevenLabs API Key (leave blank to keep current):", qmark="🌸").ask()
         if elevenlabs_key:
             update_global_config("ELEVENLABS_API_KEY", elevenlabs_key)
             console.print(f"\n[green]Voice updated: {mask_key(elevenlabs_key)}[/green]")
+            time.sleep(1)
+
+        console.print()
+        console.print(f"[dim]Current Voice ID: {voice_id or 'Not set'}[/dim]")
+        console.print("[dim]Find Voice IDs at: https://elevenlabs.io/voice-library[/dim]")
+        new_voice_id = questionary.text(
+            "New Voice ID (leave blank to keep current):",
+            qmark="🌸"
+        ).ask()
+        if new_voice_id and new_voice_id.strip():
+            update_global_config("ELEVENLABS_VOICE_ID", new_voice_id.strip())
+            console.print(f"\n[green]Voice ID updated ✅[/green]")
             time.sleep(1)
 
     clear_screen()

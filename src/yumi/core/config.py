@@ -12,6 +12,7 @@ for key, value in _global_config.items():
 
 class Settings(BaseSettings):
     elevenlabs_api_key: str | None = Field(default=None, alias='ELEVENLABS_API_KEY')
+    elevenlabs_voice_id: str | None = Field(default=None, alias='ELEVENLABS_VOICE_ID')
     llm_provider: str = Field(default="Groq", alias='LLM_PROVIDER')
     groq_api_key: str | None = Field(default=None, alias='GROQ_API_KEY')
     openai_api_key: str | None = Field(default=None, alias='OPENAI_API_KEY')
