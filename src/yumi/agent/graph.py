@@ -6,10 +6,19 @@ from yumi.audio.stt import AudioPipeline
 from yumi.tts.speaker import YumiSpeaker
 from yumi.agent.nodes import chat_node
 from yumi.agent.state import MainState
+from yumi.core.config import settings
 
 def build_graph(broadcast_callback: Callable):
-    print("Initializing Yumi Audio Pipeline...")
-    pipeline = AudioPipeline()
+    stt_provider   = settings.stt_provider        # "local" or "groq"
+    model_size     = settings.whisper_model_size   # "tiny" / "base" / "small"
+    groq_api_key   = settings.groq_api_key         # used only when provider == "groq"
+
+    print(f"Initializing Yumi Audio Pipeline (STT: {stt_provider})...")
+    pipeline = AudioPipeline(
+        provider=stt_provider,
+        model_size=model_size,
+        groq_api_key=groq_api_key,
+    )
 
     print("Initializing Yumi Speaker (TTS)...")
     speaker = YumiSpeaker()

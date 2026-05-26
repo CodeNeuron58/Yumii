@@ -1,42 +1,25 @@
+import io
 import queue
+import wave
 import collections
 import numpy as np
 import sounddevice as sd
 import torch
-from faster_whisper import WhisperModel
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 RATE       = 16000
 # Silero VAD requires EXACTLY 512 samples per chunk at 16 kHz (32 ms).
-# Do NOT compute this from FRAME_DURATION — the math must land on 512.
 FRAME_SIZE = 512
 CHANNELS   = 1
 
 # --- Thresholds (tune these if needed) ---
-# How many of the last 15 frames must be speech to START recording
-SPEECH_TRIGGER_FRAMES = 8      # was 6 (40%) — now 8 (53%). Harder to trigger.
-# How many of the last 15 frames must be silent to STOP recording
-SILENCE_END_FRAMES    = 12
-
-# Minimum recorded audio duration to attempt transcription (seconds).
-# Anything shorter is almost certainly a noise burst, not a real sentence.
-MIN_SPEECH_DURATION_SEC = 0.7  # 700 ms
-
-# Silero VAD confidence threshold — frames with probability below this are
-# treated as non-speech. 0.5 is the default; raise to 0.6-0.7 for noisier
-# environments.
-SILERO_THRESHOLD = 0.5
-
-# RMS energy gate — audio frames quieter than this are skipped before even
-# going through VAD. This catches very-low-amplitude background noise.
-# Range: 0.0–1.0 (float32 normalised). 0.01 ≈ barely audible.
-RMS_ENERGY_GATE = 0.008
-
-# Whisper no_speech_prob threshold — if Whisper itself thinks there was no
-# real speech in the segment, we discard it instead of returning hallucinated
-# text.
+SPEECH_TRIGGER_FRAMES    = 8    # of last 15 frames must be speech to START
+SILENCE_END_FRAMES       = 12   # of last 15 frames must be silent to STOP
+MIN_SPEECH_DURATION_SEC  = 0.7  # anything < 700 ms is likely noise
+SILERO_THRESHOLD         = 0.5  # Silero speech-probability cutoff
+RMS_ENERGY_GATE          = 0.008
 NO_SPEECH_PROB_THRESHOLD = 0.45
 
 
@@ -64,6 +47,17 @@ def rms_energy(audio_float32: np.ndarray) -> float:
     return float(np.sqrt(np.mean(audio_float32 ** 2)))
 
 
+def _pcm16_to_wav_bytes(audio_int16: np.ndarray, sample_rate: int = RATE) -> bytes:
+    """Encode a int16 numpy array as an in-memory WAV file and return raw bytes."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)          # int16 = 2 bytes per sample
+        wf.setframerate(sample_rate)
+        wf.writeframes(audio_int16.tobytes())
+    return buf.getvalue()
+
+
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
@@ -72,28 +66,35 @@ class AudioPipeline:
     """
     Voice-activity-detection + Whisper STT pipeline.
 
-    Improvements over the original implementation:
-      1. Silero VAD (neural) instead of WebRTC VAD (rule-based) →
-         far fewer false triggers on keyboard clicks, fan noise, etc.
-      2. RMS energy pre-gate → ultra-quiet frames are rejected before VAD.
-      3. Minimum utterance duration gate → noise bursts < 700 ms are dropped.
-      4. no_speech_prob filter → Whisper's own confidence score gates output,
-         preventing hallucinated text on near-silent audio.
-      5. Trigger threshold raised from 6/15 → 8/15 frames.
+    Supports two transcription backends:
+      - "local"  : faster-whisper running on CPU (private, no API key needed)
+      - "groq"   : Groq Whisper API (cloud, ~5-10x faster, requires GROQ_API_KEY)
+
+    Silero VAD is used for speech detection in BOTH modes — the only difference
+    is what happens after the audio is captured.
+
+    Noise-rejection stack (shared by both backends):
+      1. RMS energy pre-gate (pre-trigger only) → blocks fan/AC hum
+      2. Silero VAD per-frame probability       → neural speech detection
+      3. Minimum utterance duration gate        → drops bursts < 700 ms
+      4. no_speech_prob filter (local only)     → Whisper hallucination guard
     """
 
-    def __init__(self, model_size: str = "base"):
-        # --- Whisper ---
-        print(f"Loading Whisper model ({model_size})...")
-        self.model = WhisperModel(model_size, device="cpu", compute_type="int8")
-        print("Whisper model loaded.")
+    # ------------------------------------------------------------------
+    # Init
+    # ------------------------------------------------------------------
 
-        # --- Silero VAD ---
+    def __init__(
+        self,
+        provider: str = "local",
+        model_size: str = "base",
+        groq_api_key: str | None = None,
+    ):
+        self.provider = provider.lower()
+
+        # Silero VAD is always loaded — it drives speech detection for both modes.
         print("Loading Silero VAD...")
-        # trust_repo=True suppresses the interactive "do you trust this repo?"
-        # prompt that would block a non-interactive / first-run startup.
-        # Silero VAD is a widely-used, well-audited library — safe to trust.
-        self._silero_model, self._silero_utils = torch.hub.load(
+        self._silero_model, _ = torch.hub.load(
             repo_or_dir="snakers4/silero-vad",
             model="silero_vad",
             force_reload=False,
@@ -101,41 +102,57 @@ class AudioPipeline:
             verbose=False,
             trust_repo=True,
         )
-        # We only need the model itself for per-frame probability inference.
-        # No VADIterator needed — we do our own trigger logic below.
         self._silero_model.reset_states()
-        print("Silero VAD loaded. Audio pipeline ready.")
+        print("Silero VAD loaded.")
+
+        if self.provider == "groq":
+            self._init_groq(groq_api_key)
+        else:
+            self._init_local_whisper(model_size)
+
+        print("Audio pipeline ready.")
+
+    def _init_local_whisper(self, model_size: str) -> None:
+        from faster_whisper import WhisperModel
+        print(f"Loading Whisper model ({model_size}) on CPU...")
+        self._whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
+        print(f"Whisper model ({model_size}) loaded.")
+
+    def _init_groq(self, api_key: str | None) -> None:
+        from groq import Groq
+        if not api_key:
+            raise ValueError(
+                "\n\n  ❌  No Groq API key configured for Groq STT.\n"
+                "  Run 'yumi attune' or open ⚙️ Configure Senses → Listening Settings.\n"
+            )
+        self._groq_client = Groq(api_key=api_key)
+        print("Groq Whisper STT ready (whisper-large-v3-turbo).")
 
     # ------------------------------------------------------------------
-    # Internal: per-frame Silero speech probability
+    # Silero VAD helpers
     # ------------------------------------------------------------------
 
     def _is_speech_silero(self, audio_float32_frame: np.ndarray) -> bool:
         """
         Run one 512-sample (32 ms) float32 frame through Silero.
-
-        Silero requires EXACTLY 512 samples at 16 kHz — feeding fewer
-        samples raises "Input audio chunk is too short".
         Returns True if speech probability >= SILERO_THRESHOLD.
         """
-        # Model expects a 1-D float32 tensor: shape [512]
         tensor = torch.FloatTensor(audio_float32_frame)
         with torch.no_grad():
             prob = self._silero_model(tensor, RATE).item()
         return prob >= SILERO_THRESHOLD
 
-    def _reset_vad(self):
+    def _reset_vad(self) -> None:
         """Reset Silero's internal hidden state between utterances."""
         self._silero_model.reset_states()
 
     # ------------------------------------------------------------------
-    # Capture
+    # Capture (shared by both backends)
     # ------------------------------------------------------------------
 
     def listen_and_capture(self) -> np.ndarray:
         """
         Block until a complete utterance is captured.
-
         Returns int16 PCM numpy array, or an empty array if nothing was heard.
         """
         print("Listening...")
@@ -161,20 +178,20 @@ class AudioPipeline:
             callback=_callback,
         ):
             while True:
-                indata = audio_q.get()
-                audio_f32 = indata.flatten()          # float32, -1..1
+                indata   = audio_q.get()
+                audio_f32 = indata.flatten()
 
-                # ── Gate 1: RMS energy (pre-trigger only) ─────────────────
+                # ── Gate 1: RMS energy (pre-trigger only) ──────────────
                 # Skip near-silent frames ONLY before speech has started.
-                # Once triggered, we record EVERYTHING — dropping quiet frames
-                # during speech creates holes in the audio that break Whisper.
+                # Once triggered we record EVERYTHING — dropping quiet frames
+                # during speech creates holes that break transcription.
                 if not triggered and rms_energy(audio_f32) < RMS_ENERGY_GATE:
                     pre_buffer.append((float_to_pcm16(audio_f32), False))
                     continue
 
                 # ── Gate 2: Silero VAD ──────────────────────────────────
                 is_speech = self._is_speech_silero(audio_f32)
-                pcm16 = float_to_pcm16(audio_f32)
+                pcm16     = float_to_pcm16(audio_f32)
 
                 if not triggered:
                     pre_buffer.append((pcm16, is_speech))
@@ -205,27 +222,35 @@ class AudioPipeline:
         return normalize_audio(audio)
 
     # ------------------------------------------------------------------
-    # Transcribe
+    # Transcription — dispatches to the correct backend
     # ------------------------------------------------------------------
 
     def transcribe(self, audio_data: np.ndarray) -> str:
         """
-        Run faster-whisper on int16 PCM audio.
+        Transcribe int16 PCM audio.
 
         Returns the transcribed string, or an empty string if:
           - The audio is too short (< MIN_SPEECH_DURATION_SEC).
-          - Whisper's no_speech_prob is too high (hallucination guard).
+          - Whisper's no_speech_prob is too high (local mode only).
+          - An API error occurs (Groq mode).
         """
-        # ── Gate 3: Minimum duration ────────────────────────────────────
+        # ── Gate 3: Minimum duration (both backends) ────────────────────
         duration_sec = len(audio_data) / RATE
         if duration_sec < MIN_SPEECH_DURATION_SEC:
             print(f"⚠  Audio too short ({duration_sec:.2f}s < {MIN_SPEECH_DURATION_SEC}s), skipping.")
             return ""
 
+        if self.provider == "groq":
+            return self._transcribe_groq(audio_data)
+        else:
+            return self._transcribe_local(audio_data)
+
+    def _transcribe_local(self, audio_data: np.ndarray) -> str:
+        """Transcribe using faster-whisper on CPU (private, offline)."""
         # faster-whisper expects float32 in [-1, 1]
         audio_float = audio_data.astype(np.float32) / 32768.0
 
-        segments, info = self.model.transcribe(
+        segments, _ = self._whisper.transcribe(
             audio_float,
             # beam_size=1 (greedy) is 3-5x faster than beam_size=5 on CPU
             # with negligible accuracy loss for clean speech. Latency matters.
@@ -235,7 +260,7 @@ class AudioPipeline:
             no_speech_threshold=NO_SPEECH_PROB_THRESHOLD,
         )
 
-        # ── Gate 4: no_speech_prob per segment ─────────────────────────
+        # ── Gate 4: no_speech_prob per segment (local only) ────────────
         text_parts = []
         for segment in segments:
             if segment.no_speech_prob > NO_SPEECH_PROB_THRESHOLD:
@@ -247,6 +272,26 @@ class AudioPipeline:
             text_parts.append(segment.text)
 
         return "".join(text_parts).strip()
+
+    def _transcribe_groq(self, audio_data: np.ndarray) -> str:
+        """
+        Transcribe by sending the captured WAV buffer to Groq's Whisper API.
+
+        Groq runs whisper-large-v3-turbo on LPU hardware — typical response
+        time is 100-300ms for a 5-second sentence (vs 1-2s locally on CPU).
+        """
+        try:
+            wav_bytes = _pcm16_to_wav_bytes(audio_data)
+            result = self._groq_client.audio.transcriptions.create(
+                file=("audio.wav", wav_bytes),
+                model="whisper-large-v3-turbo",
+                response_format="text",
+                language="en",
+            )
+            return result.strip() if result else ""
+        except Exception as e:
+            print(f"❌  Groq STT error: {e}")
+            return ""
 
     # ------------------------------------------------------------------
     # Full cycle

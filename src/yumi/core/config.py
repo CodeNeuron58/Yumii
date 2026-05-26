@@ -24,11 +24,14 @@ for key, value in _creds.items():
 class Settings(BaseSettings):
     elevenlabs_api_key:  str | None = Field(default=None, alias='ELEVENLABS_API_KEY')
     elevenlabs_voice_id: str | None = Field(default=None, alias='ELEVENLABS_VOICE_ID')
-    llm_provider:        str        = Field(default="Groq",   alias='LLM_PROVIDER')
+    llm_provider:        str        = Field(default="Groq",    alias='LLM_PROVIDER')
     groq_api_key:        str | None = Field(default=None, alias='GROQ_API_KEY')
     openai_api_key:      str | None = Field(default=None, alias='OPENAI_API_KEY')
     anthropic_api_key:   str | None = Field(default=None, alias='ANTHROPIC_API_KEY')
-    personality:         str        = Field(default="caring", alias='PERSONALITY')
+    personality:         str        = Field(default="caring",  alias='PERSONALITY')
+    # STT configuration
+    stt_provider:        str        = Field(default="local",   alias='STT_PROVIDER')
+    whisper_model_size:  str        = Field(default="base",    alias='WHISPER_MODEL_SIZE')
 
     # No env_file — project-local .env files must never shadow user config.
     # All values come from os.environ (populated above from keychain + config.json).

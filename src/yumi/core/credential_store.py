@@ -34,6 +34,8 @@ PREFERENCE_KEYS: frozenset[str] = frozenset({
     "LLM_PROVIDER",
     "PERSONALITY",
     "TTS_PROVIDER",
+    "STT_PROVIDER",
+    "WHISPER_MODEL_SIZE",
     "COMPUTE_PROFILE",
 })
 

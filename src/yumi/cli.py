@@ -98,12 +98,22 @@ def dashboard():
     else:
         voice_line = "Voice (ElevenLabs): 🔴  [dim]Not configured[/dim]"
 
+    # STT status line
+    stt_provider = config.get("STT_PROVIDER", "local")
+    if stt_provider == "groq":
+        groq_key     = get_credential("GROQ_API_KEY")
+        stt_status   = "🔐 Keychain (Groq Whisper)" if groq_key else "🔴 Groq key missing"
+    else:
+        model_size   = config.get("WHISPER_MODEL_SIZE", "base")
+        stt_status   = f"[dim]Local Whisper ({model_size})[/dim]"
+
     personality = config.get("PERSONALITY", "caring")
     kcn         = keychain_name()
 
     status_text = f"""
   Mind ({llm_provider}):  {llm_status}  [dim]{mask_key(llm_key or '')}[/dim]
   {voice_line}
+  Ears (STT):   {stt_status}
   Personality:  [magenta]{personality}[/magenta]
   Keychain:     [dim]{kcn}[/dim]
 """
@@ -198,7 +208,7 @@ def attune():
     clear_screen()
     console.print(header)
     console.print()
-    
+
     type_text("How should she sound?", style="bold cyan")
     tts_choice = questionary.select(
         "",
@@ -209,10 +219,10 @@ def attune():
         ],
         qmark="🌸"
     ).ask()
-    
+
     if not tts_choice:
         raise typer.Exit()
-        
+
     if tts_choice == "ElevenLabs":
         elevenlabs_key = questionary.password("Give her a voice (ElevenLabs API Key):", qmark="🌸").ask()
         if elevenlabs_key:
@@ -231,6 +241,60 @@ def attune():
             save_credential("ELEVENLABS_VOICE_ID", voice_id.strip())
             console.print(f"\n[🔐] [green]Voice ID secured in {keychain_name()} ✅[/green]")
             time.sleep(1)
+
+    # ── STT / Listening configuration ────────────────────────────────────
+    clear_screen()
+    console.print(header)
+    console.print()
+
+    type_text("How should she listen?", style="bold cyan")
+    stt_choice = questionary.select(
+        "",
+        choices=[
+            questionary.Choice(
+                "🖥  Local Whisper  (Private, works offline, no API key needed)",
+                value="local"
+            ),
+            questionary.Choice(
+                "⚡ Groq Whisper   (Cloud, ~5-10x faster, uses Groq API)",
+                value="groq"
+            ),
+        ],
+        qmark="🌸"
+    ).ask()
+
+    if stt_choice == "local":
+        update_global_config("STT_PROVIDER", "local")
+        model_choice = questionary.select(
+            "Which Whisper model size?",
+            choices=[
+                questionary.Choice("tiny  — Fastest, slightly less accurate",  value="tiny"),
+                questionary.Choice("base  — Recommended, balanced (default)",   value="base"),
+                questionary.Choice("small — Slower, more accurate",             value="small"),
+            ],
+            qmark="🌸"
+        ).ask()
+        update_global_config("WHISPER_MODEL_SIZE", model_choice or "base")
+        console.print(f"\n[green]✅ Local Whisper ({model_choice or 'base'}) configured.[/green]")
+        time.sleep(1)
+
+    elif stt_choice == "groq":
+        update_global_config("STT_PROVIDER", "groq")
+        # Reuse the Groq key if it's already stored for the LLM
+        existing_groq_key = get_credential("GROQ_API_KEY")
+        if existing_groq_key:
+            console.print(
+                f"\n[green]✅ Groq API key already in {keychain_name()} — "
+                f"will reuse for STT. {mask_key(existing_groq_key)}[/green]"
+            )
+        else:
+            console.print()
+            console.print("[dim]Get a free Groq API key at: https://console.groq.com[/dim]")
+            groq_key = questionary.password("Groq API Key:", qmark="🌸").ask()
+            if groq_key:
+                save_credential("GROQ_API_KEY", groq_key)
+                console.print(f"\n[🔐] [green]Groq key secured in {keychain_name()}: {mask_key(groq_key)}[/green]")
+        time.sleep(1)
 
     clear_screen()
     success_msg = Panel(
@@ -376,6 +440,64 @@ def models():
             save_credential("ELEVENLABS_VOICE_ID", new_voice_id.strip())
             console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
             time.sleep(1)
+
+    # ── STT / Listening configuration ────────────────────────────────────
+    clear_screen()
+    config          = load_global_config()
+    stt_provider    = config.get("STT_PROVIDER", "local")
+    model_size      = config.get("WHISPER_MODEL_SIZE", "base")
+
+    stt_state = (
+        f"⚡ Groq Whisper  | 🔐 {mask_key(get_credential('GROQ_API_KEY') or '')}"
+        if stt_provider == "groq"
+        else f"🖥  Local Whisper ({model_size})"
+    )
+    current_state = f"""
+  Ears (STT):  [magenta]{stt_state}[/magenta]
+"""
+    console.print(Panel(current_state, title="[bold cyan]Listening Settings[/bold cyan]", border_style="cyan", expand=False))
+    console.print()
+
+    type_text("Switch how she listens:", style="bold cyan")
+    new_stt = questionary.select(
+        "",
+        choices=[
+            questionary.Choice("🖥  Local Whisper  (Private, offline)",        value="local"),
+            questionary.Choice("⚡ Groq Whisper   (Cloud, ~5-10x faster)",    value="groq"),
+            questionary.Choice("Keep Current",                                  value=None),
+        ],
+        qmark="🌸"
+    ).ask()
+
+    if new_stt == "local":
+        update_global_config("STT_PROVIDER", "local")
+        new_model = questionary.select(
+            "Which Whisper model size?",
+            choices=[
+                questionary.Choice("tiny  — Fastest, slightly less accurate",  value="tiny"),
+                questionary.Choice("base  — Recommended, balanced (default)",   value="base"),
+                questionary.Choice("small — Slower, more accurate",             value="small"),
+            ],
+            qmark="🌸"
+        ).ask()
+        update_global_config("WHISPER_MODEL_SIZE", new_model or "base")
+        console.print(f"\n[green]✅ Local Whisper ({new_model or 'base'}) saved.[/green]")
+        time.sleep(1)
+
+    elif new_stt == "groq":
+        update_global_config("STT_PROVIDER", "groq")
+        existing_groq_key = get_credential("GROQ_API_KEY")
+        if existing_groq_key:
+            console.print(
+                f"\n[green]✅ Groq key already in {keychain_name()} — {mask_key(existing_groq_key)}[/green]"
+            )
+        else:
+            console.print("[dim]Get a free Groq key at: https://console.groq.com[/dim]")
+            groq_key = questionary.password("Groq API Key:", qmark="🌸").ask()
+            if groq_key:
+                save_credential("GROQ_API_KEY", groq_key)
+                console.print(f"\n[🔐] [green]Groq key secured: {mask_key(groq_key)}[/green]")
+        time.sleep(1)
 
     clear_screen()
     console.print("\n[bold green]✅ Adjustments saved![/bold green]")
