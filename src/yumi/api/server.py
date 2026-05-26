@@ -88,8 +88,9 @@ def sync_broadcast(payload: dict):
         if main_loop:
             asyncio.run_coroutine_threadsafe(broadcast(), main_loop)
         else:
-            # Fallback if loop is not yet captured (should not happen in production)
-            asyncio.run(broadcast())
+            # main_loop is captured at startup — this should never be None in production.
+            # Calling asyncio.run() here would crash inside uvicorn's running loop.
+            print("Warning: main_loop not yet initialized, broadcast skipped.")
     except Exception as e:
         print(f"Failed to broadcast WS: {e}")
 

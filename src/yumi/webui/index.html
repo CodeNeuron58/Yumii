@@ -196,7 +196,9 @@
 
         // --- WebSocket & Lip Sync Setup ---
         function initWebSocket() {
-            socket = new WebSocket("ws://localhost:8000/ws");
+            // Use window.location.host so this works on any port or host,
+            // not just hardcoded localhost:8000.
+            socket = new WebSocket(`ws://${window.location.host}/ws`);
 
             socket.onopen = () => {
                 console.log("Connected to Python backend.");
@@ -206,6 +208,20 @@
 
             socket.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
+
+                // Handle TTS / backend errors — show visibly instead of silent failure
+                if (data.error) {
+                    const subtitle = document.getElementById('subtitle');
+                    subtitle.innerText = `⚠️ ${data.error}`;
+                    subtitle.style.color = '#ffb86c';
+                    document.getElementById('ui-layer').style.opacity = 1;
+                    setTimeout(() => {
+                        document.getElementById('ui-layer').style.opacity = 0;
+                        subtitle.style.color = '';
+                    }, 5000);
+                    return;
+                }
+
                 console.log("Received AI payload:", data);
 
                 // 1. Show Subtitle
@@ -244,6 +260,12 @@
                     setTimeout(() => {
                         document.getElementById('ui-layer').style.opacity = 0;
                     }, 500);
+                } else {
+                    // Text received but no audio (TTS may have failed) —
+                    // keep subtitle visible for a few seconds then fade
+                    setTimeout(() => {
+                        document.getElementById('ui-layer').style.opacity = 0;
+                    }, 4000);
                 }
             };
 

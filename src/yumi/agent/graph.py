@@ -50,27 +50,36 @@ def build_graph(broadcast_callback: Callable):
 
         print(f"Yumi: {response_text}")
         print(f"[{expression} | {motion}]")
-        
+
         # Synthesize audio and get base64 string
         audio_b64, duration = speaker.speak(response_text, play_local=False)
-        
-        payload = {
-            "text": response_text,
-            "expression": expression,
-            "motion": motion,
-            "audio": audio_b64
-        }
-        
-        # Broadcast to all connected web UIs using the injected callback
-        broadcast_callback(payload)
-        
+
+        if audio_b64 is None:
+            # TTS failed — broadcast the text response with an explicit error flag
+            # so the frontend can show the user what went wrong instead of going mute.
+            broadcast_callback({
+                "text": response_text,
+                "expression": expression,
+                "motion": motion,
+                "audio": None,
+                "error": "TTS failed — check your ElevenLabs API key and credits.",
+            })
+        else:
+            broadcast_callback({
+                "text": response_text,
+                "expression": expression,
+                "motion": motion,
+                "audio": audio_b64,
+            })
+
         if duration > 0:
             import time
-            print(f"Waiting for {duration:.2f} seconds while audio plays on frontend before listening again...")
-            time.sleep(duration + 0.5)  # add 500ms safety buffer
-            
+            print(f"Waiting for {duration:.2f}s while audio plays on frontend...")
+            time.sleep(duration + 0.5)  # 500ms safety buffer
+
         print("-" * 50)
         return {"response": response_text}
+
 
     def should_think(state: MainState):
         if state.get("input") and state["input"].strip():
