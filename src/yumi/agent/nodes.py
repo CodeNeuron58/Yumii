@@ -1,94 +1,104 @@
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from yumi.agent.llm import agent
+from langchain_core.messages import HumanMessage, AIMessage
+from yumi.agent.llm import get_agent
 from yumi.agent.personality_manager import personality_manager
 
+
+# ---------------------------------------------------------------------------
+# Personality switch detection
+# ---------------------------------------------------------------------------
+
 def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
-    """Check if user wants to switch personality. Returns (is_switch, new_personality)."""
-    user_input_lower = user_input.lower().strip()
-    
-    personalities = personality_manager.list_personalities()
-    
-    # Check for personality switch commands
-    for personality in personalities:
-        if user_input_lower in [f"switch to {personality}", f"be {personality}", f"become {personality}", personality]:
+    """Return (True, new_personality) if the user asked to switch, else (False, None)."""
+    lowered = user_input.lower().strip()
+    for personality in personality_manager.list_personalities():
+        if lowered in (
+            f"switch to {personality}",
+            f"be {personality}",
+            f"become {personality}",
+            personality,
+        ):
             return True, personality
-    
     return False, None
 
-def chat_node(state):
-    user_input = state["input"]
-    history = state.get("messages", [])
 
-    # 1. Check for personality switch
+# ---------------------------------------------------------------------------
+# Chat node
+# ---------------------------------------------------------------------------
+
+def chat_node(state: dict) -> dict:
+    """
+    Core reasoning node — invokes the LLM agent and returns structured output.
+
+    What changed vs the old version
+    ────────────────────────────────
+    Before:
+      • Manually built [SystemMessage, ...history, HumanMessage] every turn.
+      • Injected a 60-token CRITICAL INSTRUCTION to prevent tool/schema conflicts.
+      • Called a single global agent instance regardless of active personality.
+
+    Now:
+      • Passes only (history + new HumanMessage) to the agent.
+      • The system prompt (personality + tool hint) is baked into the agent via
+        create_agent(system_prompt=...) in llm.py and injected by the framework
+        inside the ReAct loop — at the correct position, before every LLM call.
+      • Selects the right cached agent for the current personality.
+      • The CRITICAL INSTRUCTION is gone — replaced by a one-line _TOOL_HINT
+        in llm.py, appended once at agent-build time.
+
+    History strategy (unchanged — this is the correct pattern)
+    ──────────────────────────────────────────────────────────
+    We discard the agent's internal tool-call trace (ToolMessages, intermediate
+    AIMessages with tool_calls) and store only a clean HumanMessage + plain
+    AIMessage in state.  This prevents ToolMessage confusion on subsequent turns
+    while keeping history readable for the LLM.
+    """
+    user_input: str = state["input"]
+    history: list = state.get("messages", [])
+
+    # 1. Personality switch detection
     is_switch, new_personality = check_personality_switch(user_input)
     if is_switch:
         from yumi.core.global_config import update_global_config
         update_global_config("PERSONALITY", new_personality)
-        # We rewrite the user input so the LLM explicitly acknowledges the switch naturally
-        user_input = f"I want you to become {new_personality}. Acknowledge this personality switch warmly in your new style."
+        # Rewrite input so the LLM acknowledges the switch in its new style
+        user_input = (
+            f"I want you to become {new_personality}. "
+            "Acknowledge this personality switch warmly in your new style."
+        )
 
-    # 2. Inject current personality as SystemMessage on EVERY turn
-    # This solves the "Broken Personality Persistence" bug by ensuring
-    # the LLM always has the correct prompt even after a switch.
-    current_personality_prompt = personality_manager.get_current_personality_prompt()
-    
-    # Add an explicit instruction to prevent tool-calling hallucinations where the LLM tries
-    # to output its final structured response at the same time it calls a data-fetching tool.
-    system_instruction = (
-        current_personality_prompt + 
-        "\n\nCRITICAL INSTRUCTION: If you need to use a tool to get information (like checking the time), "
-        "you MUST ONLY call that tool and wait for the result. Do NOT generate your final YumiResponse "
-        "or answer until you have received the tool's output."
-    )
-    
-    system_message = SystemMessage(content=system_instruction)
+    # 2. Resolve the correct agent for the current personality.
+    #    get_agent() reads personality from config.json and returns a cached
+    #    create_agent instance — no agent rebuild unless personality changed.
+    current_personality = personality_manager.get_current_personality()
+    agent = get_agent(current_personality)
 
-    # 3. Prepare the input payload
+    # 3. Build the message list — system prompt is handled by the agent itself.
     new_human_message = HumanMessage(content=user_input)
-    input_messages = [system_message] + history + [new_human_message]
+    input_messages = history + [new_human_message]
 
-    # 4. Invoke the unified agent (handles tools & structured output natively)
+    # 4. Run the ReAct loop
     result = agent.invoke({"messages": input_messages})
 
-    # Extract the structured response and the new messages generated by the agent
+    # 5. Extract structured response
     structured_response = result.get("structured_response")
-    
     if structured_response is None:
-        # Fallback in case structured output fails
-        print("ERROR: structured_response was None. Falling back to default.")
-        class Fallback:
-            pass
-        structured_response = Fallback()
-        structured_response.response_text = "I'm having trouble processing that right now."
-        structured_response.expression = "sad"
-        structured_response.motion = "idle"
+        # LLM did not call the output schema — likely a tool-loop timeout.
+        print("WARNING: structured_response was None — LLM did not produce YumiResponse.")
+        class _Fallback:
+            response_text = "I'm having a little trouble right now. Could you say that again?"
+            expression = "sad"
+            motion = "idle"
+        structured_response = _Fallback()
 
-    # The agent returns all messages (including what we gave it).
-    # We only want to return the newly generated messages to be appended to state history.
-    # The newly generated messages are everything after our `input_messages`.
-    
-    # Wait, the history in `MainState` doesn't have the current `user_input` yet.
-    # So we must return the `new_human_message` PLUS whatever the agent generated.
-    # Wait, in the older version, we returned the HumanMessage and AIMessage.
-    # Because `MainState` uses `add_messages` reducer, returning a list of messages appends them.
-    # However, if the `new_agent_messages` contains the ToolMessage with the structured response,
-    # we don't necessarily want that raw ToolMessage cluttering the LLM's future context as an AI turn.
-    # Let's see... if it used tools, we want the Tool history. If it just structured the output, 
-    # it generates an AIMessage with a tool_call, and a ToolMessage with the structured JSON.
-    # Feeding this back to the LLM next turn might confuse it because the "final answer" is in a ToolMessage.
-    
-    # LangChain's `create_agent` docs state that when using structured output via tools, 
-    # the structured data is captured in `structured_response`.
-    # It's cleaner to just append a standard AIMessage with the text to the history, 
-    # discarding the complex tool-call trace of the structured output tool itself.
-    # If the agent used OTHER tools (like get_time), we *do* want those.
-    # For now, to keep history clean and avoid LLM confusion with its own structured output tool calls:
-    
-    messages_to_append = [new_human_message, AIMessage(content=structured_response.response_text)]
+    # 6. Return clean messages to state (see history strategy in docstring)
+    messages_to_append = [
+        new_human_message,
+        AIMessage(content=structured_response.response_text),
+    ]
 
     return {
         "response": structured_response.response_text,
-        "expression": getattr(structured_response, 'expression', 'normal'),
-        "motion": getattr(structured_response, 'motion', 'idle'),
-        "messages": messages_to_append
+        "expression": getattr(structured_response, "expression", "normal"),
+        "motion":     getattr(structured_response, "motion",     "idle"),
+        "messages":   messages_to_append,
     }
