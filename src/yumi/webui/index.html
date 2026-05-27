@@ -113,6 +113,7 @@
         let audioContext = null;
         let analyser = null;
         let socket = null;
+        let currentAudioSource = null;
 
         // --- EMOTION/MOTION HANDLING ---
         // Map LLM expressions to available huohuo expressions
@@ -209,6 +210,25 @@
             socket.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
 
+                // Handle global interrupt (barge-in)
+                if (data.type === "interrupt") {
+                    console.log("Interrupt received! Stopping audio.");
+                    if (currentAudioSource) {
+                        try {
+                            currentAudioSource.stop();
+                        } catch (e) {}
+                        currentAudioSource = null;
+                    }
+                    document.getElementById('ui-layer').style.opacity = 0;
+                    if (live2dModel) {
+                        live2dModel.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', 0);
+                        try {
+                            live2dModel.motion("idle");
+                        } catch (e) {}
+                    }
+                    return;
+                }
+
                 // Handle TTS / backend errors — show visibly instead of silent failure
                 if (data.error) {
                     const subtitle = document.getElementById('subtitle');
@@ -288,9 +308,16 @@
             const audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffer;
+            currentAudioSource = source;
 
             source.connect(analyser);
             analyser.connect(audioContext.destination);
+
+            source.onended = () => {
+                if (currentAudioSource === source) {
+                    currentAudioSource = null;
+                }
+            };
 
             source.start(0);
 

@@ -1,5 +1,6 @@
 import io
 import queue
+from typing import Callable
 import wave
 import collections
 import numpy as np
@@ -150,7 +151,7 @@ class AudioPipeline:
     # Capture (shared by both backends)
     # ------------------------------------------------------------------
 
-    def listen_and_capture(self) -> np.ndarray:
+    def listen_and_capture(self, on_speech_start: Callable[[], None] | None = None) -> np.ndarray:
         """
         Block until a complete utterance is captured.
         Returns int16 PCM numpy array, or an empty array if nothing was heard.
@@ -199,6 +200,8 @@ class AudioPipeline:
                     if speech_count >= SPEECH_TRIGGER_FRAMES:
                         triggered = True
                         print("🎙  Speech started")
+                        if on_speech_start:
+                            on_speech_start()
                         recording.extend(frame for frame, _ in pre_buffer)
                         pre_buffer.clear()
                 else:
@@ -297,9 +300,9 @@ class AudioPipeline:
     # Full cycle
     # ------------------------------------------------------------------
 
-    def run_cycle(self) -> str:
+    def run_cycle(self, on_speech_start: Callable[[], None] | None = None) -> str:
         """Capture one utterance and return its transcription."""
-        raw_audio = self.listen_and_capture()
+        raw_audio = self.listen_and_capture(on_speech_start=on_speech_start)
         if len(raw_audio) == 0:
             return ""
 
