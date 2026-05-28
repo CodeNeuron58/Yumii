@@ -62,7 +62,8 @@
           "guides/installation",
           "guides/configuration",
           "guides/personalities",
-          "guides/voice-setup"
+          "guides/voice-setup",
+          "guides/troubleshooting"
         ]
       },
       {

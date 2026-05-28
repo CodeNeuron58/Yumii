@@ -1,0 +1,32 @@
+---
+title: Troubleshooting
+description: Common issues and how to resolve them when using Yumi.
+---
+
+# Troubleshooting
+
+If you encounter issues while running Yumi, check this guide for common solutions.
+
+## Common Issues
+
+### API Key Errors
+
+**Symptom:** You receive an authentication error or a message that an API key is missing.
+
+**Solution:**
+Ensure you have set the necessary API keys in your environment variables.
+```bash
+# Check your environment variables
+echo $GROQ_API_KEY
+```
+
+### Audio Device Not Found
+
+**Symptom:** Yumi cannot hear you or fails to initialize the microphone.
+
+**Solution:**
+Make sure your microphone is properly connected and recognized by your operating system. You might need to configure the default audio input device.
+
+## Getting More Help
+
+If you're still stuck, join our [Discord server](https://discord.gg/yourdiscord) or open an issue on our [GitHub repository](https://github.com/yourusername/yumi).
