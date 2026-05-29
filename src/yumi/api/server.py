@@ -10,6 +10,7 @@ from typing import List
 from yumi.agent.graph import build_graph
 from yumi.audio.stt import AudioPipeline
 from yumi.tts.speaker import YumiSpeaker
+from yumi.tts.camb_speaker import CambSpeaker
 from yumi.core.config import settings
 
 # Global connections for broadcasting
@@ -21,6 +22,7 @@ main_loop = None
 # ---------------------------------------------------------------------------
 transcription_queue = asyncio.Queue()
 tts_queue = asyncio.Queue()
+audio_input_queue = asyncio.Queue()
 interrupt_event = asyncio.Event()
 
 # Hardware
@@ -31,8 +33,12 @@ groq_api_key = settings.groq_api_key
 print(f"Initializing Yumi Audio Pipeline (STT: {stt_provider})...")
 pipeline = AudioPipeline(provider=stt_provider, model_size=model_size, groq_api_key=groq_api_key)
 
-print("Initializing Yumi Speaker (TTS)...")
-speaker = YumiSpeaker()
+tts_provider = settings.tts_provider
+print(f"Initializing Yumi Speaker (TTS: {tts_provider})...")
+if tts_provider == "CAMB.ai":
+    speaker = CambSpeaker()
+else:
+    speaker = YumiSpeaker()
 
 # ---------------------------------------------------------------------------
 # Background Tasks
@@ -40,7 +46,7 @@ speaker = YumiSpeaker()
 
 async def audio_listener_task():
     """
-    Task A: Continuously listens to the microphone.
+    Task A: Continuously listens to the audio stream from the browser.
     If speech starts, it triggers the global interrupt.
     When speech ends, it transcribes and queues the text.
     """
@@ -48,20 +54,27 @@ async def audio_listener_task():
         """Callback fired by STT when human speech breaks the silence threshold."""
         # 1. Fire the global interrupt flag to kill LLM and TTS tasks.
         interrupt_event.set()
-        
+
         # 2. Tell the UI to instantly shut up (stop playing audio)
         payload = {"type": "interrupt"}
         if main_loop:
             asyncio.run_coroutine_threadsafe(broadcast_payload(payload), main_loop)
 
-    print("Listener task active.")
+    print("Listener task active (streaming).")
     while True:
         try:
-            # Run the blocking audio capture in a thread so it doesn't freeze FastAPI
-            text = await asyncio.to_thread(pipeline.run_cycle, on_speech_start)
-            if text and text.strip():
-                # We have a new sentence! Push it to the reasoning engine.
-                await transcription_queue.put(text)
+            # Use the new stream_capture that consumes from the WebSocket queue
+            text = await pipeline.stream_capture(audio_input_queue, on_speech_start)
+
+            if text is not None and len(text) > 0:
+                # We have a captured utterance! Now we need to transcribe it.
+                # Note: stream_capture returns the audio array, then we call process_audio and transcribe.
+                clean_audio = pipeline.process_audio(text)
+                if len(clean_audio) > 0:
+                    transcribed_text = pipeline.transcribe(clean_audio)
+                    if transcribed_text and transcribed_text.strip():
+                        print(f"✅ Transcription: {transcribed_text}")
+                        await transcription_queue.put(transcribed_text)
         except Exception as e:
             print(f"Listener crashed: {e}")
             await asyncio.sleep(1)
@@ -130,41 +143,79 @@ async def tts_speaker_task():
             print(f"Yumi: {response_text}")
             print(f"[{expression} | {motion}]")
 
-            # 2. Synthesize audio (this blocks, so we run it in a thread)
-            audio_b64, duration = await asyncio.to_thread(speaker.speak, response_text, False)
-
-            if interrupt_event.is_set():
-                print("TTS interrupted during synthesis! Discarding audio.")
-                continue
-
-            # 3. Broadcast to frontend
-            if audio_b64 is None:
-                await broadcast_payload({
-                    "text": response_text,
-                    "expression": expression,
-                    "motion": motion,
-                    "audio": None,
-                    "error": "TTS failed — check your ElevenLabs API key and credits."
-                })
+            if tts_provider == "CAMB.ai":
+                # CAMB.ai Streaming Implementation
+                try:
+                    async for chunk_data in speaker.stream_speak(response_text):
+                        if interrupt_event.is_set():
+                            print("TTS interrupted during stream! Discarding remaining chunks.")
+                            break
+                            
+                        if isinstance(chunk_data, dict) and chunk_data.get("type") == "metadata":
+                            # Send start metadata
+                            await broadcast_payload({
+                                "type": "audio_start",
+                                "sampleRate": chunk_data["sampleRate"],
+                                "text": response_text,
+                                "expression": expression,
+                                "motion": motion
+                            })
+                        else:
+                            # Send base64 audio chunk
+                            await broadcast_payload({
+                                "type": "audio_chunk",
+                                "data": chunk_data
+                            })
+                            
+                    if not interrupt_event.is_set():
+                        await broadcast_payload({"type": "audio_end"})
+                        
+                except Exception as stream_err:
+                    print(f"Stream error: {stream_err}")
+                    await broadcast_payload({
+                        "text": response_text,
+                        "expression": expression,
+                        "motion": motion,
+                        "audio": None,
+                        "error": f"CAMB.ai TTS failed: {stream_err}"
+                    })
             else:
-                await broadcast_payload({
-                    "text": response_text,
-                    "expression": expression,
-                    "motion": motion,
-                    "audio": audio_b64
-                })
+                # ElevenLabs Blocking Implementation
+                # 2. Synthesize audio (this blocks, so we run it in a thread)
+                audio_b64, duration = await asyncio.to_thread(speaker.speak, response_text, False)
 
-            # 4. Wait for audio to finish playing, BUT allow early breakout if interrupted
-            if duration > 0:
-                print(f"Waiting {duration:.2f}s for playback...")
-                # We wait in 100ms chunks so we can abort instantly if the user speaks
-                slept = 0.0
-                while slept < (duration + 0.5):
-                    if interrupt_event.is_set():
-                        print("Playback interrupted!")
-                        break
-                    await asyncio.sleep(0.1)
-                    slept += 0.1
+                if interrupt_event.is_set():
+                    print("TTS interrupted during synthesis! Discarding audio.")
+                    continue
+
+                # 3. Broadcast to frontend
+                if audio_b64 is None:
+                    await broadcast_payload({
+                        "text": response_text,
+                        "expression": expression,
+                        "motion": motion,
+                        "audio": None,
+                        "error": "TTS failed — check your ElevenLabs API key and credits."
+                    })
+                else:
+                    await broadcast_payload({
+                        "text": response_text,
+                        "expression": expression,
+                        "motion": motion,
+                        "audio": audio_b64
+                    })
+
+                # 4. Wait for audio to finish playing, BUT allow early breakout if interrupted
+                if duration > 0:
+                    print(f"Waiting {duration:.2f}s for playback...")
+                    # We wait in 100ms chunks so we can abort instantly if the user speaks
+                    slept = 0.0
+                    while slept < (duration + 0.5):
+                        if interrupt_event.is_set():
+                            print("Playback interrupted!")
+                            break
+                        await asyncio.sleep(0.1)
+                        slept += 0.1
 
         except Exception as e:
             print(f"Speaker crashed: {e}")
@@ -217,7 +268,13 @@ async def websocket_endpoint(websocket: WebSocket):
     active_connections.append(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            message = await websocket.receive()
+            if "text" in message:
+                # Standard text message handling (if any)
+                pass
+            elif "bytes" in message:
+                # Binary audio chunk from the browser
+                await audio_input_queue.put(message["bytes"])
     except WebSocketDisconnect:
         if websocket in active_connections:
             active_connections.remove(websocket)

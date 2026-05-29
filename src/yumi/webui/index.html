@@ -114,6 +114,8 @@
         let analyser = null;
         let socket = null;
         let currentAudioSource = null;
+        let micStream = null;
+        let micProcessor = null;
 
         // --- EMOTION/MOTION HANDLING ---
         // Map LLM expressions to available huohuo expressions
@@ -196,10 +198,58 @@
         }
 
         // --- WebSocket & Lip Sync Setup ---
+        async function initMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                micStream = stream;
+
+                // Create a dedicated AudioContext for recording at 16kHz
+                const recContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 16000,
+                });
+
+                const source = recContext.createMediaStreamSource(stream);
+
+                // ScriptProcessorNode for raw PCM capture
+                // 4096 samples is about 256ms at 16kHz
+                micProcessor = recContext.createScriptProcessor(4096, 1, 1);
+
+                micProcessor.onaudioprocess = (e) => {
+                    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    // Convert Float32 (-1 to 1) to Int16 (PCM)
+                    const pcm16 = new Int16Array(inputData.length);
+                    for (let i = 0; i < inputData.length; i++) {
+                        const s = Math.max(-1, Math.min(1, inputData[i]));
+                        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    }
+                    socket.send(pcm16.buffer);
+                };
+
+                source.connect(micProcessor);
+                micProcessor.connect(recContext.destination);
+
+                document.getElementById('debug-info').innerText += `\n🎙️ Mic Active (16kHz)`;
+                console.log("Microphone initialized and streaming.");
+            } catch (err) {
+                console.error("Error initializing microphone:", err);
+                document.getElementById('debug-info').innerText += `\n❌ Mic Error: ${err.message}`;
+            }
+        }
+
         function initWebSocket() {
+
             // Use window.location.host so this works on any port or host,
             // not just hardcoded localhost:8000.
             socket = new WebSocket(`ws://${window.location.host}/ws`);
+            socket.binaryType = 'arraybuffer';
 
             socket.onopen = () => {
                 console.log("Connected to Python backend.");
@@ -207,21 +257,39 @@
                 document.getElementById('ui-layer').style.opacity = 0; // Hide until spoken to
             };
 
+
+            let nextPlayTime = 0;
+            let isStreaming = false;
+            let scheduledSources = [];
+            let currentSampleRate = 24000;
+
+            function stopAllAudio() {
+                if (currentAudioSource) {
+                    try { currentAudioSource.stop(); } catch (e) {}
+                    currentAudioSource = null;
+                }
+                scheduledSources.forEach(src => {
+                    try { src.stop(); } catch (e) {}
+                });
+                scheduledSources = [];
+                isStreaming = false;
+                nextPlayTime = 0;
+                
+                if (live2dModel) {
+                    live2dModel.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', 0);
+                }
+            }
+
             socket.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
 
                 // Handle global interrupt (barge-in)
                 if (data.type === "interrupt") {
                     console.log("Interrupt received! Stopping audio.");
-                    if (currentAudioSource) {
-                        try {
-                            currentAudioSource.stop();
-                        } catch (e) {}
-                        currentAudioSource = null;
-                    }
+                    stopAllAudio();
+                    
                     document.getElementById('ui-layer').style.opacity = 0;
                     if (live2dModel) {
-                        live2dModel.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', 0);
                         try {
                             live2dModel.motion("idle");
                         } catch (e) {}
@@ -241,51 +309,97 @@
                     }, 5000);
                     return;
                 }
-
-                console.log("Received AI payload:", data);
-
-                // 1. Show Subtitle
-                document.getElementById('subtitle').innerText = data.text;
-                document.getElementById('ui-layer').style.opacity = 1;
-
-                // --- EMOTION/MOTION HANDLING ---
-                let rawExp = data.expression?.toLowerCase() || "normal";
-                let rawMot = data.motion?.toLowerCase() || "idle";
                 
-                // Map to available expressions and motions
-                const expression = EXPRESSION_MAP[rawExp];
-                const motion = MOTION_MAP[rawMot] || "idle";
+                // ─── STREAMING AUDIO HANDLERS (CAMB.ai) ──────────────────────────────────
+                if (data.type === "audio_start") {
+                    console.log("Starting streaming session:", data);
+                    stopAllAudio();
+                    isStreaming = true;
+                    currentSampleRate = data.sampleRate || 24000;
+                    nextPlayTime = audioContext.currentTime + 0.1; // Small buffer delay
+                    
+                    document.getElementById('subtitle').innerText = data.text;
+                    document.getElementById('ui-layer').style.opacity = 1;
+                    setExpressionAndMotion(data.expression, data.motion);
+                    
+                    startStreamingLipSync();
+                    return;
+                }
                 
-                document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nExpression: ${expression || 'none'}\nMotion: ${motion}`;
-                
-                try {
-                    // Play expression if available
-                    if (expression && live2dModel.internalModel.expressionManager) {
-                        live2dModel.expression(expression);
+                if (data.type === "audio_chunk") {
+                    if (!isStreaming) return; // Discard if interrupted
+                    
+                    const float32Data = pcm16Base64ToFloat32(data.data);
+                    if (float32Data.length === 0) return;
+                    
+                    const audioBuffer = audioContext.createBuffer(1, float32Data.length, currentSampleRate);
+                    audioBuffer.getChannelData(0).set(float32Data);
+                    
+                    const source = audioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    
+                    // Reduce volume slightly to prevent mic bleed (echo)
+                    const gainNode = audioContext.createGain();
+                    gainNode.gain.value = 0.7;
+                    
+                    source.connect(gainNode);
+                    gainNode.connect(analyser);
+                    analyser.connect(audioContext.destination);
+                    
+                    // If we fell behind, catch up
+                    if (nextPlayTime < audioContext.currentTime) {
+                        nextPlayTime = audioContext.currentTime + 0.05;
                     }
                     
-                    // Play motion
-                    if (motion) {
-                        live2dModel.motion(motion);
-                    }
-                } catch (e) { 
-                    console.error("Motion/Expression error:", e);
-                    document.getElementById('debug-info').innerText += `\nError: ${e.message}`;
+                    source.start(nextPlayTime);
+                    scheduledSources.push(source);
+                    nextPlayTime += audioBuffer.duration;
+                    
+                    // Cleanup array when done playing
+                    source.onended = () => {
+                        const idx = scheduledSources.indexOf(source);
+                        if (idx > -1) scheduledSources.splice(idx, 1);
+                    };
+                    return;
+                }
+                
+                if (data.type === "audio_end") {
+                    console.log("Stream ended.");
+                    // The lip-sync loop will self-terminate when currentTime > nextPlayTime
+                    
+                    const remainingTime = Math.max(0, nextPlayTime - audioContext.currentTime);
+                    setTimeout(() => {
+                        if (!isStreaming) return; // Was interrupted
+                        isStreaming = false;
+                        document.getElementById('ui-layer').style.opacity = 0;
+                    }, remainingTime * 1000 + 500);
+                    
+                    return;
                 }
 
-                // 3. Play Audio and Auto-Lip Sync
-                if (data.audio) {
-                    await playAudioAndSyncLips(data.audio);
+                // ─── LEGACY AUDIO HANDLER (ElevenLabs) ───────────────────────────────────
+                if (data.text) {
+                    console.log("Received AI payload (legacy block):", data);
 
-                    setTimeout(() => {
-                        document.getElementById('ui-layer').style.opacity = 0;
-                    }, 500);
-                } else {
-                    // Text received but no audio (TTS may have failed) —
-                    // keep subtitle visible for a few seconds then fade
-                    setTimeout(() => {
-                        document.getElementById('ui-layer').style.opacity = 0;
-                    }, 4000);
+                    // 1. Show Subtitle
+                    document.getElementById('subtitle').innerText = data.text;
+                    document.getElementById('ui-layer').style.opacity = 1;
+
+                    setExpressionAndMotion(data.expression, data.motion);
+
+                    // 3. Play Audio and Auto-Lip Sync
+                    if (data.audio) {
+                        await playAudioAndSyncLips(data.audio);
+
+                        setTimeout(() => {
+                            document.getElementById('ui-layer').style.opacity = 0;
+                        }, 500);
+                    } else {
+                        // Text received but no audio (TTS may have failed)
+                        setTimeout(() => {
+                            document.getElementById('ui-layer').style.opacity = 0;
+                        }, 4000);
+                    }
                 }
             };
 
@@ -293,6 +407,74 @@
                 console.log("Disconnected. Reconnecting in 3s...");
                 setTimeout(initWebSocket, 3000);
             };
+        }
+
+        function setExpressionAndMotion(rawExp, rawMot) {
+            rawExp = rawExp?.toLowerCase() || "normal";
+            rawMot = rawMot?.toLowerCase() || "idle";
+            
+            const expression = EXPRESSION_MAP[rawExp];
+            const motion = MOTION_MAP[rawMot] || "idle";
+            
+            document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nExpression: ${expression || 'none'}\nMotion: ${motion}`;
+            
+            try {
+                if (expression && live2dModel?.internalModel?.expressionManager) {
+                    live2dModel.expression(expression);
+                }
+                if (motion && live2dModel) {
+                    live2dModel.motion(motion);
+                }
+            } catch (e) { 
+                console.error("Motion/Expression error:", e);
+                document.getElementById('debug-info').innerText += `\nError: ${e.message}`;
+            }
+        }
+
+        function pcm16Base64ToFloat32(base64) {
+            const binary = window.atob(base64);
+            const len = binary.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            const int16 = new Int16Array(bytes.buffer);
+            const float32 = new Float32Array(int16.length);
+            for (let i = 0; i < int16.length; i++) {
+                float32[i] = int16[i] / 32768.0;
+            }
+            return float32;
+        }
+
+        let streamingLipSyncReqId = null;
+        function startStreamingLipSync() {
+            if (streamingLipSyncReqId) return;
+            
+            const pcmData = new Float32Array(analyser.fftSize);
+            
+            const loop = () => {
+                if (!live2dModel || !isStreaming) {
+                    if (live2dModel) {
+                        live2dModel.internalModel.coreModel.setParameterValueById("ParamMouthOpenY", 0);
+                    }
+                    streamingLipSyncReqId = null;
+                    return;
+                }
+
+                analyser.getFloatTimeDomainData(pcmData);
+                let sumSquares = 0.0;
+                for (const amplitude of pcmData) {
+                    sumSquares += amplitude * amplitude;
+                }
+                const rms = Math.sqrt(sumSquares / pcmData.length);
+
+                const mouthOpen = Math.min(1.0, rms * 15.0);
+                live2dModel.internalModel.coreModel.setParameterValueById("ParamMouthOpenY", mouthOpen);
+
+                streamingLipSyncReqId = requestAnimationFrame(loop);
+            };
+            
+            streamingLipSyncReqId = requestAnimationFrame(loop);
         }
 
         async function playAudioAndSyncLips(base64Audio) {
@@ -351,12 +533,13 @@
             });
         }
 
-        document.getElementById('btn-start').addEventListener('click', () => {
+        document.getElementById('btn-start').addEventListener('click', async () => {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 512;
 
             document.getElementById('btn-start').style.display = 'none';
+            await initMicrophone();
             initLive2D();
             initWebSocket();
         });

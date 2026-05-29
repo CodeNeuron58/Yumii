@@ -92,8 +92,10 @@ else:
 #     hallucinate malformed tool calls (e.g. ',get_current_time') that fail
 #     with a 400 validation error from the API.
 _TOOL_HINT = (
-    "\n\nWhen you need information from a tool, call that tool first "
-    "and wait for its result before generating your final YumiResponse."
+    "\n\nCRITICAL RULES: "
+    "\n1. You MUST use the YumiResponse tool to deliver your final response. "
+    "\n2. Keep your spoken response text short and punchy: UNDER 3 sentences and strictly LESS THAN 400 characters."
+    "\n3. If you need to use other tools (like getting the time), use them first before calling YumiResponse."
 )
 
 # Lazy cache: personality name → compiled create_agent instance

@@ -1,10 +1,10 @@
 import io
 import queue
+import asyncio
 from typing import Callable
 import wave
 import collections
 import numpy as np
-import sounddevice as sd
 import torch
 
 # ---------------------------------------------------------------------------
@@ -151,55 +151,53 @@ class AudioPipeline:
     # Capture (shared by both backends)
     # ------------------------------------------------------------------
 
-    def listen_and_capture(self, on_speech_start: Callable[[], None] | None = None) -> np.ndarray:
+    async def stream_capture(self, queue: asyncio.Queue, on_speech_start: Callable[[], None] | None = None) -> np.ndarray:
         """
-        Block until a complete utterance is captured.
+        Consume audio chunks from a queue and implement VAD to capture one utterance.
         Returns int16 PCM numpy array, or an empty array if nothing was heard.
         """
-        print("Listening...")
+        print("Streaming audio capture active...")
         self._reset_vad()
 
-        audio_q: queue.Queue = queue.Queue()
-
-        def _callback(indata, frames, time_info, status):
-            if status:
-                print(f"[Audio status] {status}", flush=True)
-            audio_q.put(indata.copy())
-
-        # Rolling pre-speech buffer so we don't clip the start of a sentence
-        pre_buffer: collections.deque = collections.deque(maxlen=15)
+        # Local buffers
         recording = []
+        pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
 
-        with sd.InputStream(
-            samplerate=RATE,
-            channels=CHANNELS,
-            dtype="float32",
-            blocksize=FRAME_SIZE,
-            callback=_callback,
-        ):
-            while True:
-                indata   = audio_q.get()
-                audio_f32 = indata.flatten()
+        # Sample buffer to handle chunks that aren't exactly 512 samples
+        accumulation_buffer = np.array([], dtype=np.float32)
+
+        while True:
+            # 1. Get next binary chunk from the WebSocket queue
+            chunk_bytes = await queue.get()
+
+            # Convert Int16 PCM bytes to float32 normalized
+            audio_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
+            audio_f32 = audio_int16.astype(np.float32) / 32768.0
+
+            # Add to accumulation buffer
+            accumulation_buffer = np.append(accumulation_buffer, audio_f32)
+
+            # 2. Process buffer in 512-sample frames
+            while len(accumulation_buffer) >= FRAME_SIZE:
+                frame = accumulation_buffer[:FRAME_SIZE]
+                accumulation_buffer = accumulation_buffer[FRAME_SIZE:]
 
                 # ── Gate 1: RMS energy (pre-trigger only) ──────────────
-                # Skip near-silent frames ONLY before speech has started.
-                # Once triggered we record EVERYTHING — dropping quiet frames
-                # during speech creates holes that break transcription.
-                if not triggered and rms_energy(audio_f32) < RMS_ENERGY_GATE:
-                    pre_buffer.append((float_to_pcm16(audio_f32), False))
+                if not triggered and rms_energy(frame) < RMS_ENERGY_GATE:
+                    pre_buffer.append((float_to_pcm16(frame), False))
                     continue
 
                 # ── Gate 2: Silero VAD ──────────────────────────────────
-                is_speech = self._is_speech_silero(audio_f32)
-                pcm16     = float_to_pcm16(audio_f32)
+                is_speech = self._is_speech_silero(frame)
+                pcm16 = float_to_pcm16(frame)
 
                 if not triggered:
                     pre_buffer.append((pcm16, is_speech))
                     speech_count = sum(1 for _, s in pre_buffer if s)
                     if speech_count >= SPEECH_TRIGGER_FRAMES:
                         triggered = True
-                        print("🎙  Speech started")
+                        print("🎙  Speech started (stream)")
                         if on_speech_start:
                             on_speech_start()
                         recording.extend(frame for frame, _ in pre_buffer)
@@ -209,12 +207,10 @@ class AudioPipeline:
                     pre_buffer.append((pcm16, is_speech))
                     silence_count = sum(1 for _, s in pre_buffer if not s)
                     if silence_count >= SILENCE_END_FRAMES:
-                        print("🔇  Speech ended")
-                        break
+                        print("🔇  Speech ended (stream)")
+                        return np.concatenate(recording) if recording else np.array([], dtype=np.int16)
 
-        if not recording:
-            return np.array([], dtype=np.int16)
-        return np.concatenate(recording)
+        return np.array([], dtype=np.int16)
 
     # ------------------------------------------------------------------
     # Post-process

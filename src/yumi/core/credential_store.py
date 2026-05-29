@@ -24,6 +24,8 @@ SERVICE_NAME = "Yumi"
 CREDENTIAL_KEYS: frozenset[str] = frozenset({
     "ELEVENLABS_API_KEY",
     "ELEVENLABS_VOICE_ID",
+    "CAMB_API_KEY",
+    "CAMB_VOICE_ID",
     "GROQ_API_KEY",
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",

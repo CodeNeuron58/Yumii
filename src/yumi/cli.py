@@ -80,23 +80,43 @@ def dashboard():
     llm_key            = get_credential(active_key_name)
     llm_status         = "🔐 Keychain" if llm_key else "🔴 Not set"
 
-    eleven_key  = get_credential("ELEVENLABS_API_KEY")
-    voice_id    = get_credential("ELEVENLABS_VOICE_ID")
-    if eleven_key and voice_id:
-        eleven_status = "🔐 Keychain"
-        voice_line = (
-            f"Voice (ElevenLabs): {eleven_status}  "
-            f"[dim]{mask_key(eleven_key)}[/dim]  "
-            f"Voice ID: [dim]{voice_id[:6]}...[/dim]"
-        )
-    elif eleven_key:
-        eleven_status = "🟡 Keychain"
-        voice_line = (
-            f"Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(eleven_key)}[/dim]  "
-            f"[yellow]Voice ID not set — go to ⚙️ Configure Senses[/yellow]"
-        )
+    tts_provider = config.get("TTS_PROVIDER", "ElevenLabs")
+    if tts_provider == "CAMB.ai":
+        tts_key = get_credential("CAMB_API_KEY")
+        voice_id = get_credential("CAMB_VOICE_ID")
+        if tts_key and voice_id:
+            tts_status = "🔐 Keychain"
+            voice_line = (
+                f"Voice (CAMB.ai): {tts_status}  "
+                f"[dim]{mask_key(tts_key)}[/dim]  "
+                f"Voice ID: [dim]{voice_id[:6]}...[/dim]"
+            )
+        elif tts_key:
+            tts_status = "🟡 Keychain"
+            voice_line = (
+                f"Voice (CAMB.ai): {tts_status}  [dim]{mask_key(tts_key)}[/dim]  "
+                f"[yellow]Voice ID not set — go to ⚙️ Configure Senses[/yellow]"
+            )
+        else:
+            voice_line = "Voice (CAMB.ai): 🔴  [dim]Not configured[/dim]"
     else:
-        voice_line = "Voice (ElevenLabs): 🔴  [dim]Not configured[/dim]"
+        eleven_key  = get_credential("ELEVENLABS_API_KEY")
+        voice_id    = get_credential("ELEVENLABS_VOICE_ID")
+        if eleven_key and voice_id:
+            eleven_status = "🔐 Keychain"
+            voice_line = (
+                f"Voice (ElevenLabs): {eleven_status}  "
+                f"[dim]{mask_key(eleven_key)}[/dim]  "
+                f"Voice ID: [dim]{voice_id[:6]}...[/dim]"
+            )
+        elif eleven_key:
+            eleven_status = "🟡 Keychain"
+            voice_line = (
+                f"Voice (ElevenLabs): {eleven_status}  [dim]{mask_key(eleven_key)}[/dim]  "
+                f"[yellow]Voice ID not set — go to ⚙️ Configure Senses[/yellow]"
+            )
+        else:
+            voice_line = "Voice (ElevenLabs): 🔴  [dim]Not configured[/dim]"
 
     # STT status line
     stt_provider = config.get("STT_PROVIDER", "local")
@@ -399,11 +419,18 @@ def models():
     llm_provider        = config.get("LLM_PROVIDER", "Groq")
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
     llm_key             = get_credential(active_llm_key_name)
-    voice_id            = get_credential("ELEVENLABS_VOICE_ID") or ""
+    tts_provider        = config.get("TTS_PROVIDER", "ElevenLabs")
+    
+    if tts_provider == "CAMB.ai":
+        voice_key = get_credential("CAMB_API_KEY")
+        voice_id  = get_credential("CAMB_VOICE_ID") or ""
+    else:
+        voice_key = get_credential("ELEVENLABS_API_KEY")
+        voice_id  = get_credential("ELEVENLABS_VOICE_ID") or ""
 
     current_state = f"""
   Mind (LLM):  [magenta]{llm_provider}[/magenta]  | 🔐 {mask_key(llm_key or '')}
-  Voice (TTS): [magenta]ElevenLabs[/magenta] | 🔐 {mask_key(get_credential('ELEVENLABS_API_KEY') or '')}
+  Voice (TTS): [magenta]{tts_provider}[/magenta] | 🔐 {mask_key(voice_key or '')}
   Voice ID:    [magenta]{voice_id[:6] + '...' if voice_id else '[yellow]Not set[/yellow]'}[/magenta]
   Keychain: [dim]{kcn}[/dim]
 """
@@ -415,12 +442,16 @@ def models():
         "",
         choices=[
             questionary.Choice("ElevenLabs", value="ElevenLabs"),
+            questionary.Choice("CAMB.ai", value="CAMB.ai"),
             questionary.Choice("Kokoro (Local) - Coming Soon", value="Kokoro", disabled="Coming Soon"),
             questionary.Choice("System - Coming Soon", value="System", disabled="Coming Soon"),
             questionary.Choice("Keep Current", value=None)
         ],
         qmark="🌸"
     ).ask()
+    
+    if tts_choice:
+        update_global_config("TTS_PROVIDER", tts_choice)
 
     if tts_choice == "ElevenLabs":
         elevenlabs_key = questionary.password("New ElevenLabs API Key (leave blank to keep current):", qmark="🌸").ask()
@@ -430,7 +461,7 @@ def models():
             time.sleep(1)
 
         console.print()
-        console.print(f"[dim]Current Voice ID: {voice_id or 'Not set'}[/dim]")
+        console.print(f"[dim]Current Voice ID: {voice_id if tts_provider == 'ElevenLabs' else 'Not set'}[/dim]")
         console.print("[dim]Find Voice IDs at: https://elevenlabs.io/voice-library[/dim]")
         new_voice_id = questionary.text(
             "New Voice ID (leave blank to keep current):",
@@ -438,6 +469,25 @@ def models():
         ).ask()
         if new_voice_id and new_voice_id.strip():
             save_credential("ELEVENLABS_VOICE_ID", new_voice_id.strip())
+            console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
+            time.sleep(1)
+            
+    elif tts_choice == "CAMB.ai":
+        camb_key = questionary.password("New CAMB.ai API Key (leave blank to keep current):", qmark="🌸").ask()
+        if camb_key:
+            save_credential("CAMB_API_KEY", camb_key)
+            console.print(f"\n[🔐] [green]Voice secured: {mask_key(camb_key)}[/green]")
+            time.sleep(1)
+
+        console.print()
+        console.print(f"[dim]Current Voice ID: {voice_id if tts_provider == 'CAMB.ai' else 'Not set'}[/dim]")
+        console.print("[dim]Find Voice IDs at: https://client.camb.ai/[/dim]")
+        new_voice_id = questionary.text(
+            "New Voice ID (leave blank to keep current):",
+            qmark="🌸"
+        ).ask()
+        if new_voice_id and new_voice_id.strip():
+            save_credential("CAMB_VOICE_ID", new_voice_id.strip())
             console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
             time.sleep(1)
 

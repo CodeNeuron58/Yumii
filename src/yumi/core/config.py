@@ -22,8 +22,11 @@ for key, value in _creds.items():
 
 
 class Settings(BaseSettings):
+    tts_provider:        str        = Field(default="ElevenLabs", alias='TTS_PROVIDER')
     elevenlabs_api_key:  str | None = Field(default=None, alias='ELEVENLABS_API_KEY')
     elevenlabs_voice_id: str | None = Field(default=None, alias='ELEVENLABS_VOICE_ID')
+    camb_api_key:        str | None = Field(default=None, alias='CAMB_API_KEY')
+    camb_voice_id:       str | None = Field(default=None, alias='CAMB_VOICE_ID')
     llm_provider:        str        = Field(default="Groq",    alias='LLM_PROVIDER')
     groq_api_key:        str | None = Field(default=None, alias='GROQ_API_KEY')
     openai_api_key:      str | None = Field(default=None, alias='OPENAI_API_KEY')
