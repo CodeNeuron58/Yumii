@@ -1,10 +1,11 @@
 """Manages the non-sensitive JSON preference file located at ~/.yumi/config.json."""
+
 import json
 from pathlib import Path
 
 # ~/.yumi/config.json stores ONLY non-sensitive preferences.
 # Secrets (API keys) live in the OS keychain — see credential_store.py.
-CONFIG_DIR  = Path.home() / ".yumi"
+CONFIG_DIR = Path.home() / ".yumi"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
@@ -25,6 +26,7 @@ def load_global_config() -> dict:
 
     # Auto-migrate stale plaintext credentials to the OS keychain
     from yumi.core.credential_store import CREDENTIAL_KEYS, migrate_from_plaintext
+
     if any(k in CREDENTIAL_KEYS for k in raw):
         cleaned = migrate_from_plaintext(raw)
         save_global_config(cleaned)

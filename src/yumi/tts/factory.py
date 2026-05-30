@@ -1,8 +1,10 @@
 """Factory for instantiating the configured TTS speaker."""
+
 from yumi.core.config import settings
 from yumi.core.interfaces import BaseSpeaker
-from yumi.tts.speaker import YumiSpeaker
 from yumi.tts.camb_speaker import CambSpeaker
+from yumi.tts.speaker import YumiSpeaker
+
 
 def get_speaker() -> BaseSpeaker:
     """Instantiate the correct TTS speaker based on configuration."""

@@ -1,12 +1,16 @@
 """
 CAMB.ai TTS (Text-to-Speech) provider for Yumi.
 """
+
 import base64
-import aiohttp
 import struct
+from typing import Any, AsyncGenerator
+
+import aiohttp
+
 from yumi.core.config import settings
 from yumi.core.interfaces import BaseSpeaker
-from typing import AsyncGenerator, Any
+
 
 class CambSpeaker(BaseSpeaker):
     """TTS implementation using the CAMB.ai streaming API."""
@@ -30,7 +34,9 @@ class CambSpeaker(BaseSpeaker):
             return
 
         if len(text) > 495:
-            print(f"Warning: Text too long for CAMB.ai ({len(text)} chars), truncating.")
+            print(
+                f"Warning: Text too long for CAMB.ai ({len(text)} chars), truncating."
+            )
             text = text[:495] + "..."
 
         url = "https://client.camb.ai/apis/tts-stream"
@@ -76,7 +82,7 @@ class CambSpeaker(BaseSpeaker):
                             if data_idx != -1 and len(buffer) >= data_idx + 8:
                                 sample_rate = struct.unpack("<I", buffer[24:28])[0]
                                 yield {"type": "metadata", "sampleRate": sample_rate}
-                                audio_data = buffer[data_idx + 8:]
+                                audio_data = buffer[data_idx + 8 :]
                                 if audio_data:
                                     yield base64.b64encode(audio_data).decode("utf-8")
                                 is_first_chunk = False
@@ -92,6 +98,7 @@ class CambSpeaker(BaseSpeaker):
         # This is a bridge for the interface.
         # In a production-grade version, we would handle the loop here or avoid sync speak.
         import asyncio
+
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
@@ -101,13 +108,14 @@ class CambSpeaker(BaseSpeaker):
 
             # Accumulate the stream into a single block
             chunks = []
+
             async def collect() -> None:
                 async for chunk in self.stream_speak(text):
                     if isinstance(chunk, str):
                         chunks.append(chunk)
 
             loop.run_until_complete(collect())
-            full_audio = ",".join(chunks) # Simplified
+            full_audio = ",".join(chunks)  # Simplified
         except Exception as e:
             print(f"Sync speak error: {e}")
             return None, 0.0

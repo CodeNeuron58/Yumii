@@ -8,6 +8,7 @@ Platform backends (handled automatically by the `keyring` library):
 API keys are NEVER written to disk as plaintext.
 Non-sensitive preferences (personality, provider choice) stay in config.json.
 """
+
 from __future__ import annotations
 
 import sys
@@ -20,25 +21,29 @@ import keyring.errors
 SERVICE_NAME = "Yumi"
 
 # Keys that are secrets (live ONLY in the OS keychain)
-CREDENTIAL_KEYS: frozenset[str] = frozenset({
-    "ELEVENLABS_API_KEY",
-    "ELEVENLABS_VOICE_ID",
-    "CAMB_API_KEY",
-    "CAMB_VOICE_ID",
-    "GROQ_API_KEY",
-    "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY",
-})
+CREDENTIAL_KEYS: frozenset[str] = frozenset(
+    {
+        "ELEVENLABS_API_KEY",
+        "ELEVENLABS_VOICE_ID",
+        "CAMB_API_KEY",
+        "CAMB_VOICE_ID",
+        "GROQ_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+    }
+)
 
 # Keys that are preferences (safe to store in plaintext config.json)
-PREFERENCE_KEYS: frozenset[str] = frozenset({
-    "LLM_PROVIDER",
-    "PERSONALITY",
-    "TTS_PROVIDER",
-    "STT_PROVIDER",
-    "WHISPER_MODEL_SIZE",
-    "COMPUTE_PROFILE",
-})
+PREFERENCE_KEYS: frozenset[str] = frozenset(
+    {
+        "LLM_PROVIDER",
+        "PERSONALITY",
+        "TTS_PROVIDER",
+        "STT_PROVIDER",
+        "WHISPER_MODEL_SIZE",
+        "COMPUTE_PROFILE",
+    }
+)
 
 
 def keychain_name() -> str:

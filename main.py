@@ -1,9 +1,12 @@
 """Backward-compatibility wrapper for starting the Yumi API server."""
+
 import os
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 if __name__ == "__main__":
     import uvicorn
+
     # Import the FastAPI app from the new modular structure
     from yumi.api.server import app
 

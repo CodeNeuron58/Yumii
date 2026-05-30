@@ -3,13 +3,15 @@
 Defines the LangGraph workflow that orchestrates the LLM interaction loop
 and maintains the conversational state.
 """
-from langgraph.graph import StateGraph, END
+
+from typing import Any
+
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import END, StateGraph
 
 from yumi.agent.nodes import chat_node
 from yumi.core.types import MainState
 
-from typing import Any
 
 def build_graph() -> Any:
     """Build and return the compiled LangGraph for Yumi's reasoning engine.
@@ -20,16 +22,18 @@ def build_graph() -> Any:
     def think_node(state: MainState) -> dict:
         """Run the LLM ReAct loop and return a structured YumiResponse."""
         print(f"User: {state['input']}")
-        result = chat_node({
-            "input": state["input"],
-            "messages": state.get("messages", []),
-            "session_id": state["session_id"]
-        })
+        result = chat_node(
+            {
+                "input": state["input"],
+                "messages": state.get("messages", []),
+                "session_id": state["session_id"],
+            }
+        )
         return {
             "response": result["response"],
             "expression": result.get("expression") or "normal",
             "motion": result.get("motion") or "idle",
-            "messages": result.get("messages", [])
+            "messages": result.get("messages", []),
         }
 
     print("Building LangGraph...")

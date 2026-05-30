@@ -3,30 +3,35 @@ Voice Activity Detection (VAD) and Speech-to-Text (STT) pipeline.
 
 Captures audio streams, detects speech boundaries, and processes utterances.
 """
-import io
+
 import asyncio
-from typing import Callable
-import wave
 import collections
+import io
+import wave
+from typing import Callable
+
 import numpy as np
 import torch
+
 from yumi.audio.stt_factory import get_stt_provider
 
-RATE       = 16000
+RATE = 16000
 FRAME_SIZE = 512
-CHANNELS   = 1
+CHANNELS = 1
 
-SPEECH_TRIGGER_FRAMES    = 8
-SILENCE_END_FRAMES       = 12
-MIN_SPEECH_DURATION_SEC  = 0.7
-SILERO_THRESHOLD         = 0.5
-RMS_ENERGY_GATE          = 0.008
+SPEECH_TRIGGER_FRAMES = 8
+SILENCE_END_FRAMES = 12
+MIN_SPEECH_DURATION_SEC = 0.7
+SILERO_THRESHOLD = 0.5
+RMS_ENERGY_GATE = 0.008
 NO_SPEECH_PROB_THRESHOLD = 0.45
+
 
 def float_to_pcm16(audio: np.ndarray) -> np.ndarray:
     """Convert float32 audio data to PCM int16 format."""
     audio = np.clip(audio, -1, 1)
     return (audio * 32767).astype(np.int16)
+
 
 def normalize_audio(audio: np.ndarray) -> np.ndarray:
     """Normalize audio amplitude to a safe peak value."""
@@ -36,9 +41,11 @@ def normalize_audio(audio: np.ndarray) -> np.ndarray:
         return audio
     return ((audio_float / max_val) * 0.9 * 32767.0).astype(np.int16)
 
+
 def rms_energy(audio_float32: np.ndarray) -> float:
     """Calculate the Root Mean Square (RMS) energy of an audio frame."""
-    return float(np.sqrt(np.mean(audio_float32 ** 2)))
+    return float(np.sqrt(np.mean(audio_float32**2)))
+
 
 def _pcm16_to_wav_bytes(audio_int16: np.ndarray, sample_rate: int = RATE) -> bytes:
     """Convert a PCM int16 numpy array to a valid WAV byte string."""
@@ -57,7 +64,12 @@ class AudioPipeline:
     Uses Silero VAD for speech detection and a pluggable BaseSTTProvider for transcription.
     """
 
-    def __init__(self, provider: str = "local", model_size: str = "base", groq_api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        provider: str = "local",
+        model_size: str = "base",
+        groq_api_key: str | None = None,
+    ) -> None:
         """Initialize the audio pipeline, loading VAD and STT models."""
         # VAD is always loaded locally
         print("Loading Silero VAD...")
@@ -85,7 +97,9 @@ class AudioPipeline:
     def _reset_vad(self) -> None:
         self._silero_model.reset_states()
 
-    async def stream_capture(self, queue: asyncio.Queue, on_speech_start: Callable[[], None] | None = None) -> np.ndarray:
+    async def stream_capture(
+        self, queue: asyncio.Queue, on_speech_start: Callable[[], None] | None = None
+    ) -> np.ndarray:
         """Continuously consume audio chunks from a queue until a speech segment completes."""
         self._reset_vad()
         recording = []
@@ -126,7 +140,11 @@ class AudioPipeline:
                     silence_count = sum(1 for _, s in pre_buffer if not s)
                     if silence_count >= SILENCE_END_FRAMES:
                         print("🔇  Speech ended (stream)")
-                        return np.concatenate(recording) if recording else np.array([], dtype=np.int16)
+                        return (
+                            np.concatenate(recording)
+                            if recording
+                            else np.array([], dtype=np.int16)
+                        )
 
         return np.array([], dtype=np.int16)
 
@@ -138,7 +156,9 @@ class AudioPipeline:
         """Convert a complete audio utterance into text."""
         duration_sec = len(audio_data) / RATE
         if duration_sec < MIN_SPEECH_DURATION_SEC:
-            print(f"⚠  Audio too short ({duration_sec:.2f}s < {MIN_SPEECH_DURATION_SEC}s), skipping.")
+            print(
+                f"⚠  Audio too short ({duration_sec:.2f}s < {MIN_SPEECH_DURATION_SEC}s), skipping."
+            )
             return ""
 
         text = self.transcriber.transcribe(audio_data)

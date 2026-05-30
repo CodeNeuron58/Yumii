@@ -2,8 +2,10 @@
 
 Defines the contracts for Text-to-Speech (TTS) and Speech-to-Text (STT) providers.
 """
+
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Any
+from typing import Any, AsyncGenerator
+
 
 class BaseSpeaker(ABC):
     """Abstract Base Class for Yumi's TTS (Text-to-Speech) providers."""
@@ -26,6 +28,7 @@ class BaseSpeaker(ABC):
 
         """
         pass
+
 
 class BaseSTTProvider(ABC):
     """Abstract Base Class for Yumi's STT (Speech-to-Text) providers."""

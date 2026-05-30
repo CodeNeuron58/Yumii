@@ -1,11 +1,14 @@
 """LLM (Large Language Model) agent initialization and caching."""
+
+from langchain.agents import create_agent
+from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from pydantic import BaseModel, Field
+
 from yumi.core.config import settings
 from yumi.tools import tools
-from langchain.agents import create_agent
+
 
 class YumiResponse(BaseModel):
     """Yumi's structured reply.
@@ -29,6 +32,7 @@ class YumiResponse(BaseModel):
             "nod, shakehead, tilthead, fidget, forward, lookaway, greeting, idle"
         )
     )
+
 
 provider = settings.llm_provider.lower()
 
@@ -69,6 +73,7 @@ def _build_system_prompt(personality_name: str) -> str:
     """Return the full system prompt for a personality (prompt file + tool hint)."""
     # Import here to avoid a circular import at module load time
     from yumi.agent.personality_manager import personality_manager
+
     base = personality_manager.load_personality(personality_name)
     return base + _TOOL_HINT
 

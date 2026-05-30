@@ -1,8 +1,11 @@
 """Shared type definitions for the Yumi codebase."""
-from typing import TypedDict, Annotated, Literal
+
+from typing import Annotated, Literal, TypedDict
+
 from langgraph.graph import add_messages
 
 # --- AI Reasoning Types ---
+
 
 class MainState(TypedDict):
     """The shared state for Yumi's LangGraph reasoning engine."""
@@ -14,6 +17,9 @@ class MainState(TypedDict):
     motion: str
     session_id: str
 
+
 # --- Personality Types ---
 
-PERSONALITY_TYPE = Literal["caring", "tsundere", "genki", "kuudere", "yandere", "dandere"]
+PERSONALITY_TYPE = Literal[
+    "caring", "tsundere", "genki", "kuudere", "yandere", "dandere"
+]

@@ -1,9 +1,12 @@
-""" Concrete implementations of Speech-to-Text (STT) providers.
+"""Concrete implementations of Speech-to-Text (STT) providers.
 
 Includes a local CPU-based `faster-whisper` provider and a cloud-based `Groq` provider.
 """
+
 import numpy as np
+
 from yumi.core.interfaces import BaseSTTProvider
+
 
 class LocalSTT(BaseSTTProvider):
     """Transcription using faster-whisper on CPU."""
@@ -11,6 +14,7 @@ class LocalSTT(BaseSTTProvider):
     def __init__(self, model_size: str = "base") -> None:
         """Initialize the local Whisper model."""
         from faster_whisper import WhisperModel
+
         print(f"Loading Whisper model ({model_size}) on CPU...")
         self._whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
         print(f"Whisper model ({model_size}) loaded.")
@@ -37,12 +41,14 @@ class LocalSTT(BaseSTTProvider):
 
         return "".join(text_parts).strip() or None
 
+
 class GroqSTT(BaseSTTProvider):
     """Transcription using Groq's Whisper API."""
 
     def __init__(self, api_key: str) -> None:
         """Initialize the Groq API client."""
         from groq import Groq
+
         self._groq_client = Groq(api_key=api_key)
         print("Groq Whisper STT ready (whisper-large-v3-turbo).")
 
@@ -51,11 +57,12 @@ class GroqSTT(BaseSTTProvider):
         # Helper to encode as WAV bytes
         import io
         import wave
+
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
-            wf.setframerate(16000) # RATE
+            wf.setframerate(16000)  # RATE
             wf.writeframes(audio_data.tobytes())
 
         try:

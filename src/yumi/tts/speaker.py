@@ -1,12 +1,16 @@
 """
 ElevenLabs TTS (Text-to-Speech) provider for Yumi.
 """
+
 import base64
+from typing import Any, AsyncGenerator
+
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
+
 from yumi.core.config import settings
 from yumi.core.interfaces import BaseSpeaker
-from typing import AsyncGenerator, Any
+
 
 class YumiSpeaker(BaseSpeaker):
     """TTS implementation using the ElevenLabs cloud API."""
@@ -31,7 +35,7 @@ class YumiSpeaker(BaseSpeaker):
         audio_base64, duration = self.speak(text)
         if audio_base64:
             # Yield metadata first to satisfy the engine's expectations
-            yield {"type": "metadata", "sampleRate": 22050} # ElevenLabs default
+            yield {"type": "metadata", "sampleRate": 22050}  # ElevenLabs default
             # Yield the full audio as a single chunk
             yield audio_base64
         else:

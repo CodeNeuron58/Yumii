@@ -1,21 +1,23 @@
 """FastAPI server for the Yumi backend.
 
-Provides a WebSocket endpoint for real-time communication and serves the 
+Provides a WebSocket endpoint for real-time communication and serves the
 Live2D frontend assets.
 """
-import os
+
 import asyncio
+import os
 from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from yumi.core.engine import YumiEngine
 
-from typing import AsyncGenerator, Any
-
 # The Engine handles all the heavy lifting: STT, LLM, TTS, and state
 engine = YumiEngine()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
@@ -29,6 +31,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     asyncio.create_task(engine.tts_speaker_task())
     yield
 
+
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
@@ -38,6 +41,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
@@ -57,9 +61,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         if websocket in engine.active_connections:
             engine.active_connections.remove(websocket)
 
+
 # Mount frontend
 # Path logic: src/yumi/api/server.py -> src/yumi/api -> src/yumi -> src -> root
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+root_dir = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 webui_dir = os.path.join(root_dir, "assets", "webui")
 avatar_dir = os.path.join(root_dir, "assets", "avatar")
 

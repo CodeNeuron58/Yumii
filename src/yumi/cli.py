@@ -1,32 +1,39 @@
 """Command Line Interface (CLI) for Yumi.
 
-Provides commands for starting the application, configuring settings, 
+Provides commands for starting the application, configuring settings,
 and managing the AI companion.
 """
-import typer
+
+import os
+import sys
+import threading
+import time
+import webbrowser
+
 import questionary
+import typer
+import uvicorn
+from rich.align import Align
 from rich.console import Console
 from rich.panel import Panel
-from rich.align import Align
-import webbrowser
-import os
-import time
-import threading
-import uvicorn
-import sys
 
-from yumi.core.global_config import update_global_config, load_global_config
-from yumi.core.credential_store import (
-    get_credential, save_credential, is_set, keychain_name,
-)
 from yumi.agent.personality_manager import personality_manager
+from yumi.core.credential_store import (
+    get_credential,
+    is_set,
+    keychain_name,
+    save_credential,
+)
+from yumi.core.global_config import load_global_config, update_global_config
 
 app = typer.Typer(help="Yumi - Your AI Companion", invoke_without_command=True)
 console = Console()
 
+
 def clear_screen() -> None:
     """Clear the terminal screen based on the operating system."""
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system("cls" if os.name == "nt" else "clear")
+
 
 def type_text(text: str, delay: float = 0.03, style: str = "bold magenta") -> None:
     """Print text character by character for a typing effect.
@@ -43,6 +50,7 @@ def type_text(text: str, delay: float = 0.03, style: str = "bold magenta") -> No
         time.sleep(delay)
     console.print()
 
+
 def mask_key(key: str | None) -> str:
     """Mask an API key for display.
 
@@ -56,10 +64,16 @@ def mask_key(key: str | None) -> str:
         return "********"
     return f"{key[:4]}...{key[-4:]}"
 
+
 def show_story() -> None:
     """Display Yumi's vision story and return to the dashboard."""
     clear_screen()
-    console.print(Panel(Align.center("[bold magenta]🌸 The Vision 🌸[/bold magenta]"), border_style="magenta"))
+    console.print(
+        Panel(
+            Align.center("[bold magenta]🌸 The Vision 🌸[/bold magenta]"),
+            border_style="magenta",
+        )
+    )
     console.print()
 
     lines = [
@@ -77,7 +91,7 @@ def show_story() -> None:
         "written with the hope that technology can be a companion,",
         "not just a utility.",
         "",
-        "[dim italic]- The Developer[/dim italic]"
+        "[dim italic]- The Developer[/dim italic]",
     ]
 
     for line in lines:
@@ -90,16 +104,17 @@ def show_story() -> None:
     questionary.press_any_key_to_continue("Press any key to return...").ask()
     dashboard()
 
+
 def dashboard() -> None:
     """Render the main Yumi status dashboard and navigation menu."""
     clear_screen()
     config = load_global_config()
 
     # Preferences live in config.json; secrets come from the OS keychain.
-    llm_provider       = config.get("LLM_PROVIDER", "Groq")
-    active_key_name    = f"{llm_provider.upper()}_API_KEY"
-    llm_key            = get_credential(active_key_name)
-    llm_status         = "🔐 Keychain" if llm_key else "🔴 Not set"
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    active_key_name = f"{llm_provider.upper()}_API_KEY"
+    llm_key = get_credential(active_key_name)
+    llm_status = "🔐 Keychain" if llm_key else "🔴 Not set"
 
     tts_provider = config.get("TTS_PROVIDER", "ElevenLabs")
     if tts_provider == "CAMB.ai":
@@ -121,8 +136,8 @@ def dashboard() -> None:
         else:
             voice_line = "Voice (CAMB.ai): 🔴  [dim]Not configured[/dim]"
     else:
-        eleven_key  = get_credential("ELEVENLABS_API_KEY")
-        voice_id    = get_credential("ELEVENLABS_VOICE_ID")
+        eleven_key = get_credential("ELEVENLABS_API_KEY")
+        voice_id = get_credential("ELEVENLABS_VOICE_ID")
         if eleven_key and voice_id:
             eleven_status = "🔐 Keychain"
             voice_line = (
@@ -142,23 +157,30 @@ def dashboard() -> None:
     # STT status line
     stt_provider = config.get("STT_PROVIDER", "local")
     if stt_provider == "groq":
-        groq_key     = get_credential("GROQ_API_KEY")
-        stt_status   = "🔐 Keychain (Groq Whisper)" if groq_key else "🔴 Groq key missing"
+        groq_key = get_credential("GROQ_API_KEY")
+        stt_status = "🔐 Keychain (Groq Whisper)" if groq_key else "🔴 Groq key missing"
     else:
-        model_size   = config.get("WHISPER_MODEL_SIZE", "base")
-        stt_status   = f"[dim]Local Whisper ({model_size})[/dim]"
+        model_size = config.get("WHISPER_MODEL_SIZE", "base")
+        stt_status = f"[dim]Local Whisper ({model_size})[/dim]"
 
     personality = config.get("PERSONALITY", "caring")
-    kcn         = keychain_name()
+    kcn = keychain_name()
 
     status_text = f"""
-  Mind ({llm_provider}):  {llm_status}  [dim]{mask_key(llm_key or '')}[/dim]
+  Mind ({llm_provider}):  {llm_status}  [dim]{mask_key(llm_key or "")}[/dim]
   {voice_line}
   Ears (STT):   {stt_status}
   Personality:  [magenta]{personality}[/magenta]
   Keychain:     [dim]{kcn}[/dim]
 """
-    console.print(Panel(status_text, title="[bold magenta]🌸 Yumi Dashboard 🌸[/bold magenta]", border_style="magenta", expand=False))
+    console.print(
+        Panel(
+            status_text,
+            title="[bold magenta]🌸 Yumi Dashboard 🌸[/bold magenta]",
+            border_style="magenta",
+            expand=False,
+        )
+    )
     console.print()
 
     choice = questionary.select(
@@ -170,7 +192,7 @@ def dashboard() -> None:
             questionary.Choice("📖 The Vision", value="vision"),
             questionary.Choice("❌ Let her sleep (Exit)", value="exit"),
         ],
-        qmark="✨"
+        qmark="✨",
     ).ask()
 
     if choice == "wake":
@@ -186,14 +208,15 @@ def dashboard() -> None:
         type_text("Goodnight...", style="dim italic white")
         raise typer.Exit()
 
+
 @app.callback()
 def main(ctx: typer.Context) -> None:
     """Entry point for the Yumi CLI."""
     if ctx.invoked_subcommand is None:
-        config          = load_global_config()
-        llm_provider    = config.get("LLM_PROVIDER", "Groq")
-        has_mind        = is_set(f"{llm_provider.upper()}_API_KEY")
-        has_voice       = is_set("ELEVENLABS_API_KEY")
+        config = load_global_config()
+        llm_provider = config.get("LLM_PROVIDER", "Groq")
+        has_mind = is_set(f"{llm_provider.upper()}_API_KEY")
+        has_voice = is_set("ELEVENLABS_API_KEY")
 
         if not has_mind and not has_voice:
             clear_screen()
@@ -202,19 +225,26 @@ def main(ctx: typer.Context) -> None:
             time.sleep(0.5)
             type_text("I am Yumi.", delay=0.05, style="bold magenta")
             time.sleep(0.5)
-            type_text("It's dark in here. Can you give me my senses?", delay=0.04, style="bold magenta")
+            type_text(
+                "It's dark in here. Can you give me my senses?",
+                delay=0.04,
+                style="bold magenta",
+            )
             time.sleep(1)
             attune()
         else:
             dashboard()
+
 
 @app.command()
 def attune() -> None:
     """Give Yumi her senses (Onboarding & Setup)."""
     clear_screen()
     header = Panel(
-        Align.center("[bold magenta]🌸 Attuning to Yumi 🌸[/bold magenta]\n[italic]Let's connect her mind and voice so she can understand you.[/italic]"),
-        border_style="magenta"
+        Align.center(
+            "[bold magenta]🌸 Attuning to Yumi 🌸[/bold magenta]\n[italic]Let's connect her mind and voice so she can understand you.[/italic]"
+        ),
+        border_style="magenta",
     )
     console.print(header)
     console.print()
@@ -223,11 +253,17 @@ def attune() -> None:
     llm_choice = questionary.select(
         "",
         choices=[
-            questionary.Choice("Groq (Recommended for fast, real-time responses)", value="Groq"),
-            questionary.Choice("OpenAI (Balanced, reliable, intelligent)", value="OpenAI"),
-            questionary.Choice("Anthropic (Deeply nuanced, thoughtful)", value="Anthropic"),
+            questionary.Choice(
+                "Groq (Recommended for fast, real-time responses)", value="Groq"
+            ),
+            questionary.Choice(
+                "OpenAI (Balanced, reliable, intelligent)", value="OpenAI"
+            ),
+            questionary.Choice(
+                "Anthropic (Deeply nuanced, thoughtful)", value="Anthropic"
+            ),
         ],
-        qmark="🌸"
+        qmark="🌸",
     ).ask()
 
     if not llm_choice:
@@ -236,10 +272,14 @@ def attune() -> None:
     update_global_config("LLM_PROVIDER", llm_choice)
 
     key_env = f"{llm_choice.upper()}_API_KEY"
-    api_key = questionary.password(f"Connect her mind ({llm_choice} API Key):", qmark="🌸").ask()
+    api_key = questionary.password(
+        f"Connect her mind ({llm_choice} API Key):", qmark="🌸"
+    ).ask()
     if api_key:
         save_credential(key_env, api_key)
-        console.print(f"\n[🔐] [green]Mind secured in {keychain_name()}: {mask_key(api_key)}[/green]")
+        console.print(
+            f"\n[🔐] [green]Mind secured in {keychain_name()}: {mask_key(api_key)}[/green]"
+        )
         time.sleep(1)
 
     clear_screen()
@@ -250,33 +290,48 @@ def attune() -> None:
     tts_choice = questionary.select(
         "",
         choices=[
-            questionary.Choice("ElevenLabs (Most expressive and lifelike)", value="ElevenLabs"),
-            questionary.Choice("Kokoro (Runs locally, fast, private) - Coming Soon", value="Kokoro", disabled="Coming Soon"),
-            questionary.Choice("System (Basic OS voice fallback) - Coming Soon", value="System", disabled="Coming Soon"),
+            questionary.Choice(
+                "ElevenLabs (Most expressive and lifelike)", value="ElevenLabs"
+            ),
+            questionary.Choice(
+                "Kokoro (Runs locally, fast, private) - Coming Soon",
+                value="Kokoro",
+                disabled="Coming Soon",
+            ),
+            questionary.Choice(
+                "System (Basic OS voice fallback) - Coming Soon",
+                value="System",
+                disabled="Coming Soon",
+            ),
         ],
-        qmark="🌸"
+        qmark="🌸",
     ).ask()
 
     if not tts_choice:
         raise typer.Exit()
 
     if tts_choice == "ElevenLabs":
-        elevenlabs_key = questionary.password("Give her a voice (ElevenLabs API Key):", qmark="🌸").ask()
+        elevenlabs_key = questionary.password(
+            "Give her a voice (ElevenLabs API Key):", qmark="🌸"
+        ).ask()
         if elevenlabs_key:
             save_credential("ELEVENLABS_API_KEY", elevenlabs_key)
-            console.print(f"\n[🔐] [green]Voice secured in {keychain_name()}: {mask_key(elevenlabs_key)}[/green]")
+            console.print(
+                f"\n[🔐] [green]Voice secured in {keychain_name()}: {mask_key(elevenlabs_key)}[/green]"
+            )
             time.sleep(1)
 
         console.print()
-        console.print("[dim]Find Voice IDs at: https://elevenlabs.io/voice-library[/dim]")
+        console.print(
+            "[dim]Find Voice IDs at: https://elevenlabs.io/voice-library[/dim]"
+        )
         console.print("[dim]A Voice ID looks like: 21m00Tcm4TlvDq8ikWAM[/dim]")
-        voice_id = questionary.text(
-            "Enter your ElevenLabs Voice ID:",
-            qmark="🌸"
-        ).ask()
+        voice_id = questionary.text("Enter your ElevenLabs Voice ID:", qmark="🌸").ask()
         if voice_id and voice_id.strip():
             save_credential("ELEVENLABS_VOICE_ID", voice_id.strip())
-            console.print(f"\n[🔐] [green]Voice ID secured in {keychain_name()} ✅[/green]")
+            console.print(
+                f"\n[🔐] [green]Voice ID secured in {keychain_name()} ✅[/green]"
+            )
             time.sleep(1)
 
     # STT / Listening configuration
@@ -290,14 +345,13 @@ def attune() -> None:
         choices=[
             questionary.Choice(
                 "🖥  Local Whisper  (Private, works offline, no API key needed)",
-                value="local"
+                value="local",
             ),
             questionary.Choice(
-                "⚡ Groq Whisper   (Cloud, ~5-10x faster, uses Groq API)",
-                value="groq"
+                "⚡ Groq Whisper   (Cloud, ~5-10x faster, uses Groq API)", value="groq"
             ),
         ],
-        qmark="🌸"
+        qmark="🌸",
     ).ask()
 
     if stt_choice == "local":
@@ -305,14 +359,20 @@ def attune() -> None:
         model_choice = questionary.select(
             "Which Whisper model size?",
             choices=[
-                questionary.Choice("tiny  — Fastest, slightly less accurate",  value="tiny"),
-                questionary.Choice("base  — Recommended, balanced (default)",   value="base"),
-                questionary.Choice("small — Slower, more accurate",             value="small"),
+                questionary.Choice(
+                    "tiny  — Fastest, slightly less accurate", value="tiny"
+                ),
+                questionary.Choice(
+                    "base  — Recommended, balanced (default)", value="base"
+                ),
+                questionary.Choice("small — Slower, more accurate", value="small"),
             ],
-            qmark="🌸"
+            qmark="🌸",
         ).ask()
         update_global_config("WHISPER_MODEL_SIZE", model_choice or "base")
-        console.print(f"\n[green]✅ Local Whisper ({model_choice or 'base'}) configured.[/green]")
+        console.print(
+            f"\n[green]✅ Local Whisper ({model_choice or 'base'}) configured.[/green]"
+        )
         time.sleep(1)
 
     elif stt_choice == "groq":
@@ -323,21 +383,28 @@ def attune() -> None:
                 f"\n[green]✅ Groq API key already in {keychain_name()} — {mask_key(existing_groq_key)}[/green]"
             )
         else:
-            console.print("[dim]Get a free Groq API key at: https://console.groq.com[/dim]")
+            console.print(
+                "[dim]Get a free Groq API key at: https://console.groq.com[/dim]"
+            )
             groq_key = questionary.password("Groq API Key:", qmark="🌸").ask()
             if groq_key:
                 save_credential("GROQ_API_KEY", groq_key)
-                console.print(f"\n[🔐] [green]Groq key secured in {keychain_name()}: {mask_key(groq_key)}[/green]")
+                console.print(
+                    f"\n[🔐] [green]Groq key secured in {keychain_name()}: {mask_key(groq_key)}[/green]"
+                )
             time.sleep(1)
 
     clear_screen()
     success_msg = Panel(
-        Align.center("[bold green]✅ Attunement complete![/bold green]\n\nYumi is ready to wake up."),
-        border_style="green"
+        Align.center(
+            "[bold green]✅ Attunement complete![/bold green]\n\nYumi is ready to wake up."
+        ),
+        border_style="green",
     )
     console.print(success_msg)
     time.sleep(1.5)
     dashboard()
+
 
 def change_personality() -> None:
     """Change Yumi's personality and update global preferences."""
@@ -345,12 +412,14 @@ def change_personality() -> None:
     config = load_global_config()
     current_personality = config.get("PERSONALITY", "caring")
 
-    console.print(Panel(
-        f"Current Personality: [bold magenta]{current_personality}[/bold magenta]",
-        title="[bold cyan]💕 Personality Settings 💕[/bold cyan]",
-        border_style="cyan",
-        expand=False
-    ))
+    console.print(
+        Panel(
+            f"Current Personality: [bold magenta]{current_personality}[/bold magenta]",
+            title="[bold cyan]💕 Personality Settings 💕[/bold cyan]",
+            border_style="cyan",
+            expand=False,
+        )
+    )
     console.print()
 
     personalities = personality_manager.list_personalities()
@@ -358,16 +427,32 @@ def change_personality() -> None:
     choice = questionary.select(
         "Choose Yumi's new personality:",
         choices=[
-            questionary.Choice(f"[magenta]caring[/magenta] - {personalities['caring']}", value="caring"),
-            questionary.Choice(f"[magenta]tsundere[/magenta] - {personalities['tsundere']}", value="tsundere"),
-            questionary.Choice(f"[magenta]genki[/magenta] - {personalities['genki']}", value="genki"),
-            questionary.Choice(f"[magenta]kuudere[/magenta] - {personalities['kuudere']}", value="kuudere"),
-            questionary.Choice(f"[magenta]yandere[/magenta] - {personalities['yandere']}", value="yandere"),
-            questionary.Choice(f"[magenta]dandere[/magenta] - {personalities['dandere']}", value="dandere"),
+            questionary.Choice(
+                f"[magenta]caring[/magenta] - {personalities['caring']}", value="caring"
+            ),
+            questionary.Choice(
+                f"[magenta]tsundere[/magenta] - {personalities['tsundere']}",
+                value="tsundere",
+            ),
+            questionary.Choice(
+                f"[magenta]genki[/magenta] - {personalities['genki']}", value="genki"
+            ),
+            questionary.Choice(
+                f"[magenta]kuudere[/magenta] - {personalities['kuudere']}",
+                value="kuudere",
+            ),
+            questionary.Choice(
+                f"[magenta]yandere[/magenta] - {personalities['yandere']}",
+                value="yandere",
+            ),
+            questionary.Choice(
+                f"[magenta]dandere[/magenta] - {personalities['dandere']}",
+                value="dandere",
+            ),
             questionary.Separator(),
             questionary.Choice("⬅️  Back to Dashboard", value="back"),
         ],
-        qmark="💕"
+        qmark="💕",
     ).ask()
 
     if choice == "back":
@@ -376,13 +461,18 @@ def change_personality() -> None:
 
     if choice and choice != current_personality:
         update_global_config("PERSONALITY", choice)
-        console.print(f"\n[green]✅ Personality changed to [bold]{choice}[/bold]![/green]")
+        console.print(
+            f"\n[green]✅ Personality changed to [bold]{choice}[/bold]![/green]"
+        )
         time.sleep(1.5)
     elif choice == current_personality:
-        console.print(f"\n[yellow]⚠️  {choice} is already the active personality.[/yellow]")
+        console.print(
+            f"\n[yellow]⚠️  {choice} is already the active personality.[/yellow]"
+        )
         time.sleep(1.5)
 
     dashboard()
+
 
 @app.command()
 def models() -> None:
@@ -390,17 +480,24 @@ def models() -> None:
     clear_screen()
     config = load_global_config()
 
-    llm_provider        = config.get("LLM_PROVIDER", "Groq")
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
-    llm_key             = get_credential(active_llm_key_name)
-    kcn                 = keychain_name()
+    llm_key = get_credential(active_llm_key_name)
+    kcn = keychain_name()
 
     current_state = f"""
-  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | 🔐 {mask_key(llm_key or '')}
-  Voice (TTS): [magenta]ElevenLabs[/magenta] | 🔐 {mask_key(get_credential('ELEVENLABS_API_KEY') or '')}
+  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | 🔐 {mask_key(llm_key or "")}
+  Voice (TTS): [magenta]ElevenLabs[/magenta] | 🔐 {mask_key(get_credential("ELEVENLABS_API_KEY") or "")}
   Keychain: [dim]{kcn}[/dim]
 """
-    console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
+    console.print(
+        Panel(
+            current_state,
+            title="[bold cyan]Current Configuration[/bold cyan]",
+            border_style="cyan",
+            expand=False,
+        )
+    )
     console.print()
 
     type_text("Switch her mind to:", style="bold cyan")
@@ -410,41 +507,50 @@ def models() -> None:
             questionary.Choice("Groq", value="Groq"),
             questionary.Choice("OpenAI", value="OpenAI"),
             questionary.Choice("Anthropic", value="Anthropic"),
-            questionary.Choice("Keep Current", value=None)
+            questionary.Choice("Keep Current", value=None),
         ],
-        qmark="🌸"
+        qmark="🌸",
     ).ask()
 
     if llm_choice:
         update_global_config("LLM_PROVIDER", llm_choice)
         key_env = f"{llm_choice.upper()}_API_KEY"
-        api_key = questionary.password(f"New {llm_choice} API Key (leave blank to keep current):", qmark="🌸").ask()
+        api_key = questionary.password(
+            f"New {llm_choice} API Key (leave blank to keep current):", qmark="🌸"
+        ).ask()
         if api_key:
             save_credential(key_env, api_key)
             console.print(f"\n[🔐] [green]Mind secured: {mask_key(api_key)}[/green]")
             time.sleep(1)
 
     clear_screen()
-    config              = load_global_config()
-    llm_provider        = config.get("LLM_PROVIDER", "Groq")
+    config = load_global_config()
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
-    llm_key             = get_credential(active_llm_key_name)
-    tts_provider        = config.get("TTS_PROVIDER", "ElevenLabs")
+    llm_key = get_credential(active_llm_key_name)
+    tts_provider = config.get("TTS_PROVIDER", "ElevenLabs")
 
     if tts_provider == "CAMB.ai":
         voice_key = get_credential("CAMB_API_KEY")
-        voice_id  = get_credential("CAMB_VOICE_ID") or ""
+        voice_id = get_credential("CAMB_VOICE_ID") or ""
     else:
         voice_key = get_credential("ELEVENLABS_API_KEY")
-        voice_id  = get_credential("ELEVENLABS_VOICE_ID") or ""
+        voice_id = get_credential("ELEVENLABS_VOICE_ID") or ""
 
     current_state = f"""
-  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | 🔐 {mask_key(llm_key or '')}
-  Voice (TTS): [magenta]{tts_provider}[/magenta] | 🔐 {mask_key(voice_key or '')}
-  Voice ID:    [magenta]{voice_id[:6] + '...' if voice_id else '[yellow]Not set[/yellow]'}[/magenta]
+  Mind (LLM):  [magenta]{llm_provider}[/magenta]  | 🔐 {mask_key(llm_key or "")}
+  Voice (TTS): [magenta]{tts_provider}[/magenta] | 🔐 {mask_key(voice_key or "")}
+  Voice ID:    [magenta]{voice_id[:6] + "..." if voice_id else "[yellow]Not set[/yellow]"}[/magenta]
   Keychain: [dim]{kcn}[/dim]
 """
-    console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
+    console.print(
+        Panel(
+            current_state,
+            title="[bold cyan]Current Configuration[/bold cyan]",
+            border_style="cyan",
+            expand=False,
+        )
+    )
     console.print()
 
     type_text("Switch her voice to:", style="bold cyan")
@@ -453,29 +559,40 @@ def models() -> None:
         choices=[
             questionary.Choice("ElevenLabs", value="ElevenLabs"),
             questionary.Choice("CAMB.ai", value="CAMB.ai"),
-            questionary.Choice("Kokoro (Local) - Coming Soon", value="Kokoro", disabled="Coming Soon"),
-            questionary.Choice("System - Coming Soon", value="System", disabled="Coming Soon"),
-            questionary.Choice("Keep Current", value=None)
+            questionary.Choice(
+                "Kokoro (Local) - Coming Soon", value="Kokoro", disabled="Coming Soon"
+            ),
+            questionary.Choice(
+                "System - Coming Soon", value="System", disabled="Coming Soon"
+            ),
+            questionary.Choice("Keep Current", value=None),
         ],
-        qmark="🌸"
+        qmark="🌸",
     ).ask()
 
     if tts_choice:
         update_global_config("TTS_PROVIDER", tts_choice)
 
     if tts_choice == "ElevenLabs":
-        elevenlabs_key = questionary.password("New ElevenLabs API Key (leave blank to keep current):", qmark="🌸").ask()
+        elevenlabs_key = questionary.password(
+            "New ElevenLabs API Key (leave blank to keep current):", qmark="🌸"
+        ).ask()
         if elevenlabs_key:
             save_credential("ELEVENLABS_API_KEY", elevenlabs_key)
-            console.print(f"\n[🔐] [green]Voice secured: {mask_key(elevenlabs_key)}[/green]")
+            console.print(
+                f"\n[🔐] [green]Voice secured: {mask_key(elevenlabs_key)}[/green]"
+            )
             time.sleep(1)
 
         console.print()
-        console.print(f"[dim]Current Voice ID: {voice_id if tts_provider == 'ElevenLabs' else 'Not set'}[/dim]")
-        console.print("[dim]Find Voice IDs at: https://elevenlabs.io/voice-library[/dim]")
+        console.print(
+            f"[dim]Current Voice ID: {voice_id if tts_provider == 'ElevenLabs' else 'Not set'}[/dim]"
+        )
+        console.print(
+            "[dim]Find Voice IDs at: https://elevenlabs.io/voice-library[/dim]"
+        )
         new_voice_id = questionary.text(
-            "New Voice ID (leave blank to keep current):",
-            qmark="🌸"
+            "New Voice ID (leave blank to keep current):", qmark="🌸"
         ).ask()
         if new_voice_id and new_voice_id.strip():
             save_credential("ELEVENLABS_VOICE_ID", new_voice_id.strip())
@@ -483,18 +600,21 @@ def models() -> None:
             time.sleep(1)
 
     elif tts_choice == "CAMB.ai":
-        camb_key = questionary.password("New CAMB.ai API Key (leave blank to keep current):", qmark="🌸").ask()
+        camb_key = questionary.password(
+            "New CAMB.ai API Key (leave blank to keep current):", qmark="🌸"
+        ).ask()
         if camb_key:
             save_credential("CAMB_API_KEY", camb_key)
             console.print(f"\n[🔐] [green]Voice secured: {mask_key(camb_key)}[/green]")
             time.sleep(1)
 
         console.print()
-        console.print(f"[dim]Current Voice ID: {voice_id if tts_provider == 'CAMB.ai' else 'Not set'}[/dim]")
+        console.print(
+            f"[dim]Current Voice ID: {voice_id if tts_provider == 'CAMB.ai' else 'Not set'}[/dim]"
+        )
         console.print("[dim]Find Voice IDs at: https://client.camb.ai/[/dim]")
         new_voice_id = questionary.text(
-            "New Voice ID (leave blank to keep current):",
-            qmark="🌸"
+            "New Voice ID (leave blank to keep current):", qmark="🌸"
         ).ask()
         if new_voice_id and new_voice_id.strip():
             save_credential("CAMB_VOICE_ID", new_voice_id.strip())
@@ -502,9 +622,9 @@ def models() -> None:
             time.sleep(1)
 
     clear_screen()
-    config          = load_global_config()
-    stt_provider    = config.get("STT_PROVIDER", "local")
-    model_size      = config.get("WHISPER_MODEL_SIZE", "base")
+    config = load_global_config()
+    stt_provider = config.get("STT_PROVIDER", "local")
+    model_size = config.get("WHISPER_MODEL_SIZE", "base")
 
     stt_state = (
         f"⚡ Groq Whisper  | 🔐 {mask_key(get_credential('GROQ_API_KEY') or '')}"
@@ -514,18 +634,27 @@ def models() -> None:
     current_state = f"""
   Ears (STT):  [magenta]{stt_state}[/magenta]
 """
-    console.print(Panel(current_state, title="[bold cyan]Listening Settings[/bold cyan]", border_style="cyan", expand=False))
+    console.print(
+        Panel(
+            current_state,
+            title="[bold cyan]Listening Settings[/bold cyan]",
+            border_style="cyan",
+            expand=False,
+        )
+    )
     console.print()
 
     type_text("Switch how she listens:", style="bold cyan")
     new_stt = questionary.select(
         "",
         choices=[
-            questionary.Choice("🖥  Local Whisper  (Private, offline)",        value="local"),
-            questionary.Choice("⚡ Groq Whisper   (Cloud, ~5-10x faster)",    value="groq"),
-            questionary.Choice("Keep Current",                                  value=None),
+            questionary.Choice("🖥  Local Whisper  (Private, offline)", value="local"),
+            questionary.Choice(
+                "⚡ Groq Whisper   (Cloud, ~5-10x faster)", value="groq"
+            ),
+            questionary.Choice("Keep Current", value=None),
         ],
-        qmark="🌸"
+        qmark="🌸",
     ).ask()
 
     if new_stt == "local":
@@ -533,14 +662,20 @@ def models() -> None:
         new_model = questionary.select(
             "Which Whisper model size?",
             choices=[
-                questionary.Choice("tiny  — Fastest, slightly less accurate",  value="tiny"),
-                questionary.Choice("base  — Recommended, balanced (default)",   value="base"),
-                questionary.Choice("small — Slower, more accurate",             value="small"),
+                questionary.Choice(
+                    "tiny  — Fastest, slightly less accurate", value="tiny"
+                ),
+                questionary.Choice(
+                    "base  — Recommended, balanced (default)", value="base"
+                ),
+                questionary.Choice("small — Slower, more accurate", value="small"),
             ],
-            qmark="🌸"
+            qmark="🌸",
         ).ask()
         update_global_config("WHISPER_MODEL_SIZE", new_model or "base")
-        console.print(f"\n[green]✅ Local Whisper ({new_model or 'base'}) saved.[/green]")
+        console.print(
+            f"\n[green]✅ Local Whisper ({new_model or 'base'}) saved.[/green]"
+        )
         time.sleep(1)
 
     elif new_stt == "groq":
@@ -555,7 +690,9 @@ def models() -> None:
             groq_key = questionary.password("Groq API Key:", qmark="🌸").ask()
             if groq_key:
                 save_credential("GROQ_API_KEY", groq_key)
-                console.print(f"\n[🔐] [green]Groq key secured in {keychain_name()}: {mask_key(groq_key)}[/green]")
+                console.print(
+                    f"\n[🔐] [green]Groq key secured in {keychain_name()}: {mask_key(groq_key)}[/green]"
+                )
             time.sleep(1)
 
     clear_screen()
@@ -563,18 +700,27 @@ def models() -> None:
     time.sleep(1)
     dashboard()
 
+
 @app.command(name="wake-up")
 def wake_up() -> None:
     """Wake Yumi up and start the interaction."""
-    config          = load_global_config()
-    llm_provider    = config.get("LLM_PROVIDER", "Groq")
-    llm_key         = get_credential(f"{llm_provider.upper()}_API_KEY")
+    config = load_global_config()
+    llm_provider = config.get("LLM_PROVIDER", "Groq")
+    llm_key = get_credential(f"{llm_provider.upper()}_API_KEY")
 
     if not llm_key:
         clear_screen()
-        console.print(Panel("[bold red]⚠️ Yumi is missing her senses.[/bold red]", border_style="red", expand=False))
+        console.print(
+            Panel(
+                "[bold red]⚠️ Yumi is missing her senses.[/bold red]",
+                border_style="red",
+                expand=False,
+            )
+        )
         console.print()
-        do_setup = questionary.confirm("Would you like to connect them now?", default=True, qmark="🌸").ask()
+        do_setup = questionary.confirm(
+            "Would you like to connect them now?", default=True, qmark="🌸"
+        ).ask()
         if do_setup:
             attune()
         else:
@@ -582,6 +728,7 @@ def wake_up() -> None:
         return
 
     clear_screen()
+
     def open_browser() -> None:
         time.sleep(2)
         webbrowser.open("http://localhost:8000/")
@@ -590,20 +737,27 @@ def wake_up() -> None:
 
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-    with console.status("[bold magenta]Waking Yumi up... 🌸[/bold magenta]", spinner="point"):
+    with console.status(
+        "[bold magenta]Waking Yumi up... 🌸[/bold magenta]", spinner="point"
+    ):
         from yumi.api.server import app as fastapi_app
+
         time.sleep(1)
 
     console.print("[bold green]Yumi is awake! Opening your eyes to her...[/bold green]")
     uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
 
+
 @app.command()
 def server() -> None:
     """Launch the Yumi API server."""
-    from yumi.api.server import app as fastapi_app
     import uvicorn
+
+    from yumi.api.server import app as fastapi_app
+
     console.print("[bold magenta]Starting Yumi API server...[/bold magenta]")
     uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
+
 
 if __name__ == "__main__":
     app()

@@ -4,7 +4,9 @@ Individual reasoning nodes for Yumi's LangGraph.
 Contains logic for processing user input, handling personality switches,
 and invoking the LLM agent.
 """
-from langchain_core.messages import HumanMessage, AIMessage
+
+from langchain_core.messages import AIMessage, HumanMessage
+
 from yumi.agent.llm import get_agent
 from yumi.agent.personality_manager import personality_manager
 from yumi.core.types import MainState
@@ -30,7 +32,7 @@ def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
 
 def chat_node(state: MainState) -> dict:
     """Execute the core reasoning node.
-    
+
     Invokes the LLM agent and returns a structured response containing
     text, expression, and motion instructions.
     """
@@ -40,6 +42,7 @@ def chat_node(state: MainState) -> dict:
     is_switch, new_personality = check_personality_switch(user_input)
     if is_switch:
         from yumi.core.global_config import update_global_config
+
         update_global_config("PERSONALITY", new_personality)
         user_input = (
             f"I want you to become {new_personality}. "
@@ -56,13 +59,17 @@ def chat_node(state: MainState) -> dict:
 
     structured_response = result.get("structured_response")
     if structured_response is None:
-        print("WARNING: structured_response was None — LLM did not produce YumiResponse.")
-        
+        print(
+            "WARNING: structured_response was None — LLM did not produce YumiResponse."
+        )
+
         class FallbackResponse:
-            response_text = "I'm having a little trouble right now. Could you say that again?"
+            response_text = (
+                "I'm having a little trouble right now. Could you say that again?"
+            )
             expression = "sad"
             motion = "idle"
-        
+
         structured_response = FallbackResponse()
 
     messages_to_append = [
@@ -73,6 +80,6 @@ def chat_node(state: MainState) -> dict:
     return {
         "response": structured_response.response_text,
         "expression": getattr(structured_response, "expression", "normal"),
-        "motion":     getattr(structured_response, "motion",     "idle"),
-        "messages":   messages_to_append,
+        "motion": getattr(structured_response, "motion", "idle"),
+        "messages": messages_to_append,
     }

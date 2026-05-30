@@ -4,15 +4,19 @@ Core reasoning and execution engine for Yumi.
 This module orchestrates the background tasks for audio capture, LLM reasoning,
 and TTS synthesis, passing data between them using asyncio Queues.
 """
+
 import asyncio
 import json
-from typing import List, Any, Dict
+from typing import Any, Dict, List
+
 from fastapi import WebSocket
+
+from yumi.agent.graph import build_graph
+from yumi.audio.stt import AudioPipeline
 from yumi.core.config import settings
 from yumi.core.interfaces import BaseSpeaker
 from yumi.tts.factory import get_speaker
-from yumi.audio.stt import AudioPipeline
-from yumi.agent.graph import build_graph
+
 
 class YumiEngine:
     """The central orchestration engine for Yumi.
@@ -39,7 +43,7 @@ class YumiEngine:
         self.pipeline = AudioPipeline(
             provider=self.stt_provider,
             model_size=self.model_size,
-            groq_api_key=self.groq_api_key
+            groq_api_key=self.groq_api_key,
         )
 
         print("Initializing Yumi Speaker...")
@@ -71,6 +75,7 @@ class YumiEngine:
         Triggers the global interrupt event and notifies the frontend when speech is detected,
         and pushes completed transcriptions to the reasoning queue.
         """
+
         def on_speech_start() -> None:
             # We allow interrupts even while speaking to achieve a "Gemini Live" feel.
             # The browser's echoCancellation and Silero VAD handle the filtering of Yumi's own voice.
@@ -81,7 +86,9 @@ class YumiEngine:
         print("Listener task active (streaming).")
         while True:
             try:
-                audio_segment = await self.pipeline.stream_capture(self.audio_input_queue, on_speech_start)
+                audio_segment = await self.pipeline.stream_capture(
+                    self.audio_input_queue, on_speech_start
+                )
                 if audio_segment is not None and len(audio_segment) > 0:
                     processed_audio = self.pipeline.process_audio(audio_segment)
                     if len(processed_audio) > 0:
@@ -116,8 +123,7 @@ class YumiEngine:
 
                 print(f"Reasoning starting for: {user_text}")
                 reasoning_result = await self.graph_app.ainvoke(
-                    {"input": user_text, "session_id": session_id}, 
-                    config=config
+                    {"input": user_text, "session_id": session_id}, config=config
                 )
 
                 if self.interrupt_event.is_set():
@@ -153,40 +159,57 @@ class YumiEngine:
                 # Handle providers that support the streaming interface
                 if hasattr(self.speaker, "stream_speak"):
                     try:
-                        async for chunk_data in self.speaker.stream_speak(response_text):
+                        async for chunk_data in self.speaker.stream_speak(
+                            response_text
+                        ):
                             if self.interrupt_event.is_set():
                                 break
 
-                            if isinstance(chunk_data, dict) and chunk_data.get("type") == "metadata":
-                                await self.broadcast_payload({
-                                    "type": "audio_start",
-                                    "sampleRate": chunk_data["sampleRate"],
-                                    "text": response_text,
-                                    "expression": expression,
-                                    "motion": motion
-                                })
+                            if (
+                                isinstance(chunk_data, dict)
+                                and chunk_data.get("type") == "metadata"
+                            ):
+                                await self.broadcast_payload(
+                                    {
+                                        "type": "audio_start",
+                                        "sampleRate": chunk_data["sampleRate"],
+                                        "text": response_text,
+                                        "expression": expression,
+                                        "motion": motion,
+                                    }
+                                )
                             else:
-                                await self.broadcast_payload({
-                                    "type": "audio_chunk",
-                                    "data": chunk_data
-                                })
+                                await self.broadcast_payload(
+                                    {"type": "audio_chunk", "data": chunk_data}
+                                )
                         if not self.interrupt_event.is_set():
                             await self.broadcast_payload({"type": "audio_end"})
                     except Exception as stream_err:
                         print(f"TTS Stream Error: {stream_err}")
-                        await self.broadcast_payload({
-                            "text": response_text, "expression": expression,
-                            "motion": motion, "audio": None, "error": f"TTS failed: {stream_err}"
-                        })
+                        await self.broadcast_payload(
+                            {
+                                "text": response_text,
+                                "expression": expression,
+                                "motion": motion,
+                                "audio": None,
+                                "error": f"TTS failed: {stream_err}",
+                            }
+                        )
                 else:
                     # Fallback for non-streaming providers
-                    audio_b64, duration = await asyncio.to_thread(self.speaker.speak, response_text)
+                    audio_b64, duration = await asyncio.to_thread(
+                        self.speaker.speak, response_text
+                    )
                     if self.interrupt_event.is_set():
                         continue
-                    await self.broadcast_payload({
-                        "text": response_text, "expression": expression,
-                        "motion": motion, "audio": audio_b64
-                    })
+                    await self.broadcast_payload(
+                        {
+                            "text": response_text,
+                            "expression": expression,
+                            "motion": motion,
+                            "audio": audio_b64,
+                        }
+                    )
                     if duration > 0:
                         slept = 0.0
                         while slept < (duration + 0.5):
