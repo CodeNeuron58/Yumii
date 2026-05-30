@@ -22,6 +22,7 @@ for key, value in _creds.items():
 
 class Settings(BaseSettings):
     """Pydantic settings model for the application configuration.
+
     Values are loaded from environment variables, which are pre-populated
     from the OS keychain and user preferences.
     """

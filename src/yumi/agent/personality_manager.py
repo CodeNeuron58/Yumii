@@ -1,3 +1,7 @@
+"""Personality management system for Yumi.
+
+Handles loading, switching, and listing available AI personalities from local files.
+"""
 import os
 from typing import Dict
 from yumi.core.global_config import load_global_config
@@ -16,6 +20,7 @@ class PersonalityManager:
     """Manages personality prompt loading and switching."""
     
     def __init__(self):
+        """Initialize the manager and set up personality file paths."""
         # Calculate project root (src/yumi/agent/personality_manager.py -> src/yumi/agent -> src/yumi -> src -> root)
         root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         self._prompts_dir = os.path.join(root_dir, "assets", "prompts")

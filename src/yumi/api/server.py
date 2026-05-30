@@ -1,3 +1,8 @@
+"""FastAPI server for the Yumi backend.
+
+Provides a WebSocket endpoint for real-time communication and serves the 
+Live2D frontend assets.
+"""
 import os
 import asyncio
 from contextlib import asynccontextmanager
@@ -13,6 +18,7 @@ engine = YumiEngine()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage the lifecycle of the FastAPI application.
+
     Initializes the background audio and reasoning tasks on startup.
     """
     # Spawn the three parallel engines in the background
@@ -33,7 +39,8 @@ app.add_middleware(
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
-    """Main WebSocket endpoint for real-time audio and event communication.
+    """Handle real-time audio and event communication via WebSocket.
+
     Processes incoming binary audio chunks and maintains connection state.
     """
     await websocket.accept()

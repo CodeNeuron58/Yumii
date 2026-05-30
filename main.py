@@ -1,3 +1,4 @@
+"""Backward-compatibility wrapper for starting the Yumi API server."""
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 

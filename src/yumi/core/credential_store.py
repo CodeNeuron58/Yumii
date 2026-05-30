@@ -88,11 +88,10 @@ def load_all() -> dict[str, str]:
 
 
 def migrate_from_plaintext(config: dict) -> dict:
-    """One-time migration: any credential key found in the plaintext config.json
-    is moved into the OS keychain and removed from the returned dict.
+    """Perform a one-time migration of credentials to the OS keychain.
 
-    Safe to call on every startup — it is a no-op when migration is already done.
-    Returns the cleaned config dict containing preferences only.
+    Any credential key found in the plaintext config.json is moved into the
+    OS keychain and removed from the returned dict.
     """
     cleaned: dict[str, str] = {}
     for key, value in config.items():

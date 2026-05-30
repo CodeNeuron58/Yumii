@@ -1,3 +1,8 @@
+"""Command Line Interface (CLI) for Yumi.
+
+Provides commands for starting the application, configuring settings, 
+and managing the AI companion.
+"""
 import typer
 import questionary
 from rich.console import Console
@@ -20,11 +25,11 @@ app = typer.Typer(help="Yumi - Your AI Companion", invoke_without_command=True)
 console = Console()
 
 def clear_screen() -> None:
-    """Clears the terminal screen based on the operating system."""
+    """Clear the terminal screen based on the operating system."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def type_text(text: str, delay: float = 0.03, style: str = "bold magenta") -> None:
-    """Prints text character by character for a typing effect.
+    """Print text character by character for a typing effect.
 
     Args:
         text: The string to print.
@@ -39,7 +44,7 @@ def type_text(text: str, delay: float = 0.03, style: str = "bold magenta") -> No
     console.print()
 
 def mask_key(key: str | None) -> str:
-    """Masks an API key for display, showing only the first and last 4 characters.
+    """Mask an API key for display.
 
     Args:
         key: The API key string.
@@ -52,7 +57,7 @@ def mask_key(key: str | None) -> str:
     return f"{key[:4]}...{key[-4:]}"
 
 def show_story() -> None:
-    """Displays Yumi's vision story and returns to the dashboard."""
+    """Display Yumi's vision story and return to the dashboard."""
     clear_screen()
     console.print(Panel(Align.center("[bold magenta]🌸 The Vision 🌸[/bold magenta]"), border_style="magenta"))
     console.print()
@@ -86,7 +91,7 @@ def show_story() -> None:
     dashboard()
 
 def dashboard() -> None:
-    """Renders the main Yumi status dashboard and navigation menu."""
+    """Render the main Yumi status dashboard and navigation menu."""
     clear_screen()
     config = load_global_config()
 
@@ -183,7 +188,7 @@ def dashboard() -> None:
 
 @app.callback()
 def main(ctx: typer.Context) -> None:
-    """Yumi - More than just code, a companion."""
+    """Entry point for the Yumi CLI."""
     if ctx.invoked_subcommand is None:
         config          = load_global_config()
         llm_provider    = config.get("LLM_PROVIDER", "Groq")
@@ -550,7 +555,7 @@ def models() -> None:
             groq_key = questionary.password("Groq API Key:", qmark="🌸").ask()
             if groq_key:
                 save_credential("GROQ_API_KEY", groq_key)
-                console.print(f"\n[🔐] [green]Groq key secured: {mask_key(groq_key)}[/green]")
+                console.print(f"\n[🔐] [green]Groq key secured in {keychain_name()}: {mask_key(groq_key)}[/green]")
             time.sleep(1)
 
     clear_screen()

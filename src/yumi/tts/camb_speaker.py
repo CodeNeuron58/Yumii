@@ -1,3 +1,4 @@
+"""CAMB.ai TTS (Text-to-Speech) provider for Yumi."""
 import base64
 import aiohttp
 import struct
@@ -6,7 +7,10 @@ from yumi.core.interfaces import BaseSpeaker
 from typing import AsyncGenerator, Any
 
 class CambSpeaker(BaseSpeaker):
+    """TTS implementation using the CAMB.ai streaming API."""
+
     def __init__(self):
+        """Initialize the CAMB.ai speaker and verify configuration."""
         self.api_key = settings.camb_api_key
         self.voice_id = settings.camb_voice_id
 
@@ -18,7 +22,7 @@ class CambSpeaker(BaseSpeaker):
             )
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
-        """Async generator that yields raw PCM audio chunks."""
+        """Synthesize text and yield audio chunks via the CAMB.ai streaming API."""
         if not text:
             return
 
@@ -81,11 +85,7 @@ class CambSpeaker(BaseSpeaker):
             print(f"Error speaking response from CAMB.ai: {e}")
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
-        """Sychronous wrapper for stream_speak.
-        Note: Since stream_speak is async, we need to run this in a loop.
-        Because this method is defined as synchronous in the interface for legacy reasons,
-        it's better to use the streaming version.
-        """
+        """Perform blocking synthesis using the streaming generator."""
         # This is a bridge for the interface.
         # In a production-grade version, we would handle the loop here or avoid sync speak.
         import asyncio

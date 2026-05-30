@@ -1,3 +1,8 @@
+"""Reasoning graph definition for Yumi.
+
+Defines the LangGraph workflow that orchestrates the LLM interaction loop
+and maintains the conversational state.
+"""
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -6,6 +11,7 @@ from yumi.core.types import MainState
 
 def build_graph():
     """Build and return the compiled LangGraph for Yumi's reasoning engine.
+
     This graph handles the LLM ReAct loop and state memory.
     """
 

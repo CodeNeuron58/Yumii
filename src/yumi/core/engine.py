@@ -1,3 +1,8 @@
+"""Core reasoning and execution engine for Yumi.
+
+This module orchestrates the background tasks for audio capture, LLM reasoning,
+and TTS synthesis, passing data between them using asyncio Queues.
+"""
 import asyncio
 import json
 from typing import List, Any, Dict

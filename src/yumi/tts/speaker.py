@@ -1,3 +1,4 @@
+"""ElevenLabs TTS (Text-to-Speech) provider for Yumi."""
 import base64
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
@@ -6,7 +7,10 @@ from yumi.core.interfaces import BaseSpeaker
 from typing import AsyncGenerator, Any
 
 class YumiSpeaker(BaseSpeaker):
+    """TTS implementation using the ElevenLabs cloud API."""
+
     def __init__(self):
+        """Initialize the ElevenLabs client and verify voice configuration."""
         self.client = ElevenLabs(api_key=settings.elevenlabs_api_key)
         self.model_id = "eleven_multilingual_v2"
         self.voice_id = settings.elevenlabs_voice_id
@@ -20,7 +24,7 @@ class YumiSpeaker(BaseSpeaker):
             )
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
-        """Simulates a stream by yielding a single full audio chunk."""
+        """Synthesize text and yield audio metadata followed by the audio data."""
         audio_base64, duration = self.speak(text)
         if audio_base64:
             # Yield metadata first to satisfy the engine's expectations
@@ -31,7 +35,7 @@ class YumiSpeaker(BaseSpeaker):
             print("Error: ElevenLabs synthesis failed in stream_speak.")
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
-        """Synthesizes text and returns (base64_mp3, duration_seconds)."""
+        """Perform blocking synthesis and return base64 encoded audio."""
         if not text:
             return None, 0.0
 

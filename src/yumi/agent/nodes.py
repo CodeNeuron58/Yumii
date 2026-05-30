@@ -1,10 +1,20 @@
+"""Individual reasoning nodes for Yumi's LangGraph.
+
+Contains logic for processing user input, handling personality switches,
+and invoking the LLM agent.
+"""
 from langchain_core.messages import HumanMessage, AIMessage
 from yumi.agent.llm import get_agent
 from yumi.agent.personality_manager import personality_manager
 
 
 def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
-    """Return (True, new_personality) if the user asked to switch, else (False, None)."""
+    """Check if the user input contains a request to switch personalities.
+
+    Returns:
+        A tuple of (True, new_personality) if a switch was requested, else (False, None).
+
+    """
     lowered = user_input.lower().strip()
     for personality in personality_manager.list_personalities():
         if lowered in (
@@ -18,10 +28,10 @@ def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
 
 
 def chat_node(state: dict) -> dict:
-    """Core reasoning node — invokes the LLM agent and returns structured output.
+    """Execute the core reasoning node.
     
-    Discards internal tool-call traces and stores only clean Human/AIMessages 
-    in state to maintain a readable history for subsequent turns.
+    Invokes the LLM agent and returns a structured response containing
+    text, expression, and motion instructions.
     """
     user_input: str = state["input"]
     history: list = state.get("messages", [])
