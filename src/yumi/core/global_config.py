@@ -1,3 +1,4 @@
+"""Manages the non-sensitive JSON preference file located at ~/.yumi/config.json."""
 import json
 from pathlib import Path
 

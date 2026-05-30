@@ -1,3 +1,7 @@
+"""Voice Activity Detection (VAD) and Speech-to-Text (STT) pipeline.
+
+Captures audio streams, detects speech boundaries, and processes utterances.
+"""
 import io
 import asyncio
 from typing import Callable
@@ -48,10 +52,12 @@ def _pcm16_to_wav_bytes(audio_int16: np.ndarray, sample_rate: int = RATE) -> byt
 
 class AudioPipeline:
     """Voice-activity-detection + Transcription pipeline.
+
     Uses Silero VAD for speech detection and a pluggable BaseSTTProvider for transcription.
     """
 
     def __init__(self, provider: str = "local", model_size: str = "base", groq_api_key: str | None = None):
+        """Initialize the audio pipeline, loading VAD and STT models."""
         # VAD is always loaded locally
         print("Loading Silero VAD...")
         self._silero_model, _ = torch.hub.load(
@@ -79,6 +85,7 @@ class AudioPipeline:
         self._silero_model.reset_states()
 
     async def stream_capture(self, queue: asyncio.Queue, on_speech_start: Callable[[], None] | None = None) -> np.ndarray:
+        """Continuously consume audio chunks from a queue until a speech segment completes."""
         self._reset_vad()
         recording = []
         pre_buffer: collections.deque = collections.deque(maxlen=15)
@@ -123,9 +130,11 @@ class AudioPipeline:
         return np.array([], dtype=np.int16)
 
     def process_audio(self, audio: np.ndarray) -> np.ndarray:
+        """Apply post-capture processing (normalization) to the audio array."""
         return normalize_audio(audio)
 
     def transcribe(self, audio_data: np.ndarray) -> str:
+        """Convert a complete audio utterance into text."""
         duration_sec = len(audio_data) / RATE
         if duration_sec < MIN_SPEECH_DURATION_SEC:
             print(f"⚠  Audio too short ({duration_sec:.2f}s < {MIN_SPEECH_DURATION_SEC}s), skipping.")
@@ -135,6 +144,7 @@ class AudioPipeline:
         return text.strip() if text else ""
 
     def run_cycle(self, on_speech_start: Callable[[], None] | None = None) -> str:
+        """Run one complete listen-process-transcribe cycle (synchronous)."""
         raw_audio = self.listen_and_capture(on_speech_start=on_speech_start)
         if len(raw_audio) == 0:
             return ""

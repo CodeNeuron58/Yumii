@@ -1,3 +1,7 @@
+"""Central configuration settings model for Yumi.
+
+Loads values from the environment, preferring secrets mapped from the OS keychain.
+"""
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 import os

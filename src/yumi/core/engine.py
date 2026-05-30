@@ -87,7 +87,7 @@ class YumiEngine:
                 await asyncio.sleep(1)
 
     async def reasoning_engine_task(self) -> None:
-        """The main reasoning loop.
+        """Execute the main reasoning loop.
 
         Waits for transcribed text, clears any active interruptions,
         and invokes the LangGraph reasoning engine to generate a response.
@@ -119,7 +119,7 @@ class YumiEngine:
                 await asyncio.sleep(1)
 
     async def tts_speaker_task(self) -> None:
-        """The voice synthesis loop.
+        """Run the voice synthesis loop.
 
         Consumes reasoning results and uses the active TTS provider to
         stream audio chunks to the frontend.

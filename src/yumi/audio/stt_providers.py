@@ -1,3 +1,7 @@
+"""Concrete implementations of Speech-to-Text (STT) providers.
+
+Includes a local CPU-based `faster-whisper` provider and a cloud-based `Groq` provider.
+"""
 import numpy as np
 from yumi.core.interfaces import BaseSTTProvider
 
@@ -5,12 +9,14 @@ class LocalSTT(BaseSTTProvider):
     """Transcription using faster-whisper on CPU."""
 
     def __init__(self, model_size: str = "base"):
+        """Initialize the local Whisper model."""
         from faster_whisper import WhisperModel
         print(f"Loading Whisper model ({model_size}) on CPU...")
         self._whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
         print(f"Whisper model ({model_size}) loaded.")
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:
+        """Transcribe an audio array using the local Whisper model."""
         # faster-whisper expects float32 in [-1, 1]
         audio_float = audio_data.astype(np.float32) / 32768.0
 
@@ -35,11 +41,13 @@ class GroqSTT(BaseSTTProvider):
     """Transcription using Groq's Whisper API."""
 
     def __init__(self, api_key: str):
+        """Initialize the Groq API client."""
         from groq import Groq
         self._groq_client = Groq(api_key=api_key)
         print("Groq Whisper STT ready (whisper-large-v3-turbo).")
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:
+        """Transcribe an audio array using the Groq Whisper API."""
         # Helper to encode as WAV bytes
         import io
         import wave

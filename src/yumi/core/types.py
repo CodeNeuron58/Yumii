@@ -1,3 +1,6 @@
+"""
+Shared type definitions for the Yumi codebase.
+"""
 from typing import TypedDict, Annotated, Literal
 from langgraph.graph import add_messages
 

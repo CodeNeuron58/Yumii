@@ -1,9 +1,10 @@
+"""Factory module for instantiating the configured Speech-to-Text provider."""
 from yumi.core.config import settings
 from yumi.core.interfaces import BaseSTTProvider
 from yumi.audio.stt_providers import LocalSTT, GroqSTT
 
 def get_stt_provider() -> BaseSTTProvider:
-    """Factory to instantiate the correct STT provider based on configuration."""
+    """Instantiate the correct STT provider based on configuration."""
     provider = settings.stt_provider.lower()
 
     if provider == "groq":
