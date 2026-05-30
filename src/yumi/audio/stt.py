@@ -47,10 +47,10 @@ def _pcm16_to_wav_bytes(audio_int16: np.ndarray, sample_rate: int = RATE) -> byt
 
 
 class AudioPipeline:
-    """
-    Voice-activity-detection + Transcription pipeline.
+    """Voice-activity-detection + Transcription pipeline.
     Uses Silero VAD for speech detection and a pluggable BaseSTTProvider for transcription.
     """
+
     def __init__(self, provider: str = "local", model_size: str = "base", groq_api_key: str | None = None):
         # VAD is always loaded locally
         print("Loading Silero VAD...")

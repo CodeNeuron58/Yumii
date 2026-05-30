@@ -2,9 +2,8 @@ import numpy as np
 from yumi.core.interfaces import BaseSTTProvider
 
 class LocalSTT(BaseSTTProvider):
-    """
-    Transcription using faster-whisper on CPU.
-    """
+    """Transcription using faster-whisper on CPU."""
+
     def __init__(self, model_size: str = "base"):
         from faster_whisper import WhisperModel
         print(f"Loading Whisper model ({model_size}) on CPU...")
@@ -33,9 +32,8 @@ class LocalSTT(BaseSTTProvider):
         return "".join(text_parts).strip() or None
 
 class GroqSTT(BaseSTTProvider):
-    """
-    Transcription using Groq's Whisper API.
-    """
+    """Transcription using Groq's Whisper API."""
+
     def __init__(self, api_key: str):
         from groq import Groq
         self._groq_client = Groq(api_key=api_key)

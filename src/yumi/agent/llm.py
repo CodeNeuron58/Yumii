@@ -7,8 +7,7 @@ from yumi.tools import tools
 from langchain.agents import create_agent
 
 class YumiResponse(BaseModel):
-    """
-    Yumi's structured reply.
+    """Yumi's structured reply.
 
     Always populate all three fields.  expression and motion MUST be chosen
     from the lists defined in the active personality prompt.
@@ -74,8 +73,7 @@ def _build_system_prompt(personality_name: str) -> str:
 
 
 def get_agent(personality: str) -> object:
-    """
-    Return the create_agent instance for *personality*, building it on first use.
+    """Return the create_agent instance for *personality*, building it on first use.
 
     The agent is cached so subsequent calls with the same personality are free.
     Personality switching (nodes.py) simply calls get_agent with the new name,

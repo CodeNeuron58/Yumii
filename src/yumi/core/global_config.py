@@ -8,8 +8,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
 def load_global_config() -> dict:
-    """
-    Load preferences from ~/.yumi/config.json.
+    """Load preferences from ~/.yumi/config.json.
 
     On first load after an upgrade, any credential keys still present in the
     file are automatically migrated to the OS keychain and removed from disk.

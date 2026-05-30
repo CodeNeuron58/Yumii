@@ -5,8 +5,7 @@ from yumi.agent.nodes import chat_node
 from yumi.core.types import MainState
 
 def build_graph():
-    """
-    Build and return the compiled LangGraph for Yumi's reasoning engine.
+    """Build and return the compiled LangGraph for Yumi's reasoning engine.
     This graph handles the LLM ReAct loop and state memory.
     """
 

@@ -24,13 +24,13 @@ def clear_screen() -> None:
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def type_text(text: str, delay: float = 0.03, style: str = "bold magenta") -> None:
-    """
-    Prints text character by character for a typing effect.
+    """Prints text character by character for a typing effect.
 
     Args:
         text: The string to print.
         delay: Delay between characters in seconds.
         style: Rich style for the text.
+
     """
     for char in text:
         console.print(f"[{style}]{char}[/{style}]", end="")
@@ -39,11 +39,11 @@ def type_text(text: str, delay: float = 0.03, style: str = "bold magenta") -> No
     console.print()
 
 def mask_key(key: str | None) -> str:
-    """
-    Masks an API key for display, showing only the first and last 4 characters.
+    """Masks an API key for display, showing only the first and last 4 characters.
 
     Args:
         key: The API key string.
+
     """
     if not key:
         return "Not Set"
@@ -183,9 +183,7 @@ def dashboard() -> None:
 
 @app.callback()
 def main(ctx: typer.Context) -> None:
-    """
-    Yumi - More than just code, a companion.
-    """
+    """Yumi - More than just code, a companion."""
     if ctx.invoked_subcommand is None:
         config          = load_global_config()
         llm_provider    = config.get("LLM_PROVIDER", "Groq")
@@ -207,9 +205,7 @@ def main(ctx: typer.Context) -> None:
 
 @app.command()
 def attune() -> None:
-    """
-    Give Yumi her senses (Onboarding & Setup).
-    """
+    """Give Yumi her senses (Onboarding & Setup)."""
     clear_screen()
     header = Panel(
         Align.center("[bold magenta]🌸 Attuning to Yumi 🌸[/bold magenta]\n[italic]Let's connect her mind and voice so she can understand you.[/italic]"),
@@ -339,9 +335,7 @@ def attune() -> None:
     dashboard()
 
 def change_personality() -> None:
-    """
-    Change Yumi's personality and update global preferences.
-    """
+    """Change Yumi's personality and update global preferences."""
     clear_screen()
     config = load_global_config()
     current_personality = config.get("PERSONALITY", "caring")
@@ -387,9 +381,7 @@ def change_personality() -> None:
 
 @app.command()
 def models() -> None:
-    """
-    Change the LLM and TTS providers used by Yumi.
-    """
+    """Change the LLM and TTS providers used by Yumi."""
     clear_screen()
     config = load_global_config()
 
@@ -568,9 +560,7 @@ def models() -> None:
 
 @app.command(name="wake-up")
 def wake_up() -> None:
-    """
-    Wake Yumi up and start the interaction.
-    """
+    """Wake Yumi up and start the interaction."""
     config          = load_global_config()
     llm_provider    = config.get("LLM_PROVIDER", "Groq")
     llm_key         = get_credential(f"{llm_provider.upper()}_API_KEY")
@@ -604,9 +594,7 @@ def wake_up() -> None:
 
 @app.command()
 def server() -> None:
-    """
-    Launch the Yumi API server.
-    """
+    """Launch the Yumi API server."""
     from yumi.api.server import app as fastapi_app
     import uvicorn
     console.print("[bold magenta]Starting Yumi API server...[/bold magenta]")

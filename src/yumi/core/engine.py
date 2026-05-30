@@ -9,17 +9,15 @@ from yumi.audio.stt import AudioPipeline
 from yumi.agent.graph import build_graph
 
 class YumiEngine:
-    """
-    The central orchestration engine for Yumi.
+    """The central orchestration engine for Yumi.
 
     This class encapsulates the state and logic required to run the real-time
     interaction loop, decoupling the audio processing and reasoning from
     the transport layer (FastAPI).
     """
+
     def __init__(self) -> None:
-        """
-        Initialize the Yumi Engine, including audio pipelines and reasoning graph.
-        """
+        """Initialize the Yumi Engine, including audio pipelines and reasoning graph."""
         self.transcription_queue: asyncio.Queue[str] = asyncio.Queue()
         self.tts_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
         self.audio_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
@@ -44,11 +42,11 @@ class YumiEngine:
         self.graph_app = build_graph()
 
     async def broadcast_payload(self, payload: Dict[str, Any]) -> None:
-        """
-        Push a JSON payload to all currently connected WebSocket clients.
+        """Push a JSON payload to all currently connected WebSocket clients.
 
         Args:
             payload: The dictionary to be serialized and sent as a message.
+
         """
         dead_connections = []
         for connection in self.active_connections:
@@ -61,8 +59,7 @@ class YumiEngine:
             self.active_connections.remove(dead)
 
     async def audio_listener_task(self) -> None:
-        """
-        Continuously monitors the audio input queue.
+        """Continuously monitors the audio input queue.
 
         Triggers the global interrupt event and notifies the frontend when speech is detected,
         and pushes completed transcriptions to the reasoning queue.
@@ -90,8 +87,7 @@ class YumiEngine:
                 await asyncio.sleep(1)
 
     async def reasoning_engine_task(self) -> None:
-        """
-        The main reasoning loop.
+        """The main reasoning loop.
 
         Waits for transcribed text, clears any active interruptions,
         and invokes the LangGraph reasoning engine to generate a response.
@@ -123,8 +119,7 @@ class YumiEngine:
                 await asyncio.sleep(1)
 
     async def tts_speaker_task(self) -> None:
-        """
-        The voice synthesis loop.
+        """The voice synthesis loop.
 
         Consumes reasoning results and uses the active TTS provider to
         stream audio chunks to the frontend.

@@ -20,9 +20,7 @@ class YumiSpeaker(BaseSpeaker):
             )
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
-        """
-        Simulates a stream by yielding a single full audio chunk.
-        """
+        """Simulates a stream by yielding a single full audio chunk."""
         audio_base64, duration = self.speak(text)
         if audio_base64:
             # Yield metadata first to satisfy the engine's expectations
@@ -33,9 +31,7 @@ class YumiSpeaker(BaseSpeaker):
             print("Error: ElevenLabs synthesis failed in stream_speak.")
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
-        """
-        Synthesizes text and returns (base64_mp3, duration_seconds).
-        """
+        """Synthesizes text and returns (base64_mp3, duration_seconds)."""
         if not text:
             return None, 0.0
 

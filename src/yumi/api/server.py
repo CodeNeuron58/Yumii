@@ -12,8 +12,7 @@ engine = YumiEngine()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manage the lifecycle of the FastAPI application.
+    """Manage the lifecycle of the FastAPI application.
     Initializes the background audio and reasoning tasks on startup.
     """
     # Spawn the three parallel engines in the background
@@ -34,8 +33,7 @@ app.add_middleware(
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
-    """
-    Main WebSocket endpoint for real-time audio and event communication.
+    """Main WebSocket endpoint for real-time audio and event communication.
     Processes incoming binary audio chunks and maintains connection state.
     """
     await websocket.accept()

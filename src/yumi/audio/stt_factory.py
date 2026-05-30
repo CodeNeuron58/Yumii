@@ -3,9 +3,7 @@ from yumi.core.interfaces import BaseSTTProvider
 from yumi.audio.stt_providers import LocalSTT, GroqSTT
 
 def get_stt_provider() -> BaseSTTProvider:
-    """
-    Factory to instantiate the correct STT provider based on configuration.
-    """
+    """Factory to instantiate the correct STT provider based on configuration."""
     provider = settings.stt_provider.lower()
 
     if provider == "groq":

@@ -1,5 +1,4 @@
-"""
-Credential store — secure secret storage using the OS keychain.
+"""Credential store — secure secret storage using the OS keychain.
 
 Platform backends (handled automatically by the `keyring` library):
   Windows : Windows Credential Manager  (Control Panel → Credential Manager)
@@ -89,8 +88,7 @@ def load_all() -> dict[str, str]:
 
 
 def migrate_from_plaintext(config: dict) -> dict:
-    """
-    One-time migration: any credential key found in the plaintext config.json
+    """One-time migration: any credential key found in the plaintext config.json
     is moved into the OS keychain and removed from the returned dict.
 
     Safe to call on every startup — it is a no-op when migration is already done.

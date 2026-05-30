@@ -17,11 +17,11 @@ for key, value in _creds.items():
 
 
 class Settings(BaseSettings):
-    """
-    Pydantic settings model for the application configuration.
+    """Pydantic settings model for the application configuration.
     Values are loaded from environment variables, which are pre-populated
     from the OS keychain and user preferences.
     """
+
     tts_provider:        str        = Field(default="ElevenLabs", alias='TTS_PROVIDER')
     elevenlabs_api_key:  str | None = Field(default=None, alias='ELEVENLABS_API_KEY')
     elevenlabs_voice_id: str | None = Field(default=None, alias='ELEVENLABS_VOICE_ID')

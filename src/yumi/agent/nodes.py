@@ -18,8 +18,7 @@ def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
 
 
 def chat_node(state: dict) -> dict:
-    """
-    Core reasoning node — invokes the LLM agent and returns structured output.
+    """Core reasoning node — invokes the LLM agent and returns structured output.
     
     Discards internal tool-call traces and stores only clean Human/AIMessages 
     in state to maintain a readable history for subsequent turns.

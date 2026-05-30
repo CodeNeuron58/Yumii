@@ -18,9 +18,7 @@ class CambSpeaker(BaseSpeaker):
             )
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
-        """
-        Async generator that yields raw PCM audio chunks.
-        """
+        """Async generator that yields raw PCM audio chunks."""
         if not text:
             return
 
@@ -83,8 +81,7 @@ class CambSpeaker(BaseSpeaker):
             print(f"Error speaking response from CAMB.ai: {e}")
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
-        """
-        Sychronous wrapper for stream_speak.
+        """Sychronous wrapper for stream_speak.
         Note: Since stream_speak is async, we need to run this in a loop.
         Because this method is defined as synchronous in the interface for legacy reasons,
         it's better to use the streaming version.

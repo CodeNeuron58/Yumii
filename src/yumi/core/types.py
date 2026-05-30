@@ -4,9 +4,8 @@ from langgraph.graph import add_messages
 # --- AI Reasoning Types ---
 
 class MainState(TypedDict):
-    """
-    The shared state for Yumi's LangGraph reasoning engine.
-    """
+    """The shared state for Yumi's LangGraph reasoning engine."""
+
     messages: Annotated[list, add_messages]  # Conversation history for LLM
     input: str
     response: str
