@@ -1,4 +1,4 @@
-"""Concrete implementations of Speech-to-Text (STT) providers.
+""" Concrete implementations of Speech-to-Text (STT) providers.
 
 Includes a local CPU-based `faster-whisper` provider and a cloud-based `Groq` provider.
 """
@@ -8,7 +8,7 @@ from yumi.core.interfaces import BaseSTTProvider
 class LocalSTT(BaseSTTProvider):
     """Transcription using faster-whisper on CPU."""
 
-    def __init__(self, model_size: str = "base"):
+    def __init__(self, model_size: str = "base") -> None:
         """Initialize the local Whisper model."""
         from faster_whisper import WhisperModel
         print(f"Loading Whisper model ({model_size}) on CPU...")
@@ -40,7 +40,7 @@ class LocalSTT(BaseSTTProvider):
 class GroqSTT(BaseSTTProvider):
     """Transcription using Groq's Whisper API."""
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str) -> None:
         """Initialize the Groq API client."""
         from groq import Groq
         self._groq_client = Groq(api_key=api_key)

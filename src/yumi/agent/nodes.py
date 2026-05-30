@@ -1,4 +1,5 @@
-"""Individual reasoning nodes for Yumi's LangGraph.
+"""
+Individual reasoning nodes for Yumi's LangGraph.
 
 Contains logic for processing user input, handling personality switches,
 and invoking the LLM agent.
@@ -6,6 +7,7 @@ and invoking the LLM agent.
 from langchain_core.messages import HumanMessage, AIMessage
 from yumi.agent.llm import get_agent
 from yumi.agent.personality_manager import personality_manager
+from yumi.core.types import MainState
 
 
 def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
@@ -13,7 +15,6 @@ def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
 
     Returns:
         A tuple of (True, new_personality) if a switch was requested, else (False, None).
-
     """
     lowered = user_input.lower().strip()
     for personality in personality_manager.list_personalities():
@@ -27,7 +28,7 @@ def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
     return False, None
 
 
-def chat_node(state: dict) -> dict:
+def chat_node(state: MainState) -> dict:
     """Execute the core reasoning node.
     
     Invokes the LLM agent and returns a structured response containing
@@ -56,11 +57,13 @@ def chat_node(state: dict) -> dict:
     structured_response = result.get("structured_response")
     if structured_response is None:
         print("WARNING: structured_response was None — LLM did not produce YumiResponse.")
-        class _Fallback:
+        
+        class FallbackResponse:
             response_text = "I'm having a little trouble right now. Could you say that again?"
             expression = "sad"
             motion = "idle"
-        structured_response = _Fallback()
+        
+        structured_response = FallbackResponse()
 
     messages_to_append = [
         new_human_message,

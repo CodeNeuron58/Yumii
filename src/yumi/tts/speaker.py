@@ -1,4 +1,6 @@
-"""ElevenLabs TTS (Text-to-Speech) provider for Yumi."""
+"""
+ElevenLabs TTS (Text-to-Speech) provider for Yumi.
+"""
 import base64
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
@@ -9,19 +11,20 @@ from typing import AsyncGenerator, Any
 class YumiSpeaker(BaseSpeaker):
     """TTS implementation using the ElevenLabs cloud API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the ElevenLabs client and verify voice configuration."""
         self.client = ElevenLabs(api_key=settings.elevenlabs_api_key)
         self.model_id = "eleven_multilingual_v2"
         self.voice_id = settings.elevenlabs_voice_id
 
         if not self.voice_id:
-            raise ValueError(
+            msg = (
                 "\n\n  ❌  No ElevenLabs Voice ID configured.\n"
                 "  Run 'yumi attune' or open ⚙️ Configure Senses and set a Voice ID.\n"
                 "  Find your Voice ID at: https://elevenlabs.io/voice-library\n"
                 "  It looks like this: 21m00Tcm4TlvDq8ikWAM\n"
             )
+            raise ValueError(msg)
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
         """Synthesize text and yield audio metadata followed by the audio data."""
@@ -57,8 +60,8 @@ class YumiSpeaker(BaseSpeaker):
             audio_data = b"".join([chunk for chunk in response_chunks if chunk])
             duration = len(audio_data) / 4000.0
             audio_base64 = base64.b64encode(audio_data).decode("utf-8")
-            return audio_base64, duration
-
         except Exception as e:
             print(f"Error speaking response: {e}")
             return None, 0.0
+        else:
+            return audio_base64, duration

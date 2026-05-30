@@ -1,4 +1,5 @@
-"""Core reasoning and execution engine for Yumi.
+"""
+Core reasoning and execution engine for Yumi.
 
 This module orchestrates the background tasks for audio capture, LLM reasoning,
 and TTS synthesis, passing data between them using asyncio Queues.
@@ -61,7 +62,8 @@ class YumiEngine:
                 print(f"WS Send Error: {e}")
                 dead_connections.append(connection)
         for dead in dead_connections:
-            self.active_connections.remove(dead)
+            if dead in self.active_connections:
+                self.active_connections.remove(dead)
 
     async def audio_listener_task(self) -> None:
         """Continuously monitors the audio input queue.
@@ -79,16 +81,16 @@ class YumiEngine:
         print("Listener task active (streaming).")
         while True:
             try:
-                text = await self.pipeline.stream_capture(self.audio_input_queue, on_speech_start)
-                if text is not None and len(text) > 0:
-                    clean_audio = self.pipeline.process_audio(text)
-                    if len(clean_audio) > 0:
-                        transcribed_text = self.pipeline.transcribe(clean_audio)
+                audio_segment = await self.pipeline.stream_capture(self.audio_input_queue, on_speech_start)
+                if audio_segment is not None and len(audio_segment) > 0:
+                    processed_audio = self.pipeline.process_audio(audio_segment)
+                    if len(processed_audio) > 0:
+                        transcribed_text = self.pipeline.transcribe(processed_audio)
                         if transcribed_text and transcribed_text.strip():
                             print(f"✅ Transcription: {transcribed_text}")
                             await self.transcription_queue.put(transcribed_text)
             except Exception as e:
-                print(f"Listener crashed: {e}")
+                print(f"CRITICAL: Audio Listener crashed with error: {e}")
                 await asyncio.sleep(1)
 
     async def reasoning_engine_task(self) -> None:
@@ -105,6 +107,7 @@ class YumiEngine:
                 user_text = await self.transcription_queue.get()
                 self.interrupt_event.clear()
 
+                # Clear pending speech queue on new input
                 while not self.tts_queue.empty():
                     try:
                         self.tts_queue.get_nowait()
@@ -112,15 +115,18 @@ class YumiEngine:
                         break
 
                 print(f"Reasoning starting for: {user_text}")
-                result = await self.graph_app.ainvoke({"input": user_text, "session_id": session_id}, config=config)
+                reasoning_result = await self.graph_app.ainvoke(
+                    {"input": user_text, "session_id": session_id}, 
+                    config=config
+                )
 
                 if self.interrupt_event.is_set():
                     print("Thought interrupted before speaking! Discarding.")
                     continue
 
-                await self.tts_queue.put(result)
+                await self.tts_queue.put(reasoning_result)
             except Exception as e:
-                print(f"Reasoning crashed: {e}")
+                print(f"CRITICAL: Reasoning Engine crashed with error: {e}")
                 await asyncio.sleep(1)
 
     async def tts_speaker_task(self) -> None:
@@ -132,13 +138,13 @@ class YumiEngine:
         print("Speaker task active.")
         while True:
             try:
-                result = await self.tts_queue.get()
+                speech_payload = await self.tts_queue.get()
                 if self.interrupt_event.is_set():
                     continue
 
-                response_text = result["response"]
-                expression = result.get("expression", "normal")
-                motion = result.get("motion", "idle")
+                response_text = speech_payload["response"]
+                expression = speech_payload.get("expression", "normal")
+                motion = speech_payload.get("motion", "idle")
 
                 print(f"Yumi: {response_text}")
 
@@ -167,7 +173,7 @@ class YumiEngine:
                         if not self.interrupt_event.is_set():
                             await self.broadcast_payload({"type": "audio_end"})
                     except Exception as stream_err:
-                        print(f"Stream error: {stream_err}")
+                        print(f"TTS Stream Error: {stream_err}")
                         await self.broadcast_payload({
                             "text": response_text, "expression": expression,
                             "motion": motion, "audio": None, "error": f"TTS failed: {stream_err}"
@@ -192,5 +198,5 @@ class YumiEngine:
                 self.is_speaking = False
 
             except Exception as e:
-                print(f"Speaker crashed: {e}")
+                print(f"CRITICAL: TTS Speaker crashed with error: {e}")
                 await asyncio.sleep(1)

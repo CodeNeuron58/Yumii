@@ -1,4 +1,5 @@
-"""Voice Activity Detection (VAD) and Speech-to-Text (STT) pipeline.
+"""
+Voice Activity Detection (VAD) and Speech-to-Text (STT) pipeline.
 
 Captures audio streams, detects speech boundaries, and processes utterances.
 """
@@ -56,7 +57,7 @@ class AudioPipeline:
     Uses Silero VAD for speech detection and a pluggable BaseSTTProvider for transcription.
     """
 
-    def __init__(self, provider: str = "local", model_size: str = "base", groq_api_key: str | None = None):
+    def __init__(self, provider: str = "local", model_size: str = "base", groq_api_key: str | None = None) -> None:
         """Initialize the audio pipeline, loading VAD and STT models."""
         # VAD is always loaded locally
         print("Loading Silero VAD...")
@@ -151,5 +152,4 @@ class AudioPipeline:
         clean_audio = self.process_audio(raw_audio)
         if len(clean_audio) == 0:
             return ""
-        text = self.transcribe(clean_audio)
-        return text
+        return self.transcribe(clean_audio)

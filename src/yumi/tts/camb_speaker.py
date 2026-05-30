@@ -1,4 +1,6 @@
-"""CAMB.ai TTS (Text-to-Speech) provider for Yumi."""
+"""
+CAMB.ai TTS (Text-to-Speech) provider for Yumi.
+"""
 import base64
 import aiohttp
 import struct
@@ -9,17 +11,18 @@ from typing import AsyncGenerator, Any
 class CambSpeaker(BaseSpeaker):
     """TTS implementation using the CAMB.ai streaming API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the CAMB.ai speaker and verify configuration."""
         self.api_key = settings.camb_api_key
         self.voice_id = settings.camb_voice_id
 
         if not self.api_key or not self.voice_id:
-            raise ValueError(
+            msg = (
                 "\n\n  ❌  No CAMB.ai API Key or Voice ID configured.\n"
                 "  Run 'yumi attune' or open ⚙️ Configure Senses and set them up.\n"
                 "  Find your Voice ID at: https://client.camb.ai/\n"
             )
+            raise ValueError(msg)
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
         """Synthesize text and yield audio chunks via the CAMB.ai streaming API."""
@@ -98,14 +101,15 @@ class CambSpeaker(BaseSpeaker):
 
             # Accumulate the stream into a single block
             chunks = []
-            async def collect():
+            async def collect() -> None:
                 async for chunk in self.stream_speak(text):
                     if isinstance(chunk, str):
                         chunks.append(chunk)
 
             loop.run_until_complete(collect())
             full_audio = ",".join(chunks) # Simplified
-            return full_audio, 0.0
         except Exception as e:
             print(f"Sync speak error: {e}")
             return None, 0.0
+        else:
+            return full_audio, 0.0
