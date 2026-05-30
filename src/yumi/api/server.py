@@ -12,11 +12,13 @@ from fastapi.staticfiles import StaticFiles
 
 from yumi.core.engine import YumiEngine
 
+from typing import AsyncGenerator, Any
+
 # The Engine handles all the heavy lifting: STT, LLM, TTS, and state
 engine = YumiEngine()
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     """Manage the lifecycle of the FastAPI application.
 
     Initializes the background audio and reasoning tasks on startup.

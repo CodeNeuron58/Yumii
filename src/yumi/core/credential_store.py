@@ -45,10 +45,9 @@ def keychain_name() -> str:
     """Human-readable name of the OS keychain backend."""
     if sys.platform == "win32":
         return "Windows Credential Manager"
-    elif sys.platform == "darwin":
+    if sys.platform == "darwin":
         return "macOS Keychain"
-    else:
-        return "OS Keychain (libsecret)"
+    return "OS Keychain (libsecret)"
 
 
 def save_credential(key: str, value: str) -> None:

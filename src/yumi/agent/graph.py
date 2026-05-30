@@ -9,7 +9,9 @@ from langgraph.checkpoint.memory import InMemorySaver
 from yumi.agent.nodes import chat_node
 from yumi.core.types import MainState
 
-def build_graph():
+from typing import Any
+
+def build_graph() -> Any:
     """Build and return the compiled LangGraph for Yumi's reasoning engine.
 
     This graph handles the LLM ReAct loop and state memory.
