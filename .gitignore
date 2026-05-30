@@ -19,3 +19,10 @@ docs-old/
 
 # Documentation Journey
 docs/thought_process.md
+
+# Experiments and temporary assets
+Experiments/
+*.wav
+
+# Assets
+assets/avatar/

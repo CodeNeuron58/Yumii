@@ -1,8 +1,7 @@
 import os
-from typing import Dict, Literal
+from typing import Dict
 from yumi.core.global_config import load_global_config
-
-PERSONALITY_TYPE = Literal["caring", "tsundere", "genki", "kuudere", "yandere", "dandere"]
+from yumi.core.types import PERSONALITY_TYPE
 
 PERSONALITY_DESCRIPTIONS: Dict[PERSONALITY_TYPE, str] = {
     "caring": "Warm, empathetic, and supportive",
@@ -17,10 +16,9 @@ class PersonalityManager:
     """Manages personality prompt loading and switching."""
     
     def __init__(self):
-        # Get the directory containing this file (personality_manager.py)
-        self._current_dir = os.path.dirname(os.path.abspath(__file__))
-        # prompts directory is in the same directory as this file
-        self._prompts_dir = os.path.join(self._current_dir, "prompts")
+        # Calculate project root (src/yumi/agent/personality_manager.py -> src/yumi/agent -> src/yumi -> src -> root)
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        self._prompts_dir = os.path.join(root_dir, "assets", "prompts")
         self._cache: Dict[PERSONALITY_TYPE, str] = {}
     
     def load_personality(self, personality: PERSONALITY_TYPE) -> str:

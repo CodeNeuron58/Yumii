@@ -83,19 +83,13 @@ else:
 # ---------------------------------------------------------------------------
 
 # Short tool-ordering hint appended to every personality prompt.
-# Groq/Llama has no native structured-output support and falls back to a
-# tool-calling strategy, which can make it call the output schema tool before
-# finishing real tool work.  This one-liner prevents that.
-#
-# ⚠️  Do NOT mention any tool name here by text.
-#     Groq/Llama pattern-matches tool names in the system prompt and can
-#     hallucinate malformed tool calls (e.g. ',get_current_time') that fail
-#     with a 400 validation error from the API.
+# Groq/Llama can sometimes hallucinate <function=...> tags instead of proper tool calls.
+# We explicitly forbid this and emphasize the structured response.
 _TOOL_HINT = (
-    "\n\nCRITICAL RULES: "
-    "\n1. You MUST use the YumiResponse tool to deliver your final response. "
-    "\n2. Keep your spoken response text short and punchy: UNDER 3 sentences and strictly LESS THAN 400 characters."
-    "\n3. If you need to use other tools (like getting the time), use them first before calling YumiResponse."
+    "\n\nIMPORTANT: To respond to the user, you MUST call the `YumiResponse` tool. "
+    "\nDo NOT wrap your response in <function> tags or use any other format. "
+    "\nKeep your spoken response text short and punchy: UNDER 3 sentences and strictly LESS THAN 400 characters. "
+    "\nIf you need to use other tools (like getting the time), use them first before calling YumiResponse."
 )
 
 # Lazy cache: personality name → compiled create_agent instance

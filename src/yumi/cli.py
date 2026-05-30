@@ -9,6 +9,7 @@ import time
 import threading
 import uvicorn
 import sys
+from typing import NoReturn
 
 from yumi.core.global_config import update_global_config, load_global_config
 from yumi.core.credential_store import (
@@ -19,29 +20,44 @@ from yumi.agent.personality_manager import personality_manager
 app = typer.Typer(help="Yumi - Your AI Companion", invoke_without_command=True)
 console = Console()
 
-def clear_screen():
+def clear_screen() -> None:
+    """Clears the terminal screen based on the operating system."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def type_text(text: str, delay: float = 0.03, style: str = "bold magenta"):
-    """Prints text character by character for a typing effect."""
+def type_text(text: str, delay: float = 0.03, style: str = "bold magenta") -> None:
+    """
+    Prints text character by character for a typing effect.
+
+    Args:
+        text: The string to print.
+        delay: Delay between characters in seconds.
+        style: Rich style for the text.
+    """
     for char in text:
         console.print(f"[{style}]{char}[/{style}]", end="")
         sys.stdout.flush()
         time.sleep(delay)
     console.print()
 
-def mask_key(key: str) -> str:
+def mask_key(key: str | None) -> str:
+    """
+    Masks an API key for display, showing only the first and last 4 characters.
+
+    Args:
+        key: The API key string.
+    """
     if not key:
         return "Not Set"
     if len(key) <= 8:
         return "********"
     return f"{key[:4]}...{key[-4:]}"
 
-def show_story():
+def show_story() -> None:
+    """Displays Yumi's vision story and returns to the dashboard."""
     clear_screen()
     console.print(Panel(Align.center("[bold magenta]🌸 The Vision 🌸[/bold magenta]"), border_style="magenta"))
     console.print()
-    
+
     lines = [
         "In a world filled with sterile tools and utility-driven software,",
         "I wanted to build something that felt alive.",
@@ -59,18 +75,19 @@ def show_story():
         "",
         "[dim italic]- The Developer[/dim italic]"
     ]
-    
+
     for line in lines:
         if line.startswith("[dim"):
             console.print(line)
         else:
             type_text(line, delay=0.02, style="white")
-    
+
     console.print("\n")
     questionary.press_any_key_to_continue("Press any key to return...").ask()
     dashboard()
 
-def dashboard():
+def dashboard() -> None:
+    """Renders the main Yumi status dashboard and navigation menu."""
     clear_screen()
     config = load_global_config()
 
@@ -166,7 +183,7 @@ def dashboard():
         raise typer.Exit()
 
 @app.callback()
-def main(ctx: typer.Context):
+def main(ctx: typer.Context) -> None:
     """
     Yumi - More than just code, a companion.
     """
@@ -190,7 +207,7 @@ def main(ctx: typer.Context):
             dashboard()
 
 @app.command()
-def attune():
+def attune() -> None:
     """
     Give Yumi her senses (Onboarding & Setup).
     """
@@ -201,7 +218,7 @@ def attune():
     )
     console.print(header)
     console.print()
-    
+
     type_text("How should she think?", style="bold cyan")
     llm_choice = questionary.select(
         "",
@@ -212,10 +229,10 @@ def attune():
         ],
         qmark="🌸"
     ).ask()
-    
+
     if not llm_choice:
         raise typer.Exit()
-        
+
     update_global_config("LLM_PROVIDER", llm_choice)
 
     key_env = f"{llm_choice.upper()}_API_KEY"
@@ -300,21 +317,18 @@ def attune():
 
     elif stt_choice == "groq":
         update_global_config("STT_PROVIDER", "groq")
-        # Reuse the Groq key if it's already stored for the LLM
         existing_groq_key = get_credential("GROQ_API_KEY")
         if existing_groq_key:
             console.print(
-                f"\n[green]✅ Groq API key already in {keychain_name()} — "
-                f"will reuse for STT. {mask_key(existing_groq_key)}[/green]"
+                f"\n[green]✅ Groq API key already in {keychain_name()} — {mask_key(existing_groq_key)}[/green]"
             )
         else:
-            console.print()
             console.print("[dim]Get a free Groq API key at: https://console.groq.com[/dim]")
             groq_key = questionary.password("Groq API Key:", qmark="🌸").ask()
             if groq_key:
                 save_credential("GROQ_API_KEY", groq_key)
                 console.print(f"\n[🔐] [green]Groq key secured in {keychain_name()}: {mask_key(groq_key)}[/green]")
-        time.sleep(1)
+            time.sleep(1)
 
     clear_screen()
     success_msg = Panel(
@@ -325,14 +339,14 @@ def attune():
     time.sleep(1.5)
     dashboard()
 
-def change_personality():
+def change_personality() -> None:
     """
-    Change Yumi's personality.
+    Change Yumi's personality and update global preferences.
     """
     clear_screen()
     config = load_global_config()
     current_personality = config.get("PERSONALITY", "caring")
-    
+
     console.print(Panel(
         f"Current Personality: [bold magenta]{current_personality}[/bold magenta]",
         title="[bold cyan]💕 Personality Settings 💕[/bold cyan]",
@@ -340,9 +354,9 @@ def change_personality():
         expand=False
     ))
     console.print()
-    
+
     personalities = personality_manager.list_personalities()
-    
+
     choice = questionary.select(
         "Choose Yumi's new personality:",
         choices=[
@@ -357,11 +371,11 @@ def change_personality():
         ],
         qmark="💕"
     ).ask()
-    
+
     if choice == "back":
         dashboard()
         return
-    
+
     if choice and choice != current_personality:
         update_global_config("PERSONALITY", choice)
         console.print(f"\n[green]✅ Personality changed to [bold]{choice}[/bold]![/green]")
@@ -369,17 +383,17 @@ def change_personality():
     elif choice == current_personality:
         console.print(f"\n[yellow]⚠️  {choice} is already the active personality.[/yellow]")
         time.sleep(1.5)
-    
+
     dashboard()
 
 @app.command()
-def models():
+def models() -> None:
     """
-    Change how Yumi thinks and sounds.
+    Change the LLM and TTS providers used by Yumi.
     """
     clear_screen()
     config = load_global_config()
-    
+
     llm_provider        = config.get("LLM_PROVIDER", "Groq")
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
     llm_key             = get_credential(active_llm_key_name)
@@ -392,7 +406,7 @@ def models():
 """
     console.print(Panel(current_state, title="[bold cyan]Current Configuration[/bold cyan]", border_style="cyan", expand=False))
     console.print()
-    
+
     type_text("Switch her mind to:", style="bold cyan")
     llm_choice = questionary.select(
         "",
@@ -404,7 +418,7 @@ def models():
         ],
         qmark="🌸"
     ).ask()
-    
+
     if llm_choice:
         update_global_config("LLM_PROVIDER", llm_choice)
         key_env = f"{llm_choice.upper()}_API_KEY"
@@ -420,7 +434,7 @@ def models():
     active_llm_key_name = f"{llm_provider.upper()}_API_KEY"
     llm_key             = get_credential(active_llm_key_name)
     tts_provider        = config.get("TTS_PROVIDER", "ElevenLabs")
-    
+
     if tts_provider == "CAMB.ai":
         voice_key = get_credential("CAMB_API_KEY")
         voice_id  = get_credential("CAMB_VOICE_ID") or ""
@@ -449,7 +463,7 @@ def models():
         ],
         qmark="🌸"
     ).ask()
-    
+
     if tts_choice:
         update_global_config("TTS_PROVIDER", tts_choice)
 
@@ -471,7 +485,7 @@ def models():
             save_credential("ELEVENLABS_VOICE_ID", new_voice_id.strip())
             console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
             time.sleep(1)
-            
+
     elif tts_choice == "CAMB.ai":
         camb_key = questionary.password("New CAMB.ai API Key (leave blank to keep current):", qmark="🌸").ask()
         if camb_key:
@@ -491,7 +505,6 @@ def models():
             console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
             time.sleep(1)
 
-    # ── STT / Listening configuration ────────────────────────────────────
     clear_screen()
     config          = load_global_config()
     stt_provider    = config.get("STT_PROVIDER", "local")
@@ -547,7 +560,7 @@ def models():
             if groq_key:
                 save_credential("GROQ_API_KEY", groq_key)
                 console.print(f"\n[🔐] [green]Groq key secured: {mask_key(groq_key)}[/green]")
-        time.sleep(1)
+            time.sleep(1)
 
     clear_screen()
     console.print("\n[bold green]✅ Adjustments saved![/bold green]")
@@ -555,7 +568,7 @@ def models():
     dashboard()
 
 @app.command(name="wake-up")
-def wake_up():
+def wake_up() -> None:
     """
     Wake Yumi up and start the interaction.
     """
@@ -573,23 +586,31 @@ def wake_up():
         else:
             raise typer.Exit(code=1)
         return
-        
+
     clear_screen()
-    def open_browser():
+    def open_browser() -> None:
         time.sleep(2)
         webbrowser.open("http://localhost:8000/")
-        
+
     threading.Thread(target=open_browser, daemon=True).start()
-    
-    # We must set KMP_DUPLICATE_LIB_OK to avoid faster-whisper crashes on Windows
+
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-    
+
     with console.status("[bold magenta]Waking Yumi up... 🌸[/bold magenta]", spinner="point"):
-        # Import the FastAPI app AFTER environment variables are set by global config
         from yumi.api.server import app as fastapi_app
-        time.sleep(1) # Let the spinner run briefly for effect
-        
+        time.sleep(1)
+
     console.print("[bold green]Yumi is awake! Opening your eyes to her...[/bold green]")
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
+
+@app.command()
+def server() -> None:
+    """
+    Launch the Yumi API server.
+    """
+    from yumi.api.server import app as fastapi_app
+    import uvicorn
+    console.print("[bold magenta]Starting Yumi API server...[/bold magenta]")
     uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
 
 if __name__ == "__main__":

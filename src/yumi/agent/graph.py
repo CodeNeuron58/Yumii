@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import InMemorySaver
 
 from yumi.agent.nodes import chat_node
-from yumi.agent.state import MainState
+from yumi.core.types import MainState
 
 def build_graph():
     """

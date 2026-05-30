@@ -116,6 +116,7 @@
         let currentAudioSource = null;
         let micStream = null;
         let micProcessor = null;
+        let audioByteRemainder = new Uint8Array(0); // Buffer for odd-sized chunks
 
         // --- EMOTION/MOTION HANDLING ---
         // Map LLM expressions to available huohuo expressions
@@ -438,7 +439,20 @@
             for (let i = 0; i < len; i++) {
                 bytes[i] = binary.charCodeAt(i);
             }
-            const int16 = new Int16Array(bytes.buffer);
+
+            // Concatenate with any remainder from the previous chunk
+            let totalBytes = new Uint8Array(audioByteRemainder.length + bytes.length);
+            totalBytes.set(audioByteRemainder);
+            totalBytes.set(bytes, audioByteRemainder.length);
+
+            // We need an even number of bytes for Int16Array (2 bytes per sample)
+            const numFullSamples = Math.floor(totalBytes.length / 2);
+            const validBytes = totalBytes.subarray(0, numFullSamples * 2);
+
+            // Store the remainder for the next chunk
+            audioByteRemainder = totalBytes.subarray(numFullSamples * 2);
+
+            const int16 = new Int16Array(validBytes.buffer, validBytes.byteOffset, numFullSamples);
             const float32 = new Float32Array(int16.length);
             for (let i = 0; i < int16.length; i++) {
                 float32[i] = int16[i] / 32768.0;

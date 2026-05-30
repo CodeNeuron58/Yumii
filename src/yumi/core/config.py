@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     stt_provider:        str        = Field(default="local",   alias='STT_PROVIDER')
     whisper_model_size:  str        = Field(default="base",    alias='WHISPER_MODEL_SIZE')
 
+    # Project paths
+    project_root:         str        = Field(default=".", description="Root directory of the project")
+
+    # No env_file — project-local .env files must never shadow user config.
+
     # No env_file — project-local .env files must never shadow user config.
     # All values come from os.environ (populated above from keychain + config.json).
     model_config = SettingsConfigDict(extra='ignore')

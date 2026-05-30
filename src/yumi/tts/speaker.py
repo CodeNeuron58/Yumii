@@ -2,15 +2,13 @@ import base64
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
 from yumi.core.config import settings
+from yumi.core.interfaces import BaseSpeaker
+from typing import AsyncGenerator, Any
 
-
-class YumiSpeaker:
+class YumiSpeaker(BaseSpeaker):
     def __init__(self):
         self.client = ElevenLabs(api_key=settings.elevenlabs_api_key)
         self.model_id = "eleven_multilingual_v2"
-
-        # Read voice ID from config — never hardcode this.
-        # Set via 'yumi attune' or ⚙️ Configure Senses → Voice Settings.
         self.voice_id = settings.elevenlabs_voice_id
 
         if not self.voice_id:
@@ -21,10 +19,22 @@ class YumiSpeaker:
                 "  It looks like this: 21m00Tcm4TlvDq8ikWAM\n"
             )
 
-    def speak(self, text: str, play_local: bool = False):
+    async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
         """
-        Synthesizes text and returns (base64_mp3, duration_seconds) for the
-        frontend WebSocket. Returns (None, 0.0) on any error.
+        Simulates a stream by yielding a single full audio chunk.
+        """
+        audio_base64, duration = self.speak(text)
+        if audio_base64:
+            # Yield metadata first to satisfy the engine's expectations
+            yield {"type": "metadata", "sampleRate": 22050} # ElevenLabs default
+            # Yield the full audio as a single chunk
+            yield audio_base64
+        else:
+            print("Error: ElevenLabs synthesis failed in stream_speak.")
+
+    def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
+        """
+        Synthesizes text and returns (base64_mp3, duration_seconds).
         """
         if not text:
             return None, 0.0
@@ -45,16 +55,7 @@ class YumiSpeaker:
             )
 
             audio_data = b"".join([chunk for chunk in response_chunks if chunk])
-
-            # For mp3_22050_32 (32 kbps CBR), duration ≈ bytes / 4000
             duration = len(audio_data) / 4000.0
-
-            if play_local:
-                print(
-                    "Warning: Local mp3 playback is not supported — "
-                    "audio will play on the frontend only."
-                )
-
             audio_base64 = base64.b64encode(audio_data).decode("utf-8")
             return audio_base64, duration
 
