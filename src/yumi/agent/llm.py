@@ -45,7 +45,6 @@ elif provider == "anthropic":
         api_key=settings.anthropic_api_key,
     )
 else:
-    # Default: Groq
     base_llm = ChatGroq(
         model="llama-3.3-70b-versatile",
         temperature=0.7,
