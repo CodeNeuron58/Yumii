@@ -7,10 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 from yumi.core.engine import YumiEngine
 
-# ---------------------------------------------------------------------------
-# Application Setup
-# ---------------------------------------------------------------------------
-
 # The Engine handles all the heavy lifting: STT, LLM, TTS, and state
 engine = YumiEngine()
 

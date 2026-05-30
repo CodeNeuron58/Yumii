@@ -1,5 +1,4 @@
 import io
-import queue
 import asyncio
 from typing import Callable
 import wave
@@ -7,11 +6,7 @@ import collections
 import numpy as np
 import torch
 from yumi.audio.stt_factory import get_stt_provider
-from yumi.core.interfaces import BaseSTTProvider
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
 RATE       = 16000
 FRAME_SIZE = 512
 CHANNELS   = 1
@@ -23,15 +18,13 @@ SILERO_THRESHOLD         = 0.5
 RMS_ENERGY_GATE          = 0.008
 NO_SPEECH_PROB_THRESHOLD = 0.45
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def float_to_pcm16(audio: np.ndarray) -> np.ndarray:
+    """Convert float32 audio data to PCM int16 format."""
     audio = np.clip(audio, -1, 1)
     return (audio * 32767).astype(np.int16)
 
 def normalize_audio(audio: np.ndarray) -> np.ndarray:
+    """Normalize audio amplitude to a safe peak value."""
     audio_float = audio.astype(np.float32)
     max_val = np.max(np.abs(audio_float))
     if max_val == 0:
@@ -39,9 +32,11 @@ def normalize_audio(audio: np.ndarray) -> np.ndarray:
     return ((audio_float / max_val) * 0.9 * 32767.0).astype(np.int16)
 
 def rms_energy(audio_float32: np.ndarray) -> float:
+    """Calculate the Root Mean Square (RMS) energy of an audio frame."""
     return float(np.sqrt(np.mean(audio_float32 ** 2)))
 
 def _pcm16_to_wav_bytes(audio_int16: np.ndarray, sample_rate: int = RATE) -> bytes:
+    """Convert a PCM int16 numpy array to a valid WAV byte string."""
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
         wf.setnchannels(1)
@@ -50,9 +45,6 @@ def _pcm16_to_wav_bytes(audio_int16: np.ndarray, sample_rate: int = RATE) -> byt
         wf.writeframes(audio_int16.tobytes())
     return buf.getvalue()
 
-# ---------------------------------------------------------------------------
-# Main pipeline
-# ---------------------------------------------------------------------------
 
 class AudioPipeline:
     """

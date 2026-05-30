@@ -17,10 +17,10 @@ from typing import Optional
 import keyring
 import keyring.errors
 
-# ── Service name used as the "application" identifier in the OS keychain ────
+# Service name used as the "application" identifier in the OS keychain
 SERVICE_NAME = "Yumi"
 
-# ── Keys that are secrets → live ONLY in the OS keychain ────────────────────
+# Keys that are secrets (live ONLY in the OS keychain)
 CREDENTIAL_KEYS: frozenset[str] = frozenset({
     "ELEVENLABS_API_KEY",
     "ELEVENLABS_VOICE_ID",
@@ -31,7 +31,7 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset({
     "ANTHROPIC_API_KEY",
 })
 
-# ── Keys that are preferences → safe to store in plaintext config.json ───────
+# Keys that are preferences (safe to store in plaintext config.json)
 PREFERENCE_KEYS: frozenset[str] = frozenset({
     "LLM_PROVIDER",
     "PERSONALITY",
@@ -41,10 +41,6 @@ PREFERENCE_KEYS: frozenset[str] = frozenset({
     "COMPUTE_PROFILE",
 })
 
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 def keychain_name() -> str:
     """Human-readable name of the OS keychain backend."""

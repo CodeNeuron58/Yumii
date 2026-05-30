@@ -1,4 +1,3 @@
-from typing import Any
 import numpy as np
 from yumi.core.interfaces import BaseSTTProvider
 

@@ -1,4 +1,3 @@
-import os
 from yumi.core.config import settings
 
 def test_settings_load_defaults():

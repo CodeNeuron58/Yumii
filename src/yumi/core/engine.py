@@ -1,9 +1,9 @@
 import asyncio
 import json
-from typing import List, Any, Dict, AsyncGenerator
+from typing import List, Any, Dict
 from fastapi import WebSocket
 from yumi.core.config import settings
-from yumi.core.interfaces import BaseSpeaker, BaseSTTProvider
+from yumi.core.interfaces import BaseSpeaker
 from yumi.tts.factory import get_speaker
 from yumi.audio.stt import AudioPipeline
 from yumi.agent.graph import build_graph
@@ -20,7 +20,6 @@ class YumiEngine:
         """
         Initialize the Yumi Engine, including audio pipelines and reasoning graph.
         """
-        # 1. State & Queues
         self.transcription_queue: asyncio.Queue[str] = asyncio.Queue()
         self.tts_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
         self.audio_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
@@ -28,9 +27,6 @@ class YumiEngine:
         self.active_connections: List[WebSocket] = []
         self.is_speaking: bool = False
 
-        # 2. Hardware Providers
-
-        # 2. Hardware Providers
         self.stt_provider: str = settings.stt_provider
         self.model_size: str = settings.whisper_model_size
         self.groq_api_key: str | None = settings.groq_api_key
@@ -42,10 +38,9 @@ class YumiEngine:
             groq_api_key=self.groq_api_key
         )
 
-        print(f"Initializing Yumi Speaker...")
+        print("Initializing Yumi Speaker...")
         self.speaker: BaseSpeaker = get_speaker()
 
-        # 3. Reasoning Brain
         self.graph_app = build_graph()
 
     async def broadcast_payload(self, payload: Dict[str, Any]) -> None:
@@ -189,7 +184,8 @@ class YumiEngine:
                     if duration > 0:
                         slept = 0.0
                         while slept < (duration + 0.5):
-                            if self.interrupt_event.is_set(): break
+                            if self.interrupt_event.is_set():
+                                break
                             await asyncio.sleep(0.1)
                             slept += 0.1
 

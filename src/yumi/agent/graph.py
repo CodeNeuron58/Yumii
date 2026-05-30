@@ -7,13 +7,7 @@ from yumi.core.types import MainState
 def build_graph():
     """
     Build and return the compiled LangGraph for Yumi's reasoning engine.
-    
-    Graph topology (Gemini Live full-duplex):
-    ─────────────────────────────────────────
-    think → END
-    
-    Audio listening and TTS speaking are decoupled and managed asynchronously
-    in server.py. This graph only handles the LLM ReAct loop and state memory.
+    This graph handles the LLM ReAct loop and state memory.
     """
 
     def think_node(state: MainState) -> dict:

@@ -6,11 +6,6 @@ from yumi.core.config import settings
 from yumi.tools import tools
 from langchain.agents import create_agent
 
-
-# ---------------------------------------------------------------------------
-# Structured response schema
-# ---------------------------------------------------------------------------
-
 class YumiResponse(BaseModel):
     """
     Yumi's structured reply.
@@ -35,11 +30,6 @@ class YumiResponse(BaseModel):
         )
     )
 
-
-# ---------------------------------------------------------------------------
-# Base LLM — selected from config, initialised once
-# ---------------------------------------------------------------------------
-
 provider = settings.llm_provider.lower()
 
 if provider == "openai":
@@ -61,26 +51,6 @@ else:
         temperature=0.7,
         api_key=settings.groq_api_key,
     )
-
-
-# ---------------------------------------------------------------------------
-# Agent factory — one agent per personality, cached
-# ---------------------------------------------------------------------------
-# Why per-personality agents instead of per-turn system prompt injection?
-#
-# Previously nodes.py manually rebuilt [SystemMessage, ...history, HumanMessage]
-# on every call and passed it to a single global agent.  Problems with that:
-#   1. The system prompt was injected OUTSIDE the agent's ReAct loop, so the
-#      LLM never saw its own tool-call traces paired with the correct persona.
-#   2. The CRITICAL INSTRUCTION workaround was needed because structured output
-#      competed with real tools inside a single turn.
-#   3. The agent's internal tool traces were thrown away and replaced with a
-#      hand-built AIMessage — correct for history, but done for the wrong reason.
-#
-# With create_agent(system_prompt=...) the framework injects the system message
-# INSIDE the agent's loop — before every LLM call — at the correct position.
-# Personality switching = swap the cached agent instance, not rebuild messages.
-# ---------------------------------------------------------------------------
 
 # Short tool-ordering hint appended to every personality prompt.
 # Groq/Llama can sometimes hallucinate <function=...> tags instead of proper tool calls.

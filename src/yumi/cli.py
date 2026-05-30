@@ -9,7 +9,6 @@ import time
 import threading
 import uvicorn
 import sys
-from typing import NoReturn
 
 from yumi.core.global_config import update_global_config, load_global_config
 from yumi.core.credential_store import (
@@ -279,7 +278,7 @@ def attune() -> None:
             console.print(f"\n[🔐] [green]Voice ID secured in {keychain_name()} ✅[/green]")
             time.sleep(1)
 
-    # ── STT / Listening configuration ────────────────────────────────────
+    # STT / Listening configuration
     clear_screen()
     console.print(header)
     console.print()
@@ -483,7 +482,7 @@ def models() -> None:
         ).ask()
         if new_voice_id and new_voice_id.strip():
             save_credential("ELEVENLABS_VOICE_ID", new_voice_id.strip())
-            console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
+            console.print("\n[🔐] [green]Voice ID secured ✅[/green]")
             time.sleep(1)
 
     elif tts_choice == "CAMB.ai":
@@ -502,7 +501,7 @@ def models() -> None:
         ).ask()
         if new_voice_id and new_voice_id.strip():
             save_credential("CAMB_VOICE_ID", new_voice_id.strip())
-            console.print(f"\n[🔐] [green]Voice ID secured ✅[/green]")
+            console.print("\n[🔐] [green]Voice ID secured ✅[/green]")
             time.sleep(1)
 
     clear_screen()
