@@ -3,15 +3,15 @@
   "name": "Yumi",
   "theme": "maple",
   "fonts": {
-    "family": "Geist",
+    "family": "JetBrains Mono",
     "heading": {
-      "family": "Geist"
+      "family": "Black Ops One"
     },
     "body": {
-      "family": "Geist"
+      "family": "JetBrains Mono"
     },
     "mono": {
-      "family": "Geist Mono"
+      "family": "JetBrains Mono"
     }
   },
   "styling": {
@@ -51,9 +51,9 @@
       {
         "group": "Core Concepts",
         "pages": [
-          "core-concepts/what-is-yumi",
+          "core-concepts/architecture",
           "core-concepts/key-features",
-          "core-concepts/architecture"
+          "core-concepts/what-is-yumi"
         ]
       },
       {
