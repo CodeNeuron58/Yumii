@@ -31,12 +31,12 @@
     {
       "name": "GitHub",
       "icon": "github",
-      "url": "https://github.com/yourusername/yumi"
+      "url": "https://github.com/CodeNeuron58/Yumi"
     },
     {
       "name": "Discord",
       "icon": "discord",
-      "url": "https://discord.gg/yourdiscord"
+      "url": "https://discord.gg/YOUR_DISCORD_INVITE"
     }
   ],
   "navigation": {
@@ -78,7 +78,7 @@
     ]
   },
   "footerSocials": {
-    "github": "https://github.com/yourusername/yumi",
-    "discord": "https://discord.gg/yourdiscord"
+    "github": "https://github.com/CodeNeuron58/Yumi",
+    "discord": "https://discord.gg/YOUR_DISCORD_INVITE"
   }
 }

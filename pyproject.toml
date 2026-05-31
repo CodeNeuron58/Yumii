@@ -5,9 +5,22 @@ build-backend = "hatchling.build"
 [project]
 name = "yumi"
 version = "0.1.0"
-description = "Yumi - Your AI Companion"
+description = "Yumi — Open-source, locally-runnable AI companion with Live2D avatar and real-time voice."
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.12"
+keywords = ["ai", "companion", "live2d", "voice", "llm", "langgraph", "whisper", "anime"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+]
 dependencies = [
     "appdirs>=1.4.4",
     "elevenlabs>=2.38.1",
@@ -44,8 +57,19 @@ dev = [
     "mypy>=1.8.0"
 ]
 
+[project.urls]
+Homepage = "https://github.com/CodeNeuron58/Yumi"
+Repository = "https://github.com/CodeNeuron58/Yumi"
+Documentation = "https://github.com/CodeNeuron58/Yumi#readme"
+"Bug Tracker" = "https://github.com/CodeNeuron58/Yumi/issues"
+
 [project.scripts]
 yumi = "yumi.cli:app"
+
+[tool.hatch.build.targets.wheel]
+# Explicitly include everything under src/yumi/ in the wheel,
+# including non-Python assets (prompts, webui HTML).
+packages = ["src/yumi"]
 
 [tool.ruff]
 exclude = ["Experiments", "Trash", ".git", ".venv", "__pycache__"]

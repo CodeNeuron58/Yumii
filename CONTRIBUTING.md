@@ -16,8 +16,8 @@ Thank you for your interest in contributing! Yumi is designed to be open and mod
 
 1. Fork the repository on GitHub and clone your fork:
    ```bash
-   git clone https://github.com/yourusername/yumi.git
-   cd yumi
+   git clone https://github.com/CodeNeuron58/Yumi.git
+   cd Yumi
    ```
 
 2. Install all dependencies (including dev tools):
@@ -28,7 +28,17 @@ Thank you for your interest in contributing! Yumi is designed to be open and mod
    > CPU-only wheel index via `[tool.uv.sources]` in `pyproject.toml`.
    > Regular pip will download the full CUDA build (~2 GB) or fail.
 
-3. Run Yumi to set up your API keys:
+3. Run Yumi to set up your API keys. Either activate the venv first:
+   ```bash
+   # Windows
+   .venv\Scripts\activate
+   yumi
+
+   # macOS / Linux
+   source .venv/bin/activate
+   yumi
+   ```
+   Or skip activation:
    ```bash
    uv run yumi
    ```
@@ -53,15 +63,18 @@ Run all three before opening a PR. Make sure to add tests for any new functional
 ```
 src/yumi/
   agent/          # LangGraph state machine + LLM agent
-    prompts/      # Personality prompt files (.txt)
   api/            # FastAPI server + WebSocket broadcast
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
   core/           # Config, settings, OS keychain integration
-  tts/            # ElevenLabs TTS speaker
+  tts/            # ElevenLabs + CAMB.ai TTS speakers
   tools/          # LangChain tools (time, etc.)
-  webui/          # Frontend HTML (Live2D + PixiJS)
+  assets/
+    prompts/      # Personality prompt files (.txt)
+    webui/        # Frontend HTML (Live2D + PixiJS)
   cli.py          # Typer CLI entry point
 ```
+
+> Avatar files go in `~/.yumi/avatar/` (user-provided, not bundled in the package).
 
 ## Pull Requests
 

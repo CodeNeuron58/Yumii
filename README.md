@@ -5,10 +5,46 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Live2D](https://img.shields.io/badge/Live2D-Cubism-pink.svg)](https://www.live2d.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumi?style=social)](https://github.com/CodeNeuron58/Yumi)
 
 Yumi is an open-source, locally-runnable AI companion with a Live2D avatar,
 real-time voice conversation, and expressive personality. She runs on a standard
 CPU — no expensive GPU required.
+
+---
+
+## ⚡ Install (One Line)
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.ps1 | iex
+```
+
+**macOS / Linux:**
+```bash
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh | sh
+```
+
+**From source (developers):**
+```bash
+git clone https://github.com/CodeNeuron58/Yumi.git
+cd Yumi
+uv sync
+```
+Then either activate the virtual environment:
+```bash
+# Windows
+.venv\Scripts\activate
+yumi
+
+# macOS / Linux
+source .venv/bin/activate
+yumi
+```
+Or skip activation and use:
+```bash
+uv run yumi
+```
 
 ---
 
@@ -41,8 +77,8 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ### 2. Clone & Install
 
 ```bash
-git clone https://github.com/yourusername/yumi.git
-cd yumi
+git clone https://github.com/CodeNeuron58/Yumi.git
+cd Yumi
 uv sync
 ```
 
@@ -59,14 +95,21 @@ bundled in this repo.
 2. Download and extract it.
 3. Place the entire model folder into:
    ```
-   src/yumi/Yumi_Avatar/
+   ~/.yumi/avatar/
    ```
-4. Update `modelUrl` in [`src/yumi/webui/index.html`](src/yumi/webui/index.html#L111)
-   to point to your model's `.model3.json` file.
+   *(On Windows: `C:\Users\YourName\.yumi\avatar\`)*
+4. Update `modelUrl` in [`src/yumi/assets/webui/index.html`](src/yumi/assets/webui/index.html)
+   to point to your model's `.model3.json` filename.
 
 ### 4. Configure Yumi
 
 ```bash
+# Option A — activate venv (then use bare commands for the rest of the session)
+.venv\Scripts\activate    # Windows
+source .venv/bin/activate  # macOS / Linux
+yumi
+
+# Option B — no activation needed
 uv run yumi
 ```
 
@@ -86,6 +129,10 @@ dashboard.
 ### 5. Wake Up
 
 ```bash
+# If venv is activated
+yumi
+
+# Without activation
 uv run yumi
 ```
 
@@ -151,16 +198,18 @@ Yumi will reuse the same API key — no duplicate entry needed.
 ```
 src/yumi/
   agent/          # LangGraph state machine, LLM agent, personality manager
-    prompts/      # Personality prompt files (.txt)
   api/            # FastAPI server, WebSocket broadcast
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
   core/           # Pydantic settings, OS keychain credential store
-  tts/            # ElevenLabs TTS
+  tts/            # ElevenLabs TTS + CAMB.ai streaming TTS
   tools/          # LangChain tools (time, etc.)
-  webui/          # Frontend HTML (Live2D + PixiJS)
-  Yumi_Avatar/    # Live2D model files (not included — see setup above)
+  assets/
+    prompts/      # Personality prompt files (.txt)
+    webui/        # Frontend HTML (Live2D + PixiJS)
   cli.py          # Typer CLI entry point (yumi command)
 ```
+
+> **Avatar files** go in `~/.yumi/avatar/` (user-provided, not bundled).
 
 ---
 

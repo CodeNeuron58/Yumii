@@ -25,11 +25,15 @@ class PersonalityManager:
 
     def __init__(self) -> None:
         """Initialize the manager and set up personality file paths."""
-        # Calculate project root (src/yumi/agent/personality_manager.py -> src/yumi/agent -> src/yumi -> src -> root)
-        root_dir = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # Resolve prompts relative to this file — works both in development
+        # and when installed as a package via pip / uv tool install.
+        # __file__ = .../yumi/agent/personality_manager.py
+        # .parent       = .../yumi/agent/
+        # .parent.parent = .../yumi/           (package root)
+        from pathlib import Path
+        self._prompts_dir: str = str(
+            Path(__file__).parent.parent / "assets" / "prompts"
         )
-        self._prompts_dir: str = os.path.join(root_dir, "assets", "prompts")
         self._cache: Dict[PERSONALITY_TYPE, str] = {}
 
     def load_personality(self, personality: PERSONALITY_TYPE) -> str:
