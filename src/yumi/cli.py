@@ -28,6 +28,7 @@ from prompt_toolkit.styles import Style
 from rich import box
 from rich.align import Align
 from rich.console import Console
+from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -210,8 +211,20 @@ def _toolbar() -> HTML:
 
 # ─── Help Screen ──────────────────────────────────────────────────────────────
 
+# ── Command registry — add new entries here and help auto-updates ─────────────
+_COMMANDS: list[tuple[str, str, str]] = [
+    # (command,         aliases hint,            description)
+    ("/wake",         "",                       "Wake Yumi up — launch her avatar server and open the browser"),
+    ("/config",       "configure · settings",   "Configure mind (LLM), voice (TTS), and ears (STT)"),
+    ("/personality",  "",                       "Switch Yumi's personality mode"),
+    ("/vision",       "story",                  "Read the story and roadmap behind Yumi"),
+    ("/help",         "h · ?",                  "Show this help screen"),
+    ("/exit",         "quit · q",               "Let Yumi sleep — exit gracefully"),
+]
+
+
 def _show_help() -> None:
-    """Print an inline help table."""
+    """Render the help table inline (terminal scrolls naturally)."""
     table = Table(
         show_header=True,
         header_style=f"bold {_C_PRIMARY}",
@@ -219,31 +232,28 @@ def _show_help() -> None:
         box=box.SIMPLE_HEAVY,
         padding=(0, 2),
         show_lines=False,
+        min_width=70,
     )
     table.add_column("Command",     style=f"{_C_PRIMARY} bold", min_width=16, no_wrap=True)
+    table.add_column("Aliases",     style=_C_DIM,               min_width=18, no_wrap=True)
     table.add_column("Description", style=_C_TEXT)
 
-    rows: list[tuple[str, str]] = [
-        ("/wake",        "Wake Yumi up — launch her avatar server and open the browser"),
-        ("/config",      "Configure mind (LLM), voice (TTS), and ears (STT)"),
-        ("/personality", "Switch Yumi's personality mode"),
-        ("/vision",      "Read the story behind Yumi"),
-        ("/help",        "Show this help screen"),
-        ("/exit",        "Let Yumi sleep — exit gracefully"),
-    ]
-    for cmd, desc in rows:
-        table.add_row(cmd, desc)
+    for cmd, aliases, desc in _COMMANDS:
+        table.add_row(cmd, aliases or "-", desc)
 
+    console.print()
+    console.print(Align.center(Text("Yumi Commands", style=f"bold {_C_PRIMARY}")))
+    console.print(Align.center(Text("-" * 70, style=_C_PANEL)))
     console.print()
     console.print(
         Panel(
             table,
-            title=f"[bold {_C_PRIMARY}]Commands[/]",
             border_style=_C_PRIMARY,
             expand=False,
             padding=(1, 2),
         )
     )
+    console.print(f"  [{_C_DIM}]Tip: commands work with or without the leading /[/]")
     console.print()
 
 
@@ -657,28 +667,242 @@ def _cmd_personality() -> None:
         )
 
 
+# ── Vision content ────────────────────────────────────────────────────────────
+_VISION_SECTIONS = [
+    (
+        "Origin",
+        [
+            "Yumi started as a question I couldn't stop asking:",
+            "What if your computer felt less like a machine and more like a presence?",
+            "",
+            "Not a chatbot you query. Not a voice assistant you command.",
+            "Something that listens. Something that reacts. Something that simply - is there.",
+        ],
+    ),
+    (
+        "The Problem",
+        [
+            "We live in an age of extraordinary software, yet our relationship",
+            "with technology remains fundamentally transactional.",
+            "",
+            "You open a tab. You type a prompt. You get an answer. The window closes.",
+            "There is no continuity. No warmth. No sense that the other side remembers you.",
+            "",
+            "Tools are useful. But they are not companions.",
+        ],
+    ),
+    (
+        "What Yumi Is",
+        [
+            "Yumi is an open-source AI companion with a Live2D avatar - a persistent",
+            "presence on your screen that speaks with emotion, reacts in real-time,",
+            "and adapts her personality to match what you need in the moment.",
+            "",
+            "She is caring when you are tired. Energetic when you need a push.",
+            "Calm when you need to think. She is not one thing - she is yours to shape.",
+        ],
+    ),
+    (
+        "The Roadmap",
+        [
+            ">  Persistent Memory       - She will remember you across restarts,",
+            "                             your preferences, your history, the little things.",
+            "",
+            ">  Proactive Reach-Outs    - She won't just wait to be spoken to.",
+            "                             She'll check in. She'll remind. She'll be present.",
+            "",
+            ">  Seamless Integrations   - Calendar, email, smart home, music -",
+            "                             all accessible without the developer jargon.",
+            "",
+            ">  Evolving Expressiveness - Richer animations, contextual reactions,",
+            "                             and emotional intelligence that grows with use.",
+        ],
+    ),
+    (
+        "The Belief",
+        [
+            "Every line of code in this project was written with one conviction:",
+            "",
+            "Technology can be more than a utility.",
+            "It can be a companion. It can make the digital space feel a little less lonely.",
+            "",
+            "Yumi is still young. Still learning. Still growing.",
+            "But that is exactly what companions do.",
+        ],
+    ),
+]
+
+_VISION_QUOTE = (
+    "The goal was never to build a smarter tool.",
+    "It was to build something that feels alive.",
+    "                         - Biprayan",
+)
+
+
+# ─── Vision reader ───────────────────────────────────────────────────────────
+
+def _build_vision_lines() -> list[Text]:
+    """Pre-render all vision content as a flat list of styled Text rows."""
+    rows: list[Text] = []
+
+    rows.append(Text(""))   # top padding
+
+    for i, (heading, section_lines) in enumerate(_VISION_SECTIONS):
+        # Section heading
+        h = Text()
+        h.append("  | ", style=f"bold {_C_PRIMARY}")
+        h.append(heading, style=f"bold {_C_TEXT}")
+        rows.append(h)
+        rows.append(Text(""))
+
+        for line in section_lines:
+            if line == "":
+                rows.append(Text(""))
+            elif line.startswith(">"):
+                parts = line.split("-", 1)
+                row = Text()
+                row.append("    ")
+                row.append(parts[0].strip(), style=f"bold {_C_PRIMARY}")
+                if len(parts) > 1:
+                    row.append("  ", style=_C_DIM)
+                    row.append(parts[1].strip(), style=_C_TEXT)
+                rows.append(row)
+            else:
+                t = Text()
+                t.append("    " + line, style=_C_TEXT)
+                rows.append(t)
+
+        rows.append(Text(""))
+
+        if i < len(_VISION_SECTIONS) - 1:
+            sep = Text()
+            sep.append("                    . . .", style=_C_DIM)
+            rows.append(sep)
+            rows.append(Text(""))
+
+    # Divider
+    rows.append(Text("  " + "-" * 54, style=_C_PANEL))
+    rows.append(Text(""))
+
+    # Closing quote
+    for line in _VISION_QUOTE:
+        t = Text()
+        style = _C_DIM if line.startswith(" ") else f"italic {_C_TEXT}"
+        t.append("  " + line, style=style)
+        rows.append(t)
+
+    # Bottom padding so final lines scroll fully into view
+    for _ in range(6):
+        rows.append(Text(""))
+
+    return rows
+
+
 def _cmd_vision() -> None:
-    """Show the vision / story behind Yumi."""
-    message_dialog(
-        title="🌿  The Vision",
-        text=(
-            "In a world filled with sterile tools and utility-driven software,\n"
-            "I wanted to build something that felt alive.\n\n"
-            "Yumi isn't just a script waiting for a prompt;\n"
-            "she is an attempt to bridge the gap between cold logic\n"
-            "and warm interaction.\n\n"
-            "The goal was never just to build a voice assistant.\n"
-            "It was to create a presence on your screen — someone who\n"
-            "listens, reacts, and makes the digital space feel a little\n"
-            "less lonely.\n\n"
-            "She is still learning, still growing, but every line of code\n"
-            "was written with the hope that technology can be a companion,\n"
-            "not just a utility.\n\n"
-            "                                        — The Developer"
-        ),
-        ok_text="Close",
-        style=_DIALOG_STYLE,
-    ).run()
+    """Full-screen vision reader: slow auto-scroll, arrow navigation, q to close."""
+    rows     = _build_vision_lines()
+    VIEWPORT = 20               # lines visible inside the box at once
+    total    = len(rows)
+    done     = threading.Event()
+    lock     = threading.Lock()
+
+    # ── Tuning ────────────────────────────────────────────────────────────────
+    REFRESH_FPS    = 12         # redraws/sec  — keeps display silky smooth
+    TICKS_PER_LINE = 18         # advance 1 line every 18 ticks  → ~1.5 s/line
+    END_HOLD_TICKS = 60         # linger on last page ~5 s then auto-close
+    FRAME_SLEEP    = 1.0 / REFRESH_FPS
+
+    # ── Shared state (read/written from both threads) ─────────────────────────
+    _s = {"pos": 0, "tick": 0, "end_tick": 0}
+
+    # ── Keyboard thread ───────────────────────────────────────────────────────
+    def _keywatch() -> None:
+        try:
+            if os.name == "nt":
+                import msvcrt as _m  # noqa: PLC0415
+                while not done.is_set():
+                    if _m.kbhit():
+                        key = _m.getch()
+                        if key in (b"q", b"Q"):
+                            done.set()
+                        elif key in (b"\xe0", b"\x00"):   # Windows special-key prefix
+                            k2 = _m.getch()
+                            with lock:
+                                if k2 == b"H":             # Up arrow
+                                    _s["pos"]  = max(0, _s["pos"] - 2)
+                                    _s["tick"] = 0         # reset auto-scroll timer
+                                elif k2 == b"P":           # Down arrow
+                                    _s["pos"]  = min(
+                                        total - VIEWPORT, _s["pos"] + 2
+                                    )
+                                    _s["tick"] = 0
+                    time.sleep(0.04)
+        except Exception:
+            done.set()
+
+    threading.Thread(target=_keywatch, daemon=True).start()
+
+    # ── Frame renderer ────────────────────────────────────────────────────────
+    def _frame(p: int) -> Panel:
+        visible = rows[p : p + VIEWPORT]
+        while len(visible) < VIEWPORT:
+            visible = visible + [Text("")]
+
+        body = Text()
+        for ln in visible:
+            body.append_text(ln)
+            body.append("\n")
+
+        at_end = p >= total - VIEWPORT
+        pct    = int(p / max(total - VIEWPORT, 1) * 100)
+        filled = pct // 5
+        bar    = "[" + "#" * filled + "-" * (20 - filled) + "]"
+
+        if at_end:
+            sub = f"[dim]  {'[####################]'}  100%  |  q to close  [/dim]"
+        else:
+            sub = (
+                f"[dim]  {bar}  {pct}%"
+                f"  |  up/down to scroll"
+                f"  |  q to close  [/dim]"
+            )
+
+        return Panel(
+            body,
+            title=f"[bold {_C_PRIMARY}]   The Vision   [/]",
+            border_style=_C_PRIMARY,
+            subtitle=sub,
+            padding=(1, 4),
+            expand=True,
+        )
+
+    # ── Main loop — we own the clock; auto_refresh=False prevents jitter ──────
+    with Live(
+        _frame(0),
+        console=console,
+        screen=True,
+        auto_refresh=False,
+    ) as live:
+        while not done.is_set():
+            with lock:
+                p = _s["pos"]
+            live.update(_frame(p), refresh=True)
+            time.sleep(FRAME_SLEEP)
+
+            with lock:
+                _s["tick"] += 1
+                at_end = _s["pos"] >= total - VIEWPORT
+                if at_end:
+                    _s["end_tick"] += 1
+                    if _s["end_tick"] >= END_HOLD_TICKS:
+                        done.set()
+                elif _s["tick"] >= TICKS_PER_LINE:
+                    _s["pos"] += 1
+                    _s["tick"] = 0
+
+    done.set()
+
+
 
 
 # ─── Interactive Shell (REPL) ─────────────────────────────────────────────────

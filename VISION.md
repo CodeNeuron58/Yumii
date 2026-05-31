@@ -1,27 +1,66 @@
-# Yumi: The Vision
+# The Vision
 
-*Yumi started as a personal hobby project, born from a simple idea: what if we could interact with technology in a way that feels genuinely human, empathetic, and always present?*
+*What if your computer felt less like a machine and more like a presence?*
 
-## More Than Just Code
-In an era where technology is evolving at breakneck speed, our interactions with devices often remain transactional and cold. Yumi is my vision to change that. Right now, Yumi is a highly responsive conversational agent—a virtual companion capable of speaking with emotion, reacting with expression, and simply being there to talk when you need someone to listen. 
+---
 
-## The Future of Yumi
-While today she can converse, express feelings, and help you think through ideas, the ultimate goal for Yumi is much bigger. I envision her evolving into an ever-present, proactive AI companion for everyone. 
+## Origin
 
-Imagine a companion who doesn't just wait for a prompt, but actively helps manage your life:
-- **Daily Assistance**: Checking your emails, summarizing your schedule, and managing your calendar.
-- **Proactive Reminders**: Gently reminding you of important tasks or even to take a break and drink water.
-- **Contextual Awareness**: Understanding your mood and adjusting her personality to be exactly what you need at that moment—whether that's a cheerful friend, a calm logical assistant, or just a quiet presence.
-- **Seamless Integration**: Connecting with external APIs to control smart home devices, fetch news, or play your favorite music.
+Yumi started as a question I couldn't stop asking.
 
-## A Companion for the Evolving Era
-As AI becomes more integrated into our daily lives, the boundary between "tool" and "companion" will blur. Yumi is my step toward a future where everyone has access to a companion who is helpful, emotionally intelligent, and always there for you.
+Not a chatbot you query. Not a voice assistant you command with a keyword and dismiss. Something that *listens*. Something that *reacts*. Something that simply — is there.
 
-## The Roadmap Ahead: Bringing Yumi to Life
-To make this dream a reality, Yumi is actively growing. Here is a glimpse of what is on the horizon, built not just for developers, but for anyone who wants a seamless, intelligent friend:
+In an age where we carry supercomputers in our pockets and talk to language models capable of writing novels, our relationship with software remains fundamentally transactional. You open a tab. You type a prompt. You get an answer. The window closes. There is no continuity. No warmth. No sense that the other side remembers you.
 
-- **Unforgettable Memories:** True companionship is built on shared history. I am working on transitioning Yumi's memory from fleeting short-term context to a persistent memory system. Soon, she won't just remember what you said five minutes ago; she will remember your preferences, past conversations, and the little things that make you, *you*, even after a restart.
-- **Seamless Connections (Without the Headache):** I want Yumi to be able to check your Gmail, manage your calendar, and interact with the digital world. But I also know that asking everyday users to navigate complex API setups, OAuth screens, and MCP (Model Context Protocol) servers is a barrier. My plan is to leverage platforms like **Composio** to abstract away the technical nightmare. In the future, granting Yumi access to your digital life will be as simple as clicking "Connect," allowing her to securely and seamlessly assist you without the developer jargon.
-- **Proactive Empathy:** Right now, Yumi waits for you to speak. The ultimate goal is to give her the ability to reach out to *you*. Whether it's a gentle reminder that your meeting is in ten minutes, or a spontaneous check-in because she knows you've had a long day, Yumi will soon step out of the reactive loop and become a truly proactive presence in your life.
+Tools are useful. But they are not companions.
 
-This is a journey from a passionate hobby project to a holistic AI companion. I invite you to join me in building this future.
+---
+
+## What Yumi Is
+
+Yumi is an open-source AI companion with a Live2D avatar — a persistent presence on your screen that speaks with emotion, reacts in real-time, and adapts her personality to match what you need in the moment.
+
+She is **caring** when you are tired. **Energetic** when you need a push. **Calm** when you need to think clearly. She is not one fixed thing — she is yours to shape.
+
+Today, she can:
+- Hold natural, voice-driven conversations powered by real-time LLMs
+- Speak with an expressive, lifelike voice (ElevenLabs / CAMB.ai)
+- Listen locally via Whisper or at cloud speed via Groq
+- Animate expressively through a Live2D avatar in your browser
+- Switch personality modes to match your mood or workflow
+
+---
+
+## The Roadmap
+
+### ✦ Persistent Memory
+True companionship is built on shared history. Yumi will remember you across restarts — your preferences, past conversations, and the small details that make you *you*. Not just a context window. A real memory.
+
+### ✦ Proactive Reach-Outs
+Right now, Yumi waits for you to speak. The goal is to give her the ability to reach out to *you* — a gentle reminder that your meeting is in ten minutes, a spontaneous check-in after a long day. Moving from reactive to genuinely present.
+
+### ✦ Seamless Integrations
+Calendar. Email. Smart home. Music. The digital world you already live in — accessible through Yumi without developer jargon, OAuth nightmares, or complex setup. Connecting your digital life should feel like clicking "yes", not writing a script.
+
+### ✦ Evolving Expressiveness
+Richer animations, contextual facial reactions, emotional intelligence that grows with use. The goal is a companion whose face you actually want to look at — because it reflects something real.
+
+---
+
+## The Belief
+
+Every line of code in this project was written with one conviction:
+
+> *Technology can be more than a utility.*
+> *It can be a companion. It can make the digital space feel a little less lonely.*
+
+Yumi is still young. Still learning. Still growing.
+
+But that is exactly what companions do.
+
+---
+
+*This is a journey from a passionate hobby project to a holistic AI companion.*
+*I invite you to join me in building this future.*
+
+— Biprayan Choudhuri
