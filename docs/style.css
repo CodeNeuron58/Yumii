@@ -14,11 +14,11 @@
   --text-accent: #4ade80;
 
   --font-display: 'Black Ops One', system-ui;
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Outfit', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --sidebar-width: 240px;
-  --toc-width: 210px;
+  --sidebar-width: 260px;
+  --toc-width: 260px;
   --header-height-primary: 52px;
   --header-height-tabs: 40px;
   --header-height: calc(var(--header-height-primary) + var(--header-height-tabs));
@@ -249,7 +249,7 @@ code, pre {
   flex-shrink: 0;
   border-right: 1px solid var(--border-color);
   background-color: var(--bg-sidebar);
-  padding: 24px 12px 24px 16px;
+  padding: 24px 20px;
   position: sticky;
   top: var(--header-height);
   height: calc(100vh - var(--header-height));
@@ -336,12 +336,13 @@ code, pre {
 }
 
 .content-inner {
-  max-width: 760px;
+  max-width: 960px;
   width: 100%;
 }
 
 .breadcrumb {
   margin-bottom: 12px;
+  text-align: center;
 }
 
 .breadcrumb .badge {
@@ -362,9 +363,15 @@ h1 {
   font-size: 2.5rem;
   font-weight: 400;
   margin-bottom: 10px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.35em;
   text-transform: uppercase;
   line-height: 1.15;
+  text-align: center;
+  background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 40%, #4ade80 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
 }
 
 .subtitle {
@@ -373,11 +380,43 @@ h1 {
   color: var(--text-secondary);
   margin-bottom: 16px;
   line-height: 1.6;
+  text-align: center;
 }
 
 .subtitle .highlight {
   color: var(--text-accent);
   font-weight: 600;
+}
+
+.cta-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.primary-cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: var(--text-accent);
+  padding: 8px 24px;
+  border-radius: 30px;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 15px rgba(74, 222, 128, 0.1);
+}
+
+.primary-cta-button:hover {
+  background: rgba(74, 222, 128, 0.25);
+  border-color: rgba(74, 222, 128, 0.8);
+  box-shadow: 0 0 25px rgba(74, 222, 128, 0.25);
+  transform: translateY(-2px);
+  color: #fff;
 }
 
 /* ─────────────────────────────────────────────
@@ -397,7 +436,7 @@ h1 {
   isolation: isolate;
 }
 
-/* 2. dot grid — KEY: mask fades dots near center and at boundaries */
+/* 2. dot grid — KEY: mask fades dots near center and perfectly right at the boundaries */
 .hero-section::before {
   content: '';
   position: absolute; inset: 0;
@@ -405,29 +444,31 @@ h1 {
     radial-gradient(circle, rgba(46, 182, 106, 0.16) 1px, transparent 1px);
   background-size: 30px 30px;
   mask-image:
-    radial-gradient(ellipse 65% 75% at 50% 50%,
-      transparent 0%, rgba(0,0,0,0.2) 20%, black 50%, black 70%, transparent 95%);
+    radial-gradient(ellipse 50% 50% at 50% 50%,
+      transparent 0%, rgba(0,0,0,0.2) 20%, black 45%, black 60%, transparent 100%);
   -webkit-mask-image:
-    radial-gradient(ellipse 65% 75% at 50% 50%,
-      transparent 0%, rgba(0,0,0,0.2) 20%, black 50%, black 70%, transparent 95%);
+    radial-gradient(ellipse 50% 50% at 50% 50%,
+      transparent 0%, rgba(0,0,0,0.2) 20%, black 45%, black 60%, transparent 100%);
   z-index: -2;
 }
 
-/* 3. glow spotlight — KEY: center = 50% 50%, wide flat horizontal ellipse (2.5:1 proportion) */
+/* 3. glow spotlight — strictly contained within 50% radii to prevent any hard cutoff edges */
 .hero-section::after {
   content: '';
   position: absolute; inset: 0;
   background:
-    /* bright inner core — flat ellipse, reduced center opacity for mascot contrast, long soft falloff */
-    radial-gradient(ellipse 75% 30% at 50% 50%,
-      rgba(40, 195, 105, 0.28) 0%,
-      rgba(24, 140, 72, 0.11) 40%,
-      transparent 80%),
-    /* soft outer ambient bloom — very gradual falloff to edge */
-    radial-gradient(ellipse 95% 38% at 50% 50%,
-      rgba(32, 138, 76, 0.08) 0%,
-      rgba(14, 78, 40, 0.02) 55%,
-      transparent 85%);
+    /* bright inner core */
+    radial-gradient(ellipse 35% 35% at 50% 50%,
+      rgba(40, 195, 105, 0.26) 0%,
+      rgba(24, 140, 72, 0.10) 30%,
+      rgba(14, 90, 50, 0.03) 60%,
+      transparent 100%),
+    /* soft outer ambient bloom */
+    radial-gradient(ellipse 50% 50% at 50% 50%,
+      rgba(32, 138, 76, 0.06) 0%,
+      rgba(14, 78, 40, 0.02) 35%,
+      rgba(8, 50, 28, 0.005) 70%,
+      transparent 100%);
   pointer-events: none;
   z-index: -1;
 }
@@ -460,7 +501,7 @@ h1 {
 .hero-mascot {
   position: relative;
   z-index: 3;
-  height: 280px;
+  height: 340px;
   max-width: none;
   object-fit: contain;
   object-position: bottom;
@@ -482,20 +523,20 @@ h1 {
 ───────────────────────────────────────────── */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 0;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: -15px;
+  margin-bottom: 10px;
 }
 
 .card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: 8px;
-  padding: 14px 16px 16px;
+  padding: 12px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   transition: border-color 0.2s, background-color 0.2s, transform 0.2s;
   cursor: pointer;
   position: relative;
@@ -508,7 +549,7 @@ h1 {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(200px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(74, 222, 128, 0.04), transparent 80%);
+  background: radial-gradient(200px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(74, 222, 128, 0.15), transparent 80%);
   opacity: 0;
   transition: opacity 0.3s;
   pointer-events: none;
@@ -533,7 +574,7 @@ h1 {
 
 .card h3 {
   font-family: var(--font-sans);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.01em;
@@ -541,16 +582,16 @@ h1 {
 }
 
 .card p {
-  font-family: var(--font-sans);
-  font-size: 0.775rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.4;
   margin: 0;
 }
 
 .card-arrow {
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: 2px;
   color: var(--text-accent);
   transition: transform 0.2s;
   display: flex;
@@ -773,34 +814,59 @@ p code, li code {
 
 .toc ul {
   list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .toc li {
   font-family: var(--font-sans);
   font-size: 0.8rem;
   color: var(--text-secondary);
-  padding: 5px 0 5px 14px;
+  padding: 6px 10px 6px 26px;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: all 0.2s ease;
+  border-radius: 6px;
   position: relative;
-  border-left: 1px solid var(--border-color);
+}
+
+.toc li::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: transparent;
+  border: 1px solid var(--text-tertiary);
+  transition: all 0.2s ease;
 }
 
 .toc li:hover {
   color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.toc li:hover::before {
+  border-color: var(--text-accent);
+  background-color: var(--text-accent);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
 }
 
 .toc li.active {
   color: var(--text-accent);
+  background-color: rgba(74, 222, 128, 0.06);
 }
 
 .toc li.active::before {
-  content: '';
-  position: absolute;
-  left: -1px; top: 0; bottom: 0;
-  width: 2px;
+  border-color: var(--text-accent);
   background-color: var(--text-accent);
-  border-radius: 1px;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+  width: 6px;
+  height: 6px;
+  left: 9px;
 }
 
 /* ─────────────────────────────────────────────
@@ -814,7 +880,7 @@ p code, li code {
 /* ─────────────────────────────────────────────
    RESPONSIVE
 ───────────────────────────────────────────── */
-@media (max-width: 1280px) {
+@media (max-width: 1050px) {
   .cards-grid { grid-template-columns: repeat(3, 1fr); }
 }
 

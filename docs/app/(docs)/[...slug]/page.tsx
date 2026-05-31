@@ -27,7 +27,7 @@ const slugify = (text: any) => {
 // Custom components mapping
 const components = {
   CardGroup: ({ children, cols }: any) => (
-    <div className="cards-grid" style={cols === 4 ? { gridTemplateColumns: 'repeat(4, 1fr)' } : undefined}>
+    <div className={`cards-grid ${cols === 4 ? 'cols-4' : ''}`}>
       {children}
     </div>
   ),
