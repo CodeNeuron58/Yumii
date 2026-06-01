@@ -48,8 +48,8 @@ export default function TopNav() {
     <header className="top-nav">
       <div className="top-nav-shell">
         <div className="top-nav-row top-nav-row--primary">
-          <a href="https://yumii.xyz" className="logo">
-            <img src="/images/yumi-nav.png" alt="Yumi" width={30} height={30} />
+          <a href="/" className="logo">
+            <img src="/docs/images/yumi-nav.png" alt="Yumi" width={30} height={30} />
             <span>Yumi</span>
           </a>
 

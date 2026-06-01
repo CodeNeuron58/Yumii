@@ -58,7 +58,7 @@ const components = {
       <div className="hero-bottom-fade"></div>
       <div className="hero-floor"></div>
       <img
-        src="/mascot.png"
+        src="/docs/mascot.png"
         className="hero-mascot"
         alt="Yumi"
       />
@@ -85,7 +85,13 @@ const components = {
   h2: (props: any) => <h2 id={slugify(props.children)} {...props} />,
   h3: (props: any) => <h3 id={slugify(props.children)} {...props} />,
   p: (props: any) => <p {...props} />,
-  img: (props: any) => <img {...props} style={{ borderRadius: '10px', marginBottom: '28px', maxWidth: '100%' }} />,
+  img: (props: any) => {
+    let src = props.src;
+    if (typeof src === 'string' && src.startsWith('/') && !src.startsWith('/docs/')) {
+      src = '/docs' + src;
+    }
+    return <img {...props} src={src} style={{ borderRadius: '10px', marginBottom: '28px', maxWidth: '100%' }} />;
+  },
   pre: (props: any) => {
     const codeElement = props.children;
     if (codeElement && codeElement.type === 'code') {
