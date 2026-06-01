@@ -48,10 +48,10 @@ export default function TopNav() {
     <header className="top-nav">
       <div className="top-nav-shell">
         <div className="top-nav-row top-nav-row--primary">
-          <Link href="/" className="logo">
+          <a href="https://yumii.xyz" className="logo">
             <img src="/images/yumi-nav.png" alt="Yumi" width={30} height={30} />
             <span>Yumi</span>
-          </Link>
+          </a>
 
           <div className="search-bar">
             <button className="search-input" aria-label="Search documentation">
