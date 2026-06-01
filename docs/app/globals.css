@@ -23,14 +23,14 @@
   --font-header: "Geist", "Satoshi", "General Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
-  --sidebar-width: 274px;
-  --toc-width: 268px;
-  --page-gutter: 22px;
+  --sidebar-width: 280px;
+  --toc-width: 280px;
+  --page-gutter: 32px;
   --nav-top-gap: 12px;
   --header-height-primary: 62px;
   --header-height-tabs: 46px;
   --header-height: calc(var(--header-height-primary) + var(--header-height-tabs));
-  --nav-reserved: 146px;
+  --nav-reserved: 116px;
   --header-offset: calc(var(--nav-reserved) + 18px);
 
   --fast: 200ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -189,7 +189,7 @@ pre {
 
 .top-nav-shell {
   pointer-events: auto;
-  max-width: 1480px;
+  max-width: 1600px;
   margin: 0 auto;
   border-radius: 14px;
   border: 1px solid var(--border-color);
@@ -225,8 +225,8 @@ pre {
 
 .top-nav-row--primary {
   height: var(--header-height-primary);
-  padding: 0 16px;
-  gap: 18px;
+  padding: 0 24px;
+  gap: 20px;
   border-bottom: 1px solid rgba(145, 173, 199, 0.11);
 }
 
@@ -505,7 +505,7 @@ pre {
     var(--bg-panel);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  padding: 16px 12px 18px;
+  padding: 16px 16px 20px;
   overflow-y: auto;
   box-shadow:
     0 16px 34px rgba(0, 0, 0, 0.36),
@@ -542,8 +542,8 @@ pre {
 }
 
 .nav-section + .nav-section {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid rgba(123, 145, 168, 0.12);
 }
 
@@ -665,16 +665,16 @@ pre {
   min-width: 0;
   display: flex;
   justify-content: center;
-  padding: 34px 34px 72px;
+  padding: 0px 34px 72px;
 }
 
 .content-inner {
   width: 100%;
-  max-width: 940px;
+  max-width: 860px;
 }
 
 .breadcrumb {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .breadcrumb .badge {
@@ -699,7 +699,7 @@ h1 {
   line-height: 1.2;
   letter-spacing: 0;
   color: var(--text-primary);
-  margin-bottom: 14px;
+  margin-bottom: 8px;
   text-wrap: balance;
 }
 
@@ -715,7 +715,7 @@ h1#yumi,
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   background-clip: text !important;
-  margin-bottom: 20px !important;
+  margin-bottom: 6px !important;
   line-height: 1.08 !important;
 }
 
@@ -723,7 +723,7 @@ h1#yumi,
   font-family: var(--font-sans);
   font-size: 0.97rem;
   color: var(--text-secondary);
-  margin-bottom: 24px;
+  margin-bottom: 14px;
   line-height: 1.7;
   text-align: center;
 }
@@ -764,13 +764,13 @@ h1#yumi,
 .hero-section {
   position: relative;
   width: 100%;
-  height: 330px;
-  margin-top: 20px;
-  margin-bottom: 12px;
+  height: 300px;
+  margin-top: 4px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   isolation: isolate;
 }
 
@@ -859,20 +859,20 @@ h1#yumi,
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  margin-top: 6px;
+  margin-top: 0px;
   margin-bottom: 12px;
 }
 
 .card {
   background:
-    linear-gradient(180deg, rgba(18, 23, 29, 0.74) 0%, rgba(11, 15, 19, 0.9) 100%),
+    linear-gradient(180deg, rgba(20, 25, 32, 0.65) 0%, rgba(13, 17, 22, 0.8) 100%),
     var(--bg-card);
-  border: 1px solid rgba(132, 160, 188, 0.2);
+  border: 1px solid rgba(132, 160, 188, 0.12);
   border-radius: 8px;
-  padding: 14px 14px 13px;
+  padding: 10px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   transition: border-color var(--fast), background-color var(--fast), transform var(--fast), box-shadow var(--fast), filter var(--fast);
   cursor: pointer;
   position: relative;
@@ -880,8 +880,8 @@ h1#yumi,
   text-decoration: none;
   color: inherit;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 12px 28px rgba(0, 0, 0, 0.34);
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .card::after {
@@ -891,7 +891,7 @@ h1#yumi,
   border-radius: inherit;
   padding: 1px;
   pointer-events: none;
-  opacity: 0.34;
+  opacity: 0.24;
   background: linear-gradient(155deg, rgba(172, 196, 220, 0.42), rgba(72, 255, 171, 0.16), rgba(84, 132, 188, 0.16));
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -930,7 +930,7 @@ h1#yumi,
   display: flex;
   align-items: center;
   color: var(--text-accent);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   filter: drop-shadow(0 0 12px rgba(72, 255, 171, 0.36));
 }
 
@@ -945,9 +945,9 @@ h1#yumi,
 
 .card p {
   font-family: var(--font-sans);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   color: var(--text-secondary);
-  line-height: 1.55;
+  line-height: 1.45;
   margin: 0;
 }
 
@@ -1204,7 +1204,7 @@ li code {
     0 16px 34px rgba(0, 0, 0, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   position: relative;
-  padding: 15px 13px 15px 19px;
+  padding: 18px 18px 20px 22px;
 }
 
 .toc-progress-track {
@@ -1305,12 +1305,14 @@ li code {
   flex: 1;
   min-height: calc(100dvh - var(--nav-reserved));
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   position: relative;
-  overflow: hidden;
+  /* Removed overflow: hidden to fix bottom cards clipping on short viewports */
   background-color: var(--bg-main);
+  padding: 40px 0 60px;
 }
 
 .front-grid-bg {
@@ -1363,7 +1365,7 @@ li code {
   font-size: clamp(0.95rem, 2vw, 1.12rem);
   color: var(--text-secondary);
   line-height: 1.7;
-  margin-bottom: 44px;
+  margin-bottom: 24px;
   max-width: 640px;
 }
 
@@ -1416,7 +1418,7 @@ li code {
   transform: translateY(-2px);
 }
 
-@media (max-width: 1300px) {
+@media (max-width: 1440px) {
   .right-sidebar {
     display: none;
   }
@@ -1440,7 +1442,7 @@ li code {
   }
 
   .content-area {
-    padding: 36px 24px 58px;
+    padding: 24px 24px 58px;
   }
 }
 
@@ -1467,7 +1469,7 @@ li code {
   }
 
   .content-area {
-    padding: 28px 18px 48px;
+    padding: 20px 18px 48px;
   }
 
   .top-nav {
