@@ -15,7 +15,7 @@
     }
   },
   "styling": {
-    "css": ["style.css"]
+    "css": ["globals.css"]
   },
   "logo": {
     "dark": "/images/yumi-nav.png",
@@ -40,39 +40,154 @@
     }
   ],
   "navigation": {
-    "groups": [
+    "sections": [
       {
-        "group": "Getting Started",
-        "pages": [
-          "introduction",
-          "quickstart"
+        "id": "get-started",
+        "title": "Get Started",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "get-started/what-is-yumi",
+              "get-started/showcase",
+              "get-started/key-features"
+            ]
+          },
+          {
+            "group": "First Steps",
+            "pages": [
+              "quickstart",
+              "get-started/attuning-senses",
+              "get-started/first-conversation"
+            ]
+          }
         ]
       },
       {
-        "group": "Core Concepts",
-        "pages": [
-          "core-concepts/architecture",
-          "core-concepts/key-features",
-          "core-concepts/what-is-yumi"
+        "id": "installation",
+        "title": "Installation",
+        "groups": [
+          {
+            "group": "Standard Platforms",
+            "pages": [
+              "installation/windows",
+              "installation/macos",
+              "installation/linux"
+            ]
+          },
+          {
+            "group": "Advanced Environments",
+            "pages": [
+              "installation/developer-manual",
+              "installation/wsl2"
+            ]
+          }
         ]
       },
       {
-        "group": "Guides",
-        "pages": [
-          "guides/installation",
-          "guides/configuration",
-          "guides/personalities",
-          "guides/voice-setup",
-          "guides/troubleshooting"
+        "id": "core-senses",
+        "title": "Core Senses",
+        "groups": [
+          {
+            "group": "Hearing (STT)",
+            "pages": [
+              "senses/vad",
+              "senses/local-whisper",
+              "senses/groq-whisper"
+            ]
+          },
+          {
+            "group": "Thinking (LLM)",
+            "pages": [
+              "senses/thinking-providers",
+              "senses/structured-outputs"
+            ]
+          },
+          {
+            "group": "Speaking (TTS)",
+            "pages": [
+              "senses/voice-synthesis"
+            ]
+          }
         ]
       },
       {
-        "group": "Reference",
-        "pages": [
-          "reference/cli",
-          "reference/api",
-          "reference/events",
-          "reference/environments"
+        "id": "customization",
+        "title": "Customization",
+        "groups": [
+          {
+            "group": "Avatars (Live2D)",
+            "pages": [
+              "customization/adding-avatars",
+              "customization/parameter-mapping"
+            ]
+          },
+          {
+            "group": "Personalities",
+            "pages": [
+              "customization/personality-prompts",
+              "customization/custom-persona"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "capabilities",
+        "title": "Capabilities",
+        "groups": [
+          {
+            "group": "Built-in Tools",
+            "pages": [
+              "capabilities/system-tools",
+              "capabilities/memory-architecture"
+            ]
+          },
+          {
+            "group": "Developer Extensions",
+            "pages": [
+              "capabilities/custom-tools"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "integration",
+        "title": "Integration",
+        "groups": [
+          {
+            "group": "Sockets & REST APIs",
+            "pages": [
+              "integration/websocket-protocol",
+              "integration/rest-api"
+            ]
+          },
+          {
+            "group": "Model Context Protocol",
+            "pages": [
+              "integration/mcp-server"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ops-reference",
+        "title": "Ops & Reference",
+        "groups": [
+          {
+            "group": "Operations",
+            "pages": [
+              "ops/troubleshooting",
+              "ops/performance-tuning"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "ops/cli-commands",
+              "ops/configuration-schemas"
+            ]
+          }
         ]
       }
     ]

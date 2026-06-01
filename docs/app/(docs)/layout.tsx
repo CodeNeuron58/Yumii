@@ -8,7 +8,7 @@ function getNavigation() {
     const filePath = path.join(process.cwd(), 'content', 'docs.json');
     const fileContents = fs.readFileSync(filePath, 'utf8');
     const data = JSON.parse(fileContents);
-    return data.navigation.groups;
+    return data.navigation.sections || [];
   } catch (e) {
     console.error("Error reading docs.json", e);
     return [];
@@ -16,11 +16,11 @@ function getNavigation() {
 }
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
-  const groups = getNavigation();
+  const sections = getNavigation();
 
   return (
     <div className="main-layout">
-      <Sidebar groups={groups} />
+      <Sidebar sections={sections} />
 
       <div className="main-scroll-container">
         <main className="content-area">

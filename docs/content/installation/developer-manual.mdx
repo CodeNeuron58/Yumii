@@ -1,0 +1,67 @@
+---
+title: "Developer Manual (Manual Install)"
+description: "How to set up, build, and run Yumi manually from the source repository."
+---
+
+If you are a developer looking to contribute to Yumi, write custom tools, or tweak her LangGraph architecture, you should install her manually from source.
+
+## 1. Prerequisites
+
+Ensure you have the following tools installed:
+*   **Python 3.12+**
+*   **Git**
+*   **`uv` (Package Manager)**: The project uses Astral's `uv` instead of raw `pip` to manage dependencies.
+
+If you don't have `uv`, install it:
+```bash
+# Windows (PowerShell)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# macOS & Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+---
+
+## 2. Clone & Sync
+
+Clone the repository and sync the virtual environment. `uv` handles virtualenv creation automatically under the hood:
+
+```bash
+git clone https://github.com/CodeNeuron58/Yumi.git
+cd Yumi
+uv sync
+```
+
+<Info>
+  **CRITICAL RULE**: Never use `pip install`! Yumi pins PyTorch and TorchAudio to a dedicated **CPU-only index** inside `pyproject.toml` (which reduces package size from 2 GB to ~220 MB). Using raw `pip` will bypass this config, attempting to download the full CUDA build, and will likely fail on Standard CPUs.
+</Info>
+
+---
+
+## 3. Activate the Environment
+
+To make the global `yumi` command available in your current terminal session:
+
+### Windows (PowerShell)
+```powershell
+.venv\Scripts\activate
+```
+
+### macOS / Linux
+```bash
+source .venv/bin/activate
+```
+
+Once activated, you can execute `yumi` commands directly:
+```bash
+yumi --help
+yumi wake-up
+```
+
+Alternatively, you can run commands without activation by prefixing with `uv run`:
+```bash
+uv run yumi
+```
+
+Proceed to [WSL2 Installation](/installation/wsl2) or [Core Senses](/senses/vad) to learn more!

@@ -3,53 +3,62 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const SECTION_MAP: Record<string, { group: string; pages: string[] }[]> = {
-  "introduction": [
-    {
-      group: "Overview",
-      pages: ["introduction", "quickstart"],
-    },
-  ],
-  "quickstart": [
-    {
-      group: "Overview",
-      pages: ["introduction", "quickstart"],
-    },
-  ],
-  "core-concepts": [
-    {
-      group: "Core Concepts",
-      pages: ["core-concepts/architecture", "core-concepts/key-features", "core-concepts/what-is-yumi"],
-    },
-  ],
-  "guides": [
-    {
-      group: "Guides",
-      pages: ["guides/installation", "guides/configuration", "guides/personalities", "guides/voice-setup", "guides/troubleshooting"],
-    },
-  ],
-  "reference": [
-    {
-      group: "Reference",
-      pages: ["reference/cli", "reference/api", "reference/events", "reference/environments"],
-    },
-  ],
+const SEGMENT_TO_SECTION_ID: Record<string, string> = {
+  "introduction": "get-started",
+  "quickstart": "get-started",
+  "get-started": "get-started",
+  "installation": "installation",
+  "senses": "core-senses",
+  "customization": "customization",
+  "capabilities": "capabilities",
+  "integration": "integration",
+  "ops": "ops-reference"
 };
 
 function formatLabel(page: string) {
-  return page
-    .split("/")
-    .pop()!
+  // Extract the page filename and format as a title
+  const base = page.split("/").pop()!;
+  
+  // Custom manual mappings for acronyms and specific formatting
+  const customMap: Record<string, string> = {
+    "vad": "VAD (Silero)",
+    "cli": "CLI Reference",
+    "api": "API Reference",
+    "mcp-server": "MCP Server",
+    "wsl2": "Windows (WSL2)",
+    "macos": "macOS",
+    "linux": "Linux",
+    "windows": "Windows",
+  };
+
+  if (customMap[base.toLowerCase()]) {
+    return customMap[base.toLowerCase()];
+  }
+
+  return base
     .replace(/-/g, " ")
     .replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-export default function Sidebar({ groups }: { groups: any[] }) {
+interface SidebarProps {
+  sections: {
+    id: string;
+    title: string;
+    groups: {
+      group: string;
+      pages: string[];
+    }[];
+  }[];
+}
+
+export default function Sidebar({ sections }: SidebarProps) {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
-  const sectionKey = segments[0] || "introduction";
+  const activeSegment = segments[0] || "introduction";
 
-  const sectionGroups = SECTION_MAP[sectionKey] || groups;
+  const sectionId = SEGMENT_TO_SECTION_ID[activeSegment] || "get-started";
+  const activeSection = sections.find((s) => s.id === sectionId);
+  const sectionGroups = activeSection ? activeSection.groups : [];
 
   return (
     <aside className="left-sidebar">

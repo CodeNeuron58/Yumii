@@ -6,10 +6,13 @@ import ThemeToggle from "./ThemeToggle";
 import DiscordLink from "./DiscordLink";
 
 const NAV_SECTIONS = [
-  { label: "Get started", href: "/introduction", match: ["introduction", "quickstart"] },
-  { label: "Core Concepts", href: "/core-concepts/architecture", match: ["core-concepts"] },
-  { label: "Guides", href: "/guides/installation", match: ["guides"] },
-  { label: "Reference", href: "/reference/cli", match: ["reference"] },
+  { label: "Get Started", href: "/introduction", match: ["introduction", "quickstart", "get-started"] },
+  { label: "Installation", href: "/installation/windows", match: ["installation"] },
+  { label: "Core Senses", href: "/senses/vad", match: ["senses"] },
+  { label: "Customization", href: "/customization/adding-avatars", match: ["customization"] },
+  { label: "Capabilities", href: "/capabilities/system-tools", match: ["capabilities"] },
+  { label: "Integration", href: "/integration/websocket-protocol", match: ["integration"] },
+  { label: "Ops & Reference", href: "/ops/troubleshooting", match: ["ops"] },
 ];
 
 export default function TopNav() {
@@ -18,7 +21,7 @@ export default function TopNav() {
   const isActive = (section: typeof NAV_SECTIONS[0]) => {
     const segments = pathname.split("/").filter(Boolean);
     if (segments.length === 0) return section.match.includes("introduction");
-    return section.match.some((m) => segments[0] === m || pathname.includes(`/${m}`));
+    return section.match.some((m) => segments[0] === m);
   };
 
   return (

@@ -1,0 +1,51 @@
+---
+title: "Linux Installation"
+description: "How to set up and run Yumi on Ubuntu, Debian, Fedora, and Arch Linux."
+---
+
+Yumi is fully compatible with standard Linux distributions. Since she leverages local audio processing libraries, certain system-level dependencies must be installed first.
+
+## ⚡ One-Line Quick Install
+
+Open your terminal and execute:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh | sh
+```
+
+---
+
+## 🛠️ Required System Dependencies
+
+Before Yumi can capture mic streams on Linux, you must install development headers for `portaudio` and `asound`, which are used by Python’s `sounddevice` package.
+
+### Ubuntu / Debian
+```bash
+sudo apt-get update
+sudo apt-get install -y portaudio19-dev libasound2-dev git python3-pip
+```
+
+### Fedora / RedHat
+```bash
+sudo dnf install -y portaudio-devel alsa-lib-devel git python3-pip
+```
+
+### Arch Linux
+```bash
+sudo pacman -Sy portaudio alsa-lib git python-pip
+```
+
+---
+
+## 🔐 Keyring & Secrets Management on Linux
+
+Yumi secures your API credentials using the OS keychain via the `keyring` Python library. 
+
+Depending on your desktop environment, ensure the following is configured:
+*   **GNOME Desktop**: Uses `gnome-keyring`. It works automatically.
+*   **KDE Desktop**: Uses `kwallet`. It works automatically.
+*   **Headless / Server Environments (SSH)**:
+    If running without a graphical display manager, `keyring` may fail to locate a secure dbus vault.
+    *   **The Fix**: You can force keyring to use an encrypted keyrings file inside your home directory by setting a backend flag, or environment variables. Refer to the [Troubleshooting Guide](/ops/troubleshooting) if you receive keyring errors on startup.
+
+Proceed to the [Developer Manual](/installation/developer-manual) or [Core Senses](/senses/vad) sections to learn more!

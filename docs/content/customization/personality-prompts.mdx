@@ -1,0 +1,44 @@
+---
+title: "Personality Prompts"
+description: "How Yumi manages system prompts and custom text personas under the hood."
+---
+
+Yumi leverages the flexibility of LLM system prompts to enforce distinct personalities. All system prompts are stored in structured text files inside the package assets:
+
+*   **Prompt Directory**: `src/yumi/assets/prompts/`
+*   **Default Personas**:
+    *   `caring.txt` — Warm, empathetic, supportive.
+    *   `tsundere.txt` — Playful teasing, soft-hearted but sarcastic.
+    *   `genki.txt` — Highly energetic, optimistic, and enthusiastic.
+    *   `kuudere.txt` — Calm, logical, analytical.
+    *   `yandere.txt` — Devoted, intense, obsessive.
+    *   `dandere.txt` — Shy, quiet, introverted.
+
+---
+
+## Technical Prompts Structure
+
+If you open one of the prompt files (e.g. `caring.txt`), you will see a detailed set of roleplay instructions:
+
+1.  **Identity Declaration**: Instructs the model on who it is, how it should view the user, and the overall vocabulary style it should use.
+2.  **Emotional Matrix Rules**: Dictates when to transition between expressions (e.g., *"If the user is sad, transition your expression parameter to sad or shy"*).
+3.  **Behavior Constraints**: Directs the agent to remain conversational, not sound like an AI assistant, and keep spoken outputs short.
+
+---
+
+## Under the Hood: Tool Prompt Injections (`llm.py`)
+
+When loading an agent, Yumi's engine does not just send the raw text prompt file. To satisfy the WebSocket and Live2D sync requirements, `src/yumi/agent/llm.py` appends a **strict tool constraint** (`_TOOL_HINT`):
+
+```python
+_TOOL_HINT = (
+    "\n\nIMPORTANT: To respond to the user, you MUST call the `YumiResponse` tool. "
+    "\nDo NOT wrap your response in <function> tags or use any other format. "
+    "\nKeep your spoken response text short and punchy: UNDER 3 sentences and strictly LESS THAN 400 characters. "
+    "\nIf you need to use other tools (like getting the time), use them first before calling YumiResponse."
+)
+```
+
+This prevents the LLM from returning raw Markdown, bullets, or paragraphs that are too long for real-time speech synthesis, guaranteeing beautiful, snappy responses.
+
+Proceed to the [Creating a Custom Persona](/customization/custom-persona) page to build your own character from scratch!

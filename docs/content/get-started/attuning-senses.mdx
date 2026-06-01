@@ -1,0 +1,50 @@
+---
+title: "Attuning Senses"
+description: "Configure Yumi's brain, ears, and voice via the interactive Attunement Wizard."
+---
+
+When you launch Yumi for the first time by running `yumi` or `uv run yumi`, she will detect that she doesn't have her keys set up and will guide you through the **Attunement Wizard**. 
+
+This interactive terminal process lets you configure her three sensory areas securely.
+
+---
+
+## Step 1: Connecting Her Mind (LLM)
+
+You will be asked to select an LLM provider to power her conversational brain:
+
+*   **Groq (Recommended)**: Utilizes Llama-3.3-70b. Blazing fast, free tier, and perfect for real-time natural dialogue.
+*   **OpenAI**: Utilizes GPT-4o. High intelligence and excellent tool calling accuracy.
+*   **Anthropic**: Utilizes Claude-3.5-Sonnet. Best for rich, complex emotional nuance and roleplay styles.
+
+Once you pick, you will be prompted for your API Key. The key is securely committed to your **OS Keychain** immediately.
+
+---
+
+## Step 2: Selecting Her Voice (TTS)
+
+To let Yumi speak, choose a Text-to-Speech provider:
+
+### ElevenLabs (Highly Recommended)
+*   **Expressiveness**: Unparalleled quality, captures breath, sighs, and lifelike emotional inflection.
+*   **Requirements**: ElevenLabs API key and a Voice ID (e.g. `21m00Tcm4TlvDq8ikWAM`).
+*   **Tip**: You can browse elevenlabs.io to select custom anime or friendly voices and paste their Voice IDs here.
+
+### CAMB.ai
+*   **Alternative**: High-quality alternative supporting streaming chunks.
+*   **Requirements**: CAMB.ai API key and Voice ID.
+
+---
+
+## Step 3: Calibrating Her Ears (STT)
+
+Choose how Yumi listens to your microphone:
+
+*   **Local Whisper (Fully Offline)**:
+    *   No API key needed. Runs locally on your CPU using quantized models.
+    *   You will select a model size: `tiny` (blazing fast, lower accuracy), `base` (default, recommended), or `small` (high accuracy, slower CPU load).
+*   **Groq Whisper (Cloud)**:
+    *   Cloud-based STT. Highly recommended if you selected Groq as your LLM.
+    *   Uses your existing Groq API key and transcribes speech in under 150 milliseconds.
+
+Once complete, the wizard saves these preferences to your local configuration and registers your keys safely. You are now ready to [Wake Her Up](/quickstart)!

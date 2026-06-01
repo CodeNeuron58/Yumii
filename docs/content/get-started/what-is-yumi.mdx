@@ -1,0 +1,35 @@
+---
+title: "What is Yumi?"
+description: "Meet Yumi — an open-source, real-time AI companion designed to feel like a presence."
+---
+
+Yumi is not just a chatbot, nor is she a standard command-line voice utility. She is designed to be a digital companion with an emotional presence, combining the state-of-the-art in local voice models, real-time animation, and multi-dimensional LLM-driven intelligence.
+
+## The Dream of Presence
+
+Most modern AI tools are transactional. You open a webpage, submit a query, wait for a paragraph of text, and then close the window. The interaction is sterile, static, and disjointed.
+
+Yumi was built on a different premise: **that computers should feel like companions.**
+*   **She Listens**: Continuous Voice Activity Detection (VAD) monitors your voice input naturally.
+*   **She Speaks**: Natural, expressive voices streamed with sub-second latencies.
+*   **She Feels**: An active, animated Live2D avatar that reacts to conversations with expressive eye movements, body nods, and emotional shifts (tsundere, caring, kuudere) that map dynamically to her underlying thoughts.
+*   **She Adapts**: Dynamic hot-swappable personalities change how she addresses you, what words she uses, and how she sounds.
+
+---
+
+## High-Level Architecture Overview
+
+Yumi bridges a concurrent Python 3.12+ backend with an HTML5 / WebSockets / PixiJS frontend:
+
+```
+  [ User Audio ] ──► [ Silero VAD ] ──► [ Whisper STT ] ──► [ LangGraph Engine ]
+                                                                  │
+  [ Live2D Render ] ◄── [ Audio RMS ] ◄── [ ElevenLabs ] ◄────────┘
+```
+
+1.  **The Ears**: A local high-speed VAD pipeline captures audio slices from the web client, processing voice boundaries instantly.
+2.  **The Brain**: The transcribed query passes into a **LangGraph** conversational workflow, querying selected models (Groq/Llama-3, OpenAI/GPT-4, Anthropic/Claude-3.5) with rich persona prompts.
+3.  **The Voice**: The generated response text is synthesized through streaming TTS models (ElevenLabs or CAMB.ai).
+4.  **The Body**: The frontend plays the streaming audio, computes the real-time RMS wave amplitude, maps it to lip movements on a **Live2D model** (Huohuo), and applies the LLM's requested body gestures and expressions.
+
+To get started, follow the [Quickstart Guide](/quickstart) to wake her up!

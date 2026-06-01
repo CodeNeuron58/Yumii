@@ -1,0 +1,56 @@
+---
+title: "Troubleshooting Guide"
+description: "Resolve common issues, KMP runtime conflicts, and audio permissions."
+---
+
+If you run into issues launching the dashboard, connecting your microphone, or getting Yumi's voice outputs, follow this comprehensive troubleshooting registry.
+
+---
+
+## 🛠️ Windows Issues
+
+### Error: `KMP_DUPLICATE_LIB_OK`
+*   **Symptom**: The backend terminal crashes instantly on start, complaining about multiple OpenMP runtimes being loaded.
+*   **Cause**: `faster-whisper` and other ML packages (like Intel MKL or PyTorch) import duplicate OpenMP instances.
+*   **The Fix**: Ensure the environment variable is declared in your shell before starting.
+    *   **PowerShell**:
+        ```powershell
+        $env:KMP_DUPLICATE_LIB_OK="TRUE"
+        ```
+    *   **Command Prompt**:
+        ```cmd
+        set KMP_DUPLICATE_LIB_OK=TRUE
+        ```
+
+---
+
+### Keyring Connection Blocked
+*   **Symptom**: CLI crashes with a permission error when saving or getting API keys.
+*   **The Fix**: Right-click your terminal emulator (e.g. PowerShell) and run it as a standard user (not Administrator). Windows Credential Manager sometimes locks access to administrative terminals for security.
+
+---
+
+## 🎙️ Microphone & Audio Issues
+
+### Speech Not Detected (`[Voice Activity Detected]` is missing)
+*   **Symptom**: You talk to Yumi but nothing happens, and your terminal console does not register speech.
+*   **The Fix**:
+    1.  Verify that your default system recording device is unmuted and capturing audio.
+    2.  If running inside a browser overlay (like OBS or Custom Chrome), ensure that browser page has been granted **Microphone Access**.
+    3.  Click the WebUI pink button **"Connect & Start Audio Context"** to ensure the WebSocket pipeline wakes up.
+
+---
+
+## 🔑 API & Secret Keys Issues
+
+### Authentication Failures (ElevenLabs or Groq)
+*   **Symptom**: Subtitles show error messages or Yumi responds with fallback dialogue.
+*   **The Fix**:
+    1.  API keys are saved in your OS Keychain, not in `.env` files.
+    2.  Re-run the configuration wizard to overwrite corrupt keys:
+        ```bash
+        yumi --config
+        ```
+    3.  Select **Configure Senses** and re-paste your active credentials.
+
+Proceed to the [Performance Tuning](/ops/performance-tuning) page to reduce latency!

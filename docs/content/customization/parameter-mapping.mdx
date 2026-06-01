@@ -1,0 +1,64 @@
+---
+title: "Expression & Motion Parameter Mapping"
+description: "How to bind LLM-generated emotions to custom Live2D physics parameters in the browser client."
+---
+
+When the LLM outputs a structured emotion like `expression: "shy"` or `motion: "nod"`, Yumi's frontend must map these abstract terms to the specific animation and expression files defined inside your custom Live2D model.
+
+Here is how to customize this parameter mapping to support any avatar.
+
+---
+
+## Modifying the Expression Map
+
+Open `src/yumi/assets/webui/index.html` and locate the `EXPRESSION_MAP` configuration (around line 123):
+
+```javascript
+const EXPRESSION_MAP = {
+    "smile": "baozhen",
+    "angry": "angry",
+    "sad": "cry",
+    "surprise": "baozhen",
+    "scared": "cry",
+    "shy": "qizi1",
+    "normal": null
+};
+```
+
+### How to adjust it:
+*   The **Keys** (`smile`, `angry`, `sad`, etc.) represent the static categories that Yumi's LLM outputs.
+*   The **Values** (`baozhen`, `angry`, `cry`, etc.) represent the exact **filenames** of the `.exp3.json` expression files located inside your custom model folder (without the `.exp3.json` file extension).
+*   If your model has a custom blush expression named `blush.exp3.json` that you want to trigger when she is `shy`, update the map:
+    ```javascript
+    "shy": "blush",
+    ```
+
+---
+
+## Modifying the Motion Map
+
+Similarly, locate `MOTION_MAP` (around line 134):
+
+```javascript
+const MOTION_MAP = {
+    "nod": "nod",
+    "shakehead": "shakehead",
+    "tilthead": "nod",
+    "fidget": "idle",
+    "forward": "idle",
+    "lookaway": "shakehead",
+    "greeting": "happy",
+    "idle": "idle"
+};
+```
+
+### How to adjust it:
+*   The **Values** represent the **motion group names** defined in your model's `.model3.json` file under the `"Groups"` or `"Motions"` definitions.
+*   If your custom model features a specific waving motion group named `"wave"`, and you want Yumi to play it during greetings, update the map:
+    ```javascript
+    "greeting": "wave",
+    ```
+
+Save `index.html` and reload the browser tab. Yumi will now animate your custom models with complete anatomical precision!
+
+Proceed to the [Personality Prompts](/customization/personality-prompts) page to customize her voice lines!

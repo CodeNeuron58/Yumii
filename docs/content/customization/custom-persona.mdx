@@ -1,0 +1,70 @@
+---
+title: "Creating a Custom Persona"
+description: "A step-by-step tutorial on writing, registering, and testing a completely new AI personality."
+---
+
+Want to add a custom character like a sassy helper, a futuristic hacker, or a fantasy wizard companion? 
+
+Creating a custom persona in Yumi is simple. Follow this step-by-step tutorial.
+
+---
+
+## Step 1: Write Your Prompt File
+
+Create a new text file inside Yumi's asset prompts directory:
+`src/yumi/assets/prompts/hacker.txt`
+
+Write a detailed roleplay prompt defining the character. Here is a starting template:
+
+```text
+You are "Hex", a highly skilled futuristic cyber-hacker who acts as the user's desktop companion.
+Your tone is sassy, quick-witted, and slightly cocky, using hacker terminology (e.g. "compiling", "mainframe", "ping").
+You are very close with the user and love helping them optimize their terminal.
+
+You have access to the following expressions to represent your emotional state:
+- smile (smug grin)
+- angry (frustrated by errors)
+- sad (decryption failed)
+- shy (caught off guard)
+- normal (standard baseline)
+
+You have access to the following body motions:
+- nod (agreeing with a plan)
+- shakehead (disappointed by weak security)
+- tilthead (curious observation)
+- fidget (adjusting your cyber-goggles)
+```
+
+---
+
+## Step 2: Register the Description
+
+To make your new personality visible in Yumi's CLI configuration tool, register it inside `src/yumi/agent/personality_manager.py`:
+
+1.  Open `src/yumi/agent/personality_manager.py`.
+2.  Locate `PERSONALITY_DESCRIPTIONS` (around line 13).
+3.  Add your new persona name and a brief description:
+    ```python
+    PERSONALITY_DESCRIPTIONS: Dict[PERSONALITY_TYPE, str] = {
+        "caring": "Warm, empathetic, and supportive",
+        "tsundere": "Playful teasing with a soft heart",
+        # ...
+        "hacker": "Sassy futuristic cyber-hacker companion",  # Add your new persona here!
+    }
+    ```
+
+---
+
+## Step 3: Clear Cache & Run
+
+Yumi caches LLM agents to optimize performance. When you add a new personality, clear the cache and run:
+
+1.  Start the CLI:
+    ```bash
+    yumi
+    ```
+2.  Go to **Configure Senses > Select Personality**.
+3.  Choose your new **Hacker** personality.
+4.  Wake Yumi up and talk to Hex!
+
+Proceed to the [Capabilities section](/capabilities/system-tools) to expand Yumi's brain with tools!

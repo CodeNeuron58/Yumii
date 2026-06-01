@@ -1,0 +1,57 @@
+---
+title: "Performance Tuning"
+description: "How to optimize CPU threads, select whisper models, and minimize conversational latency."
+---
+
+Yumi is optimized to run smoothly entirely on standard home CPUs, requiring no heavy discrete graphics cards (GPUs). To achieve sub-second response times, apply these performance tuning parameters.
+
+---
+
+## ⚡ 1. Accelerating Speech-to-Text (STT)
+
+Local transcription is typically the heaviest computational step in Yumi's sensory loop.
+
+### A. Choose the Right Model Size
+To change model scales, run `yumi --config` and choose **Local Whisper**:
+*   **`tiny`**: Takes ~200ms to transcribe. Best for budget notebooks or single-board computers (Raspberry Pi 5).
+*   **`base`**: Takes ~500ms to transcribe. Highly accurate, handles standard phrasing easily. Recommended default.
+
+### B. Adjust CPU Core Threads
+By default, `faster-whisper` dynamically selects the number of CPU threads based on your hardware configuration. If your CPU has limited cores, or is running hot, you can throttle thread counts in `src/yumi/audio/stt.py` to prevent CPU resource locks:
+```python
+# In stt.py initialization
+self.model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=4)
+```
+
+---
+
+## 🧠 2. Optimizing LLM Response Rates
+
+### A. Use Groq Cloud
+Groq's LPU hardware delivers tokens at speeds above **200 tokens/sec**. We highly recommend using Groq as your default Mind provider for an instantaneous dialogue pacing.
+
+### B. Keep Prompts Lean
+The size of your system prompt and the length of your active chat history can degrade response times on cloud APIs.
+*   **Prompt design**: Keep personality `.txt` files under **2,000 characters**.
+*   **History length**: Periodically clear or truncate your message buffer if you experience slow performance.
+
+---
+
+## 🗣️ 3. Audio Client Echo Cancellation
+
+To prevent Yumi from "hearing herself" talk through your laptop speakers (which would trigger the local VAD, interrupt her voice, and launch a feedback loop), Yumi implements strict audio constraints on the client mic:
+
+```javascript
+// WebUI microphone configuration in index.html
+const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+        echoCancellation: true,   // Filters out playing speaker audio!
+        noiseSuppression: true,   // Dampens fans and environment hums!
+        autoGainControl: true
+    }
+});
+```
+
+Keep echo cancellation enabled, especially when running on laptops without headphones!
+
+Proceed to the [CLI Command Registry](/ops/cli-commands) to see all keyboard control routes!

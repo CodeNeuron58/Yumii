@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import "../style.css";
+import "./globals.css";
 import ThemeToggle from "./ThemeToggle";
 import DiscordLink from "./DiscordLink";
 import TopNav from "./TopNav";

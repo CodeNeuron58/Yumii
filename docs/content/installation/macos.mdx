@@ -1,0 +1,41 @@
+---
+title: "macOS Installation"
+description: "How to set up and run Yumi natively on macOS (Intel and Apple Silicon)."
+---
+
+Yumi is fully compatible with macOS, operating natively on both Intel (x86_64) and Apple Silicon (M1/M2/M3) architectures.
+
+## ⚡ One-Line Quick Install
+
+Open a standard Terminal window and run the automated bash installation script:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh | sh
+```
+
+### What this script does:
+1.  Ensures Homebrew is installed.
+2.  Installs Python 3.12 (if missing).
+3.  Installs the `uv` package manager securely.
+4.  Clones the Yumi repository to your home folder.
+5.  Sets up the virtual environment with CPU-specific PyTorch wheels.
+6.  Pins a global shell alias so typing `yumi` works everywhere.
+
+---
+
+## 🛠️ macOS Audio Permissions & Dependencies
+
+Because of macOS's strict sandbox security, a couple of steps are required to ensure audio capture and keyring storage work flawlessly:
+
+### 1. Terminal Microphone Permissions
+If you run Yumi through a terminal emulator (like Terminal, iTerm2, or VS Code), that app must be granted permission to access your microphone.
+1.  Go to **System Settings > Privacy & Security > Microphone**.
+2.  Ensure your terminal app (e.g. `Terminal` or `iTerm2`) is toggled **ON**.
+3.  If Yumi still fails to hear you, try running her from a clean terminal window so macOS can trigger the native permission prompt.
+
+### 2. Apple Silicon (M1/M2/M3) Optimization
+Apple Silicon chips include hardware matrix coprocessors (AMX) that accelerate local speech recognition.
+*   **Performance**: If using **Local Whisper** on Apple Silicon, execution is extremely fast and light.
+*   **Keyring Security**: Yumi securely commits your API keys to the **macOS Keychain Access** utility. The first time she queries the keychain, macOS will display a secure system dialog asking for your password or TouchID to authorize access. Select **Always Allow**.
+
+Proceed to the [Linux Installation](/installation/linux) or [Core Senses](/senses/vad) sections to learn more!
