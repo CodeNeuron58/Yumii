@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // We'll configure MDX here if needed, but next-mdx-remote is usually handled in components
+  // Separate directories to prevent 'npm run build' from wiping active dev server assets
+  distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
 };
 
 export default nextConfig;

@@ -4,31 +4,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const SEGMENT_TO_SECTION_ID: Record<string, string> = {
-  "introduction": "get-started",
-  "quickstart": "get-started",
+  introduction: "get-started",
+  quickstart: "get-started",
   "get-started": "get-started",
-  "installation": "installation",
-  "senses": "core-senses",
-  "customization": "customization",
-  "capabilities": "capabilities",
-  "integration": "integration",
-  "ops": "ops-reference"
+  installation: "installation",
+  senses: "core-senses",
+  customization: "customization",
+  capabilities: "capabilities",
+  integration: "integration",
+  ops: "ops-reference",
 };
 
 function formatLabel(page: string) {
-  // Extract the page filename and format as a title
-  const base = page.split("/").pop()!;
-  
-  // Custom manual mappings for acronyms and specific formatting
+  const base = page.split("/").pop() || page;
+
   const customMap: Record<string, string> = {
-    "vad": "VAD (Silero)",
-    "cli": "CLI Reference",
-    "api": "API Reference",
+    vad: "VAD (Silero)",
+    cli: "CLI Reference",
+    api: "API Reference",
     "mcp-server": "MCP Server",
-    "wsl2": "Windows (WSL2)",
-    "macos": "macOS",
-    "linux": "Linux",
-    "windows": "Windows",
+    wsl2: "Windows (WSL2)",
+    macos: "macOS",
+    linux: "Linux",
+    windows: "Windows",
   };
 
   if (customMap[base.toLowerCase()]) {
@@ -37,7 +35,7 @@ function formatLabel(page: string) {
 
   return base
     .replace(/-/g, " ")
-    .replace(/\b\w/g, (l) => l.toUpperCase());
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 interface SidebarProps {
@@ -57,42 +55,36 @@ export default function Sidebar({ sections }: SidebarProps) {
   const activeSegment = segments[0] || "introduction";
 
   const sectionId = SEGMENT_TO_SECTION_ID[activeSegment] || "get-started";
-  const activeSection = sections.find((s) => s.id === sectionId);
+  const activeSection = sections.find((section) => section.id === sectionId);
   const sectionGroups = activeSection ? activeSection.groups : [];
 
   return (
     <aside className="left-sidebar">
-      <nav>
-        {sectionGroups.map((group: any, i: number) => (
-          <div key={i} className="nav-section">
-            <h4 className="nav-section-title">{group.group}</h4>
-            <ul>
-              {group.pages.map((page: string, j: number) => {
-                const href = `/${page}`;
-                const isActive =
-                  pathname === href ||
-                  (pathname === "/" && page === "introduction");
+      <div className="left-sidebar-panel">
+        <nav className="sidebar-nav" aria-label="Documentation navigation">
+          {sectionGroups.map((group, index) => (
+            <div key={`${group.group}-${index}`} className="nav-section">
+              <h4 className="nav-section-title">{group.group}</h4>
+              <ul>
+                {group.pages.map((page, itemIndex) => {
+                  const href = `/${page}`;
+                  const isActive = pathname === href || (pathname === "/" && page === "introduction");
 
-                return (
-                  <li key={j} className={isActive ? "active" : ""}>
-                    <Link
-                      href={href}
-                      style={{
-                        textDecoration: "none",
-                        color: "inherit",
-                        display: "block",
-                        width: "100%",
-                      }}
-                    >
-                      {formatLabel(page)}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
+                  return (
+                    <li key={`${page}-${itemIndex}`} className={`sidebar-item ${isActive ? "active" : ""}`}>
+                      <span className="sidebar-item-rail" aria-hidden="true" />
+                      <Link href={href} className="sidebar-link">
+                        <span className="sidebar-item-icon" aria-hidden="true" />
+                        <span className="sidebar-item-label">{formatLabel(page)}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </div>
     </aside>
   );
 }

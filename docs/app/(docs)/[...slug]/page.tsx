@@ -4,6 +4,8 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import matter from 'gray-matter';
 import { Rocket, AudioLines, Smile, Box, LayoutDashboard } from 'lucide-react';
 
+import CodeBlock from '../../CodeBlock';
+
 const IconMap: Record<string, React.FC<any>> = {
   rocket: Rocket,
   'waveform-lines': AudioLines,
@@ -64,7 +66,7 @@ const components = {
   ),
   Info: ({ children }: any) => (
     <div className="info-callout">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px', color: '#4ade80' }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px', color: 'var(--text-accent)' }}>
         <circle cx="12" cy="12" r="10"></circle>
         <line x1="12" y1="16" x2="12" y2="12"></line>
         <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -84,6 +86,16 @@ const components = {
   h3: (props: any) => <h3 id={slugify(props.children)} {...props} />,
   p: (props: any) => <p {...props} />,
   img: (props: any) => <img {...props} style={{ borderRadius: '10px', marginBottom: '28px', maxWidth: '100%' }} />,
+  pre: (props: any) => {
+    const codeElement = props.children;
+    if (codeElement && codeElement.type === 'code') {
+      const languageClass = codeElement.props.className || '';
+      const language = languageClass.replace(/language-/, '') || 'bash';
+      const codeContent = codeElement.props.children || '';
+      return <CodeBlock language={language}>{codeContent}</CodeBlock>;
+    }
+    return <pre {...props} />;
+  },
   code: (props: any) => {
     // Inline code
     if (!props.className) {
