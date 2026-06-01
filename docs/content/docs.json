@@ -3,15 +3,15 @@
   "name": "Yumi",
   "theme": "maple",
   "fonts": {
-    "family": "JetBrains Mono",
+    "family": "Sora",
     "heading": {
-      "family": "Black Ops One"
+      "family": "Sora"
     },
     "body": {
-      "family": "JetBrains Mono"
+      "family": "Sora"
     },
     "mono": {
-      "family": "JetBrains Mono"
+      "family": "Geist Mono"
     }
   },
   "styling": {
