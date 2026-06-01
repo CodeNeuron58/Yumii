@@ -53,36 +53,51 @@ export default function TableOfContents() {
         .map((heading) => document.getElementById(heading.id))
         .filter(Boolean) as HTMLElement[];
 
+    let frame = 0;
+
     const handleScroll = () => {
-      const headingElements = getHeadingElements();
-      if (headingElements.length === 0) {
-        return;
+      if (frame) {
+        window.cancelAnimationFrame(frame);
       }
 
-      const topOffset = 140;
-      let currentId = headingElements[0].id;
-
-      for (const heading of headingElements) {
-        if (heading.getBoundingClientRect().top <= topOffset) {
-          currentId = heading.id;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const headingElements = getHeadingElements();
+        if (headingElements.length === 0) {
+          return;
         }
-      }
 
-      setActiveId((previous) => (previous === currentId ? previous : currentId));
+        const topOffset =
+          Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-offset'), 10) || 160;
+        let currentId = headingElements[0].id;
 
-      const currentIndex = headingElements.findIndex((heading) => heading.id === currentId);
-      const nextProgress =
-        headingElements.length <= 1 ? 1 : Math.max(0, Math.min(1, currentIndex / (headingElements.length - 1)));
+        for (const heading of headingElements) {
+          if (heading.getBoundingClientRect().top <= topOffset) {
+            currentId = heading.id;
+          }
+        }
 
-      setProgress(nextProgress);
+        setActiveId((previous) => (previous === currentId ? previous : currentId));
+
+        const currentIndex = headingElements.findIndex((heading) => heading.id === currentId);
+        const nextProgress =
+          headingElements.length <= 1 ? 1 : Math.max(0, Math.min(1, currentIndex / (headingElements.length - 1)));
+
+        setProgress(nextProgress);
+      });
     };
 
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleScroll);
 
     return () => {
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
       window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleScroll);
     };
   }, [headings]);
@@ -101,7 +116,7 @@ export default function TableOfContents() {
 
       <div className="toc">
         <h4>
-          <List size={12} />
+          <List size={12} aria-hidden="true" />
           On this page
         </h4>
         <ul>

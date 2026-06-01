@@ -25,6 +25,7 @@ export default function LandingPage() {
 
   return (
     <main
+      id="main-content"
       className="front-page"
       ref={containerRef}
       style={{

@@ -23,7 +23,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       <Sidebar sections={sections} />
 
       <div className="main-scroll-container">
-        <main className="content-area">
+        <main id="main-content" className="content-area">
           <div className="content-inner">
             {children}
           </div>

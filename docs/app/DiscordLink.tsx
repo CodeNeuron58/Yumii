@@ -13,7 +13,7 @@ export default function DiscordLink() {
         toast("Discord is coming soon. Stay tuned.");
       }}
     >
-      <MessageSquareText size={14} />
+      <MessageSquareText size={14} aria-hidden="true" />
       Discord
     </a>
   );

@@ -49,16 +49,16 @@ export default function TopNav() {
       <div className="top-nav-shell">
         <div className="top-nav-row top-nav-row--primary">
           <Link href="/" className="logo">
-            <img src="/images/yumi-nav.png" alt="Yumi" />
+            <img src="/images/yumi-nav.png" alt="Yumi" width={30} height={30} />
             <span>Yumi</span>
           </Link>
 
           <div className="search-bar">
             <button className="search-input" aria-label="Search documentation">
-              <Search size={14} className="search-icon" />
+              <Search size={14} className="search-icon" aria-hidden="true" />
               <span className="search-placeholder">Search docs, commands, or topics...</span>
               <span className="shortcut">
-                <Command size={12} />
+                <Command size={12} aria-hidden="true" />
                 K
               </span>
             </button>
@@ -71,7 +71,7 @@ export default function TopNav() {
               rel="noopener noreferrer"
               className="nav-utility"
             >
-              <Github size={14} />
+              <Github size={14} aria-hidden="true" />
               GitHub
             </a>
             <DiscordLink />
@@ -89,7 +89,7 @@ export default function TopNav() {
                   href={section.href}
                   className={`section-tab ${isActive(section) ? "section-tab--active" : ""}`}
                 >
-                  <Icon size={13} className="section-tab-icon" />
+                  <Icon size={13} className="section-tab-icon" aria-hidden="true" />
                   <span>{section.label}</span>
                 </Link>
               );
