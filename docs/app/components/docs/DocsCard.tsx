@@ -2,11 +2,20 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Rocket, Activity, Smile, Box, LayoutDashboard, LucideIcon } from 'lucide-react';
+
+const iconMap: Record<string, LucideIcon> = {
+  'rocket': Rocket,
+  'waveform-lines': Activity,
+  'face-smile': Smile,
+  'cube': Box,
+  'layout-dashboard': LayoutDashboard,
+};
 
 interface DocsCardProps {
   title: string;
   href?: string;
-  icon?: React.ReactNode;
+  icon?: React.ReactNode | string;
   children: React.ReactNode;
 }
 
@@ -37,6 +46,8 @@ export default function DocsCard({ title, href, icon, children }: DocsCardProps)
     };
   }, [isHovered]);
 
+  const IconComponent = typeof icon === 'string' ? iconMap[icon] : null;
+
   const CardContent = (
     <div
       ref={cardRef}
@@ -50,7 +61,11 @@ export default function DocsCard({ title, href, icon, children }: DocsCardProps)
     >
       <div className="docs-card-border-glow"></div>
       <div className="docs-card-inner">
-        {icon && <div className="docs-card-icon">{icon}</div>}
+        {icon && (
+          <div className="docs-card-icon">
+            {IconComponent ? <IconComponent size={24} /> : icon}
+          </div>
+        )}
         <h4 className="docs-card-title">{title}</h4>
         <div className="docs-card-content">{children}</div>
       </div>
