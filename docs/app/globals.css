@@ -679,7 +679,7 @@ pre {
   background: rgba(10, 14, 18, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 16px;
-  padding: 18px 40px 40px;
+  padding: 0 40px 40px; /* top:0 — main-layout already gives 18px natural gap */
   margin-top: 0px;
   margin-bottom: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -693,7 +693,7 @@ pre {
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  padding: 18px 0 40px;
+  padding: 0 0 40px;  /* top:0 eliminates the black gap without negative-margin tricks */
 }
 
 .layout-cards .docs-hero {
@@ -702,7 +702,7 @@ pre {
   padding-left: 32px;
   padding-right: 32px;
   margin-top: 0;
-  padding-top: 16px;
+  padding-top: 20px;
   border: none;
   align-items: flex-start;
   text-align: left;
@@ -812,20 +812,21 @@ h1#yumi,
 .docs-hero {
   position: relative;
   width: 100%;
-  padding: 16px 24px 64px;
+  padding: 20px 24px 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  margin-bottom: 32px;
+  margin-top: 0;
+  margin-bottom: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .docs-hero-bg {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 0%, rgba(72, 255, 171, 0.08), transparent 70%);
+  background: radial-gradient(circle at 50% 0%, rgba(72, 255, 171, 0.1), transparent 75%);
   pointer-events: none;
   z-index: -1;
 }
@@ -875,6 +876,7 @@ h1#yumi,
   align-items: center;
   justify-content: flex-start;
   text-align: center;
+  margin-top: 0;
   margin-bottom: 48px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding-top: 32px;
@@ -883,7 +885,7 @@ h1#yumi,
 .mascot-hero-bg {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 0%, rgba(72, 255, 171, 0.08), transparent 50%);
+  background: radial-gradient(circle at 50% 0%, rgba(72, 255, 171, 0.1), transparent 55%);
   pointer-events: none;
   z-index: -1;
 }
@@ -974,16 +976,21 @@ h1#yumi,
 .docs-feature-list.cols-4 { grid-template-columns: repeat(4, 1fr); }
 
 .content-card {
-  background: rgba(14, 18, 23, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 24px 32px;
-  margin-bottom: 24px;
+  background: rgba(14, 18, 23, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 28px 32px;
+  margin-bottom: 12px;
+  transition: border-color var(--fast);
+}
+
+.content-card:hover {
+  border-color: rgba(72, 255, 171, 0.1);
 }
 
 @media (max-width: 760px) {
   .content-card {
-    padding: 20px 24px;
+    padding: 22px 20px;
   }
 }
 
@@ -1069,36 +1076,73 @@ h1#yumi,
 
 .text-content h2 {
   font-family: var(--font-header);
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   font-weight: 600;
-  margin-top: 40px;
+  margin-top: 32px;
   margin-bottom: 12px;
-  color: #ffffff;
+  color: #f0f6ff;
   letter-spacing: -0.02em;
   scroll-margin-top: var(--header-offset);
   text-wrap: balance;
   text-align: left;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(72, 255, 171, 0.12);
+}
+
+/* First h2 in a ContentCard — no top margin (it's the card's heading) */
+.content-card h2:first-child,
+.content-card h2:first-of-type {
+  margin-top: 0;
+}
+
+/* h2 directly after an hr (the divider pattern in cards) — tighter gap */
+.text-content hr + h2 {
+  margin-top: 8px;
 }
 
 .text-content h3 {
   font-family: var(--font-header);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  margin-top: 28px;
+  margin-top: 24px;
   margin-bottom: 10px;
-  color: #f2f4f7;
+  color: #c8d8ea;
   letter-spacing: -0.01em;
   scroll-margin-top: var(--header-offset);
   text-wrap: balance;
   text-align: left;
 }
 
+/* h4 inside prose content only — don't override DocsCard titles */
+.text-content h4:not(.docs-card-title) {
+  font-family: var(--font-header);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 18px;
+  margin-bottom: 8px;
+  color: #a8bdd0;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+/* DocsCard title must keep its own style regardless of context */
+.docs-card-title {
+  font-family: var(--font-header) !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  text-decoration: none !important;
+}
+
 .text-content p {
   font-family: var(--font-sans);
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 16px;
-  line-height: 1.7;
+  font-size: 0.975rem;
+  color: rgba(220, 232, 248, 0.72);
+  margin-bottom: 14px;
+  line-height: 1.75;
 }
 
 .text-content p:empty {
@@ -1107,29 +1151,124 @@ h1#yumi,
 
 .text-content hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin: 48px 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(72, 255, 171, 0.18) 30%, rgba(72, 255, 171, 0.18) 70%, transparent);
+  margin: 28px 0;
 }
 
-.text-content ul,
+/* Custom bullet list styling */
+.text-content ul {
+  font-family: var(--font-sans);
+  list-style: none;
+  margin-left: 0;
+  margin-bottom: 20px;
+  padding-left: 0;
+}
+
 .text-content ol {
   font-family: var(--font-sans);
   margin-left: 20px;
   margin-bottom: 20px;
-  color: var(--text-secondary);
-  list-style-type: disc;
+  color: rgba(220, 232, 248, 0.72);
 }
 
-.text-content li {
-  margin-bottom: 8px;
-  line-height: 1.7;
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
+.text-content ul li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 9px;
+  line-height: 1.75;
+  font-size: 0.975rem;
+  color: rgba(220, 232, 248, 0.72);
+}
+
+.text-content ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(72, 255, 171, 0.7);
+  box-shadow: 0 0 6px rgba(72, 255, 171, 0.35);
+}
+
+.text-content ol li {
+  margin-bottom: 9px;
+  line-height: 1.75;
+  font-size: 0.975rem;
+  color: rgba(220, 232, 248, 0.72);
 }
 
 .text-content strong {
+  color: #e8f2ff;
+  font-weight: 650;
+}
+
+.text-content em {
+  color: rgba(220, 232, 248, 0.85);
+  font-style: italic;
+}
+
+/* Scope link styling to prose only — NOT card links */
+.text-content p a,
+.text-content li a,
+.text-content td a {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(72, 255, 171, 0.35);
+  text-underline-offset: 3px;
+  transition: color var(--fast), text-decoration-color var(--fast);
+}
+
+.text-content p a:hover,
+.text-content li a:hover,
+.text-content td a:hover {
+  color: #a0ffd9;
+  text-decoration-color: rgba(72, 255, 171, 0.8);
+}
+
+/* Ensure DocsCard links are NEVER underlined */
+.text-content .docs-card-link,
+.text-content .docs-card-link:hover {
+  text-decoration: none;
   color: inherit;
-  font-weight: 700;
+}
+
+/* Tables inside text-content */
+.text-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+}
+
+.text-content th {
+  text-align: left;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: #c0d2e4;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(72, 255, 171, 0.2);
+  background: rgba(72, 255, 171, 0.04);
+}
+
+.text-content td {
+  padding: 10px 14px;
+  color: rgba(220, 232, 248, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  vertical-align: top;
+}
+
+.text-content tr:last-child td {
+  border-bottom: none;
+}
+
+.text-content tr:hover td {
+  background: rgba(72, 255, 171, 0.025);
 }
 
 /* Callout */
@@ -1917,54 +2056,172 @@ li code {
   line-height: 1.6;
 }
 
-/* Code Card Component */
-.code-card {
-  background: #06080a; /* Deep dark black */
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  overflow: hidden;
-  margin: 24px 0;
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+
+/* Inline Code Improvements */
+.inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  background: rgba(72, 255, 171, 0.07);
+  color: #7effc8;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(72, 255, 171, 0.18);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-.code-card-actions {
-  position: absolute;
-  right: 12px;
-  top: 14px;
+/* ============================
+   Code Card — Terminal Style
+   ============================ */
+.code-card {
+  background: #040608;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 2px solid rgba(72, 255, 171, 0.35);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Header bar */
+.code-card-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px 9px 16px;
+  background: rgba(4, 7, 10, 0.98);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  flex-shrink: 0;
+  min-height: 38px;
 }
 
+/* Language badge */
+.code-card-lang {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(72, 255, 171, 0.85);
+  background: rgba(72, 255, 171, 0.09);
+  border: 1px solid rgba(72, 255, 171, 0.22);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+/* Code body */
 .code-card-body {
   padding: 16px 20px;
-  padding-right: 64px;
   flex: 1;
   overflow-x: auto;
 }
 
 .code-card-body pre {
   margin: 0;
-  background: transparent !important; 
+  background: transparent !important;
   padding: 0 !important;
 }
 
 .code-card-body code {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
-  line-height: 1.6;
+  font-size: 0.875rem;
+  line-height: 1.7;
 }
 
-/* Inline Code Improvements */
-.inline-code {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  background-color: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
-  padding: 3px 6px;
+/* Diagram variant — lighter, centered */
+.code-card--diagram .code-card-lang {
+  color: rgba(140, 170, 200, 0.6);
+  background: rgba(140, 170, 200, 0.06);
+  border-color: rgba(140, 170, 200, 0.12);
+}
+
+.code-card--diagram {
+  border-left-color: rgba(100, 140, 180, 0.25);
+}
+
+.code-card--diagram .code-card-body {
+  padding: 20px 24px;
+}
+
+.code-card--diagram .code-card-body pre code {
+  font-size: 0.78rem !important;
+  color: #8aaccc !important;
+  line-height: 1.6 !important;
+}
+
+/* Copy button inside header */
+.code-card-header .command-copy-btn {
+  padding: 5px 7px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  white-space: nowrap;
+}
+
+/* Command block (single-line blocks) — keep for backward compat */
+.command-block {
+  background: #040608;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 2px solid rgba(72, 255, 171, 0.35);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 20px 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.command-block-actions {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.command-copy-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--fast);
+}
+
+.command-copy-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.command-copy-btn.copied {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.command-block-body {
+  padding: 18px 24px;
+  padding-right: 64px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.command-block-body pre {
+  margin: 0;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.command-block-body code {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.6;
 }

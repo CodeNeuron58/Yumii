@@ -14,6 +14,7 @@ import StepsList, { Step } from '../../components/docs/StepsList';
 import MascotHero from '../../components/docs/MascotHero';
 import ContentCard from '../../components/docs/ContentCard';
 import CodeCard from '../../components/docs/CodeCard';
+import MDXPre from '../../MDXPre';
 
 const IconMap: Record<string, React.FC<any>> = {
   rocket: Rocket,
@@ -65,28 +66,10 @@ const components = {
     }
     return <img {...props} src={src} style={{ borderRadius: '10px', marginBottom: '28px', maxWidth: '100%' }} />;
   },
-  pre: (props: any) => {
-    const codeElement = props.children;
-    if (codeElement && codeElement.type === 'code') {
-      const languageClass = codeElement.props.className || '';
-      const language = languageClass.replace(/language-/, '') || 'bash';
-      
-      let codeContent = codeElement.props.children || '';
-      if (typeof codeContent !== 'string') {
-        if (Array.isArray(codeContent)) {
-          codeContent = codeContent.map((c: any) => typeof c === 'string' ? c : c?.props?.children || '').join('');
-        } else if (typeof codeContent === 'object') {
-          codeContent = codeContent?.props?.children || '';
-        }
-      }
-      codeContent = String(codeContent);
-      
-      return <CodeCard language={language} code={codeContent} />;
-    }
-    return <pre {...props} />;
-  },
+  // Async RSC — handles ALL markdown code fences with terminal-style card
+  pre: MDXPre,
   code: (props: any) => {
-    // Inline code
+    // Inline code only (no className means it's not a fenced block)
     if (!props.className) {
       return <code className="inline-code" {...props} />;
     }
