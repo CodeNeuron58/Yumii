@@ -13,6 +13,7 @@ import threading
 import time
 import webbrowser
 
+
 import typer
 import uvicorn
 from prompt_toolkit import PromptSession
@@ -40,6 +41,10 @@ from yumi.core.credential_store import (
     save_credential,
 )
 from yumi.core.global_config import load_global_config, update_global_config
+
+from yumi.core.logging import configure_logging, get_logger
+configure_logging()
+log = get_logger(__name__)
 
 # ─── Package Version ──────────────────────────────────────────────────────────
 try:
@@ -624,7 +629,7 @@ def _cmd_wake() -> None:
     )
 
     try:
-        uvicorn.run(fastapi_app, host="127.0.0.1", port=8000)
+        uvicorn.run(fastapi_app, host="127.0.0.1", port=8000, log_config=None)
     except (KeyboardInterrupt, SystemExit):
         pass
 
@@ -1037,7 +1042,7 @@ def server() -> None:
     from yumi.api.server import app as fastapi_app  # noqa: PLC0415
 
     console.print(f"[bold {_C_PRIMARY}]Starting Yumi API server...[/]")
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
+    uvicorn.run(fastapi_app, host="127.0.0.1", port=8000, log_config=None)
 
 
 if __name__ == "__main__":

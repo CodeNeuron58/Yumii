@@ -5,11 +5,15 @@ Contains logic for processing user input, handling personality switches,
 and invoking the LLM agent.
 """
 
+
 from langchain_core.messages import AIMessage, HumanMessage
 
 from yumi.agent.llm import get_agent
 from yumi.agent.personality_manager import personality_manager
 from yumi.core.types import MainState
+
+from yumi.core.logging import get_logger
+log = get_logger(__name__)
 
 
 def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
@@ -59,9 +63,7 @@ def chat_node(state: MainState) -> dict:
 
     structured_response = result.get("structured_response")
     if structured_response is None:
-        print(
-            "WARNING: structured_response was None — LLM did not produce YumiResponse."
-        )
+        log.warning("llm_no_structured_response")
 
         class FallbackResponse:
             response_text = (

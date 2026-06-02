@@ -3,9 +3,13 @@
 Includes a local CPU-based `faster-whisper` provider and a cloud-based `Groq` provider.
 """
 
+
 import numpy as np
 
 from yumi.core.interfaces import BaseSTTProvider
+
+from yumi.core.logging import get_logger
+log = get_logger(__name__)
 
 
 class LocalSTT(BaseSTTProvider):
@@ -15,9 +19,9 @@ class LocalSTT(BaseSTTProvider):
         """Initialize the local Whisper model."""
         from faster_whisper import WhisperModel
 
-        print(f"Loading Whisper model ({model_size}) on CPU...")
+        log.info("whisper_loading", model_size=model_size)
         self._whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
-        print(f"Whisper model ({model_size}) loaded.")
+        log.info("whisper_ready", model_size=model_size)
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:
         """Transcribe an audio array using the local Whisper model."""
@@ -50,7 +54,7 @@ class GroqSTT(BaseSTTProvider):
         from groq import Groq
 
         self._groq_client = Groq(api_key=api_key)
-        print("Groq Whisper STT ready (whisper-large-v3-turbo).")
+        log.info("groq_stt_ready", model="whisper-large-v3-turbo")
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:
         """Transcribe an audio array using the Groq Whisper API."""
@@ -74,5 +78,5 @@ class GroqSTT(BaseSTTProvider):
             )
             return result.strip() if result else None
         except Exception as e:
-            print(f"❌ Groq STT error: {e}")
+            log.error("groq_stt_error", error=str(e), exc_info=True)
             return None

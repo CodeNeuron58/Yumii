@@ -40,6 +40,7 @@ dependencies = [
     "prompt_toolkit>=3.0.36",
     "rich>=15.0.0",
     "sounddevice>=0.5.5",
+    "structlog>=24.1.0",
     "torch>=2.0.0",
     "torchaudio>=2.0.0",
     "typer>=0.25.1",

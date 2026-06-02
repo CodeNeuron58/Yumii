@@ -4,6 +4,7 @@ Defines the LangGraph workflow that orchestrates the LLM interaction loop
 and maintains the conversational state.
 """
 
+
 from typing import Any
 
 from langgraph.checkpoint.memory import InMemorySaver
@@ -11,6 +12,9 @@ from langgraph.graph import END, StateGraph
 
 from yumi.agent.nodes import chat_node
 from yumi.core.types import MainState
+
+from yumi.core.logging import get_logger
+log = get_logger(__name__)
 
 
 def build_graph() -> Any:
@@ -21,7 +25,7 @@ def build_graph() -> Any:
 
     def think_node(state: MainState) -> dict:
         """Run the LLM ReAct loop and return a structured YumiResponse."""
-        print(f"User: {state['input']}")
+        log.debug("user_input", text=state["input"])
         result = chat_node(
             {
                 "input": state["input"],
@@ -36,7 +40,7 @@ def build_graph() -> Any:
             "messages": result.get("messages", []),
         }
 
-    print("Building LangGraph...")
+    log.info("langgraph_building")
     workflow = StateGraph(MainState)
 
     workflow.add_node("think", think_node)

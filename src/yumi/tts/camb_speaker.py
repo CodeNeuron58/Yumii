@@ -2,6 +2,7 @@
 CAMB.ai TTS (Text-to-Speech) provider for Yumi.
 """
 
+
 import base64
 import struct
 from typing import Any, AsyncGenerator
@@ -10,6 +11,9 @@ import aiohttp
 
 from yumi.core.config import settings
 from yumi.core.interfaces import BaseSpeaker
+
+from yumi.core.logging import get_logger
+log = get_logger(__name__)
 
 
 class CambSpeaker(BaseSpeaker):
@@ -34,9 +38,7 @@ class CambSpeaker(BaseSpeaker):
             return
 
         if len(text) > 495:
-            print(
-                f"Warning: Text too long for CAMB.ai ({len(text)} chars), truncating."
-            )
+            log.warning("camb_text_truncated", original_len=len(text), limit=495)
             text = text[:495] + "..."
 
         url = "https://client.camb.ai/apis/tts-stream"
@@ -48,7 +50,7 @@ class CambSpeaker(BaseSpeaker):
         try:
             voice_id_int = int(self.voice_id)
         except ValueError:
-            print(f"Error: CAMB.ai voice_id must be an integer, got: {self.voice_id}")
+            log.error("camb_invalid_voice_id", voice_id=self.voice_id)
             return
 
         payload = {
@@ -66,7 +68,7 @@ class CambSpeaker(BaseSpeaker):
                 async with session.post(url, headers=headers, json=payload) as resp:
                     if resp.status != 200:
                         error_text = await resp.text()
-                        print(f"CAMB.ai API Error ({resp.status}): {error_text}")
+                        log.error("camb_api_error", status=resp.status, body=error_text)
                         resp.raise_for_status()
 
                     is_first_chunk = True
@@ -91,7 +93,7 @@ class CambSpeaker(BaseSpeaker):
                             yield base64.b64encode(chunk).decode("utf-8")
 
         except Exception as e:
-            print(f"Error speaking response from CAMB.ai: {e}")
+            log.error("camb_tts_error", error=str(e), exc_info=True)
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
         """Perform blocking synthesis using the streaming generator."""
@@ -117,7 +119,7 @@ class CambSpeaker(BaseSpeaker):
             loop.run_until_complete(collect())
             full_audio = ",".join(chunks)  # Simplified
         except Exception as e:
-            print(f"Sync speak error: {e}")
+            log.error("camb_sync_speak_error", error=str(e), exc_info=True)
             return None, 0.0
         else:
             return full_audio, 0.0

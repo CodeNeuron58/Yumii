@@ -4,6 +4,7 @@ Voice Activity Detection (VAD) and Speech-to-Text (STT) pipeline.
 Captures audio streams, detects speech boundaries, and processes utterances.
 """
 
+
 import asyncio
 import collections
 import io
@@ -14,6 +15,9 @@ import numpy as np
 import torch
 
 from yumi.audio.stt_factory import get_stt_provider
+
+from yumi.core.logging import get_logger
+log = get_logger(__name__)
 
 RATE = 16000
 FRAME_SIZE = 512
@@ -72,7 +76,7 @@ class AudioPipeline:
     ) -> None:
         """Initialize the audio pipeline, loading VAD and STT models."""
         # VAD is always loaded locally
-        print("Loading Silero VAD...")
+        log.info("silero_vad_loading")
         self._silero_model, _ = torch.hub.load(
             repo_or_dir="snakers4/silero-vad",
             model="silero_vad",
@@ -82,11 +86,11 @@ class AudioPipeline:
             trust_repo=True,
         )
         self._silero_model.reset_states()
-        print("Silero VAD loaded.")
+        log.info("silero_vad_ready")
 
         # Transcription provider is pluggable
         self.transcriber = get_stt_provider()
-        print("Audio pipeline ready.")
+        log.info("audio_pipeline_ready")
 
     def _is_speech_silero(self, audio_float32_frame: np.ndarray) -> bool:
         tensor = torch.FloatTensor(audio_float32_frame)
@@ -129,7 +133,7 @@ class AudioPipeline:
                     speech_count = sum(1 for _, s in pre_buffer if s)
                     if speech_count >= SPEECH_TRIGGER_FRAMES:
                         triggered = True
-                        print("🎙  Speech started (stream)")
+                        log.debug("speech_started")
                         if on_speech_start:
                             on_speech_start()
                         recording.extend(frame for frame, _ in pre_buffer)
@@ -139,7 +143,7 @@ class AudioPipeline:
                     pre_buffer.append((pcm16, is_speech))
                     silence_count = sum(1 for _, s in pre_buffer if not s)
                     if silence_count >= SILENCE_END_FRAMES:
-                        print("🔇  Speech ended (stream)")
+                        log.debug("speech_ended")
                         return (
                             np.concatenate(recording)
                             if recording
@@ -156,9 +160,7 @@ class AudioPipeline:
         """Convert a complete audio utterance into text."""
         duration_sec = len(audio_data) / RATE
         if duration_sec < MIN_SPEECH_DURATION_SEC:
-            print(
-                f"⚠  Audio too short ({duration_sec:.2f}s < {MIN_SPEECH_DURATION_SEC}s), skipping."
-            )
+            log.debug("audio_too_short", duration_sec=round(duration_sec, 2), minimum_sec=MIN_SPEECH_DURATION_SEC)
             return ""
 
         text = self.transcriber.transcribe(audio_data)
