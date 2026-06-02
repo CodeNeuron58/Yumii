@@ -1,8 +1,11 @@
 ---
 title: "Configuration & Schema Definitions"
 description: "A reference catalog of ~/.yumi/config.json configurations, settings defaults, and Pydantic models."
+layout: "cards"
+icon: "file-json"
 ---
 
+<ContentCard>
 Yumi stores non-sensitive user preferences and sensory defaults inside a standard configuration directory in your home directory.
 
 *   **Config Directory**:
@@ -11,7 +14,9 @@ Yumi stores non-sensitive user preferences and sensory defaults inside a standar
 *   **Preferences File**: `~/.yumi/config.json`
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🎛️ The `config.json` Layout
 
 This file maps non-sensitive variables like active providers and selected personalities.
@@ -28,7 +33,9 @@ Example JSON structure:
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🔒 Sensitive API Keys (OS Keychain Mappings)
 
 All sensitive credential strings are saved to the OS secure database under dedicated aliases to prevent disk exposure:
@@ -44,7 +51,9 @@ All sensitive credential strings are saved to the OS secure database under dedic
 | **`CAMB_VOICE_ID`** | `CAMB_VOICE_ID` | ❌ No — OS Encrypted Keychain |
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## ⚙️ Pydantic Configuration Model Settings (`config.py`)
 
 On start, `src/yumi/core/config.py` runs a load script:
@@ -53,12 +62,13 @@ On start, `src/yumi/core/config.py` runs a load script:
 3.  Injects all values into `os.environ`.
 4.  Compiles the `Settings(BaseSettings)` Pydantic container:
     ```python
-    class Settings(BaseSettings):
+class Settings(BaseSettings):
         tts_provider: str = Field(default="ElevenLabs", alias="TTS_PROVIDER")
         elevenlabs_api_key: str | None = Field(default=None, alias="ELEVENLABS_API_KEY")
         # ...
-    ```
+```
 
 This ensures that the entire code ecosystem has secure, seamless access to the configuration via the global `settings` object!
 
 You are now fully attuned to the operational mechanics of Yumi. Go ahead and start customizing your companion!
+</ContentCard>

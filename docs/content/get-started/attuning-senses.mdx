@@ -1,14 +1,19 @@
 ---
 title: "Attuning Senses"
 description: "Configure Yumi's brain, ears, and voice via the interactive Attunement Wizard."
+layout: "cards"
+icon: "ear"
 ---
 
+<ContentCard>
 When you launch Yumi for the first time by running `yumi` or `uv run yumi`, she will detect that she doesn't have her keys set up and will guide you through the **Attunement Wizard**. 
 
 This interactive terminal process lets you configure her three sensory areas securely.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 1: Connecting Her Mind (LLM)
 
 You will be asked to select an LLM provider to power her conversational brain:
@@ -20,7 +25,9 @@ You will be asked to select an LLM provider to power her conversational brain:
 Once you pick, you will be prompted for your API Key. The key is securely committed to your **OS Keychain** immediately.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 2: Selecting Her Voice (TTS)
 
 To let Yumi speak, choose a Text-to-Speech provider:
@@ -35,7 +42,9 @@ To let Yumi speak, choose a Text-to-Speech provider:
 *   **Requirements**: CAMB.ai API key and Voice ID.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 3: Calibrating Her Ears (STT)
 
 Choose how Yumi listens to your microphone:
@@ -48,3 +57,4 @@ Choose how Yumi listens to your microphone:
     *   Uses your existing Groq API key and transcribes speech in under 150 milliseconds.
 
 Once complete, the wizard saves these preferences to your local configuration and registers your keys safely. You are now ready to [Wake Her Up](/quickstart)!
+</ContentCard>

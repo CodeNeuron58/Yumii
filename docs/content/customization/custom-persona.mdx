@@ -1,14 +1,19 @@
 ---
 title: "Creating a Custom Persona"
 description: "A step-by-step tutorial on writing, registering, and testing a completely new AI personality."
+layout: "cards"
+icon: "venetian-mask"
 ---
 
+<ContentCard>
 Want to add a custom character like a sassy helper, a futuristic hacker, or a fantasy wizard companion? 
 
 Creating a custom persona in Yumi is simple. Follow this step-by-step tutorial.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 1: Write Your Prompt File
 
 Create a new text file inside Yumi's asset prompts directory:
@@ -36,7 +41,9 @@ You have access to the following body motions:
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 2: Register the Description
 
 To make your new personality visible in Yumi's CLI configuration tool, register it inside `src/yumi/agent/personality_manager.py`:
@@ -45,26 +52,29 @@ To make your new personality visible in Yumi's CLI configuration tool, register 
 2.  Locate `PERSONALITY_DESCRIPTIONS` (around line 13).
 3.  Add your new persona name and a brief description:
     ```python
-    PERSONALITY_DESCRIPTIONS: Dict[PERSONALITY_TYPE, str] = {
+PERSONALITY_DESCRIPTIONS: Dict[PERSONALITY_TYPE, str] = {
         "caring": "Warm, empathetic, and supportive",
         "tsundere": "Playful teasing with a soft heart",
         # ...
         "hacker": "Sassy futuristic cyber-hacker companion",  # Add your new persona here!
     }
-    ```
+```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 3: Clear Cache & Run
 
 Yumi caches LLM agents to optimize performance. When you add a new personality, clear the cache and run:
 
 1.  Start the CLI:
     ```bash
-    yumi
-    ```
+yumi
+```
 2.  Go to **Configure Senses > Select Personality**.
 3.  Choose your new **Hacker** personality.
 4.  Wake Yumi up and talk to Hex!
 
 Proceed to the [Capabilities section](/capabilities/system-tools) to expand Yumi's brain with tools!
+</ContentCard>

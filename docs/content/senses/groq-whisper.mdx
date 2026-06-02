@@ -1,14 +1,19 @@
 ---
 title: "Groq Cloud Whisper"
 description: "Enable cloud-accelerated Whisper transcribing for sub-150ms speech capturing."
+layout: "cards"
+icon: "wind"
 ---
 
+<ContentCard>
 While Local Whisper is fully private, processing speech locally on older CPUs can introduce a latency of 1 to 2 seconds. 
 
 For a truly instantaneous, real-time response model, Yumi supports **Groq Cloud Whisper**.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## How Groq Whisper Works
 
 When Groq is selected as your STT provider in the config, Yumi's local VAD still handles local voice boundaries:
@@ -17,12 +22,14 @@ When Groq is selected as your STT provider in the config, Yumi's local VAD still
 2.  **Audio Export**: The backend converts the accumulated floating-point audio buffer into a highly compressed in-memory **WAV file** (PCM 16-bit, 16kHz mono).
 3.  **API Streaming**: Yumi sends this small byte stream via an HTTP POST request to Groq's high-speed endpoint:
     ```
-    https://api.groq.com/openai/v1/audio/transcriptions
-    ```
+https://api.groq.com/openai/v1/audio/transcriptions
+```
 4.  **Hardware Acceleration**: Groq processes the audio on custom LPU (Language Processing Unit) hardware, returning the completed JSON text transcription in **under 150 milliseconds**.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Configuration & Key Sharing
 
 To configure Groq Whisper, run the config wizard:
@@ -34,3 +41,4 @@ Under **Listening Settings**, choose **Groq Whisper**.
 If you have already configured Groq as your LLM provider, Yumi is smart enough to reuse your existing `GROQ_API_KEY` stored in your keychain — **no duplicate setup required**.
 
 Proceed to the [Thinking (LLM) Providers](/senses/thinking-providers) page to see how Yumi formulates a response!
+</ContentCard>

@@ -1,11 +1,16 @@
 ---
 title: "Windows Installation"
 description: "How to set up and run Yumi natively on Windows 10 & 11."
+layout: "cards"
+icon: "windows"
 ---
 
+<ContentCard>
 Yumi runs natively on Windows 10 and 11. Because she is optimized to run on standard CPUs, no NVIDIA GPU or CUDA setups are required.
+</ContentCard>
 
-## ⚡ One-Line Quick Install
+<ContentCard>
+## <span style={{ color: 'var(--text-accent)' }}>⚡ One-Line Quick Install</span>
 
 The easiest way to install Yumi on Windows is via the automated PowerShell script. 
 
@@ -14,19 +19,21 @@ Open a PowerShell terminal (no Administrator privileges required) and paste:
 ```powershell
 irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.ps1 | iex
 ```
+</ContentCard>
 
-### What this script does:
+<ContentCard>
+### What this script does
 
 <StepsList>
-  <div>Checks if Python 3.12+ is installed (prompts if missing).</div>
-  <div>Installs the `uv` package manager securely.</div>
-  <div>Clones the Yumi repository to `C:\Users\YourName\Yumi`.</div>
-  <div>Creates a virtual environment and runs `uv sync` to set up all packages (pinning CPU-only Torch).</div>
-  <div>Creates a global `yumi` alias so you can launch the app from any directory.</div>
+  <Step icon="code" title="Checks if Python 3.12+ is installed (prompts if missing)." />
+  <Step icon="package" title="Installs the `uv` package manager securely." />
+  <Step icon="folder" title="Clones the Yumi repository to `C:\Users\YourName\Yumi`." />
+  <Step icon="terminal" title="Creates a virtual environment and runs `uv sync` to set up all packages (pinning CPU-only Torch)." />
+  <Step icon="star" title="Creates a global `yumi` alias so you can launch the app from any directory." />
 </StepsList>
+</ContentCard>
 
----
-
+<ContentCard>
 ## 🛠️ Prerequisites & Common Hurdles
 
 Before launching Yumi, ensure you have the following Windows settings calibrated:
@@ -35,9 +42,9 @@ Before launching Yumi, ensure you have the following Windows settings calibrated
 Yumi captures audio from your default system microphone.
 
 <StepsList>
-  <div>Right-click the speaker icon in your Windows Taskbar and select **Sound settings**.</div>
-  <div>Under **Input**, ensure your primary microphone is selected as the default device.</div>
-  <div>Test your microphone to ensure the volume bar moves when you speak.</div>
+  <Step icon="layout-dashboard" title="Right-click the speaker icon in your Windows Taskbar and select Sound settings." />
+  <Step icon="terminal" title="Under Input, ensure your primary microphone is selected as the default device." />
+  <Step icon="waveform-lines" title="Test your microphone to ensure the volume bar moves when you speak." />
 </StepsList>
 
 <Callout type="info" title="Windows Defender & Security Keyring">
@@ -47,9 +54,9 @@ Yumi captures audio from your default system microphone.
   
   **Approval**: The first time you configure keys, Windows might show a prompt asking to grant python.exe access to the Credential Manager. Click **Allow**.
 </Callout>
+</ContentCard>
 
----
-
+<ContentCard>
 ## 💡 Troubleshooting Windows Audio
 
 <Callout type="error" title="Error: KMP_DUPLICATE_LIB_OK">
@@ -58,8 +65,9 @@ Yumi captures audio from your default system microphone.
   **The Fix**: The Yumi CLI handles this automatically by setting `os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"` prior to importing. If you run manually, make sure this environment variable is set in your shell:
   
   ```powershell
-  $env:KMP_DUPLICATE_LIB_OK="TRUE"
-  ```
+$env:KMP_DUPLICATE_LIB_OK="TRUE"
+```
 </Callout>
 
 Proceed to the [macOS Installation](/installation/macos) or [Core Senses](/senses/vad) sections to learn more!
+</ContentCard>

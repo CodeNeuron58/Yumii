@@ -1,12 +1,17 @@
 ---
 title: "Performance Tuning"
 description: "How to optimize CPU threads, select whisper models, and minimize conversational latency."
+layout: "cards"
+icon: "gauge"
 ---
 
+<ContentCard>
 Yumi is optimized to run smoothly entirely on standard home CPUs, requiring no heavy discrete graphics cards (GPUs). To achieve sub-second response times, apply these performance tuning parameters.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## ⚡ 1. Accelerating Speech-to-Text (STT)
 
 Local transcription is typically the heaviest computational step in Yumi's sensory loop.
@@ -24,7 +29,9 @@ self.model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_thr
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🧠 2. Optimizing LLM Response Rates
 
 ### A. Use Groq Cloud
@@ -36,7 +43,9 @@ The size of your system prompt and the length of your active chat history can de
 *   **History length**: Periodically clear or truncate your message buffer if you experience slow performance.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🗣️ 3. Audio Client Echo Cancellation
 
 To prevent Yumi from "hearing herself" talk through your laptop speakers (which would trigger the local VAD, interrupt her voice, and launch a feedback loop), Yumi implements strict audio constraints on the client mic:
@@ -55,3 +64,4 @@ const stream = await navigator.mediaDevices.getUserMedia({
 Keep echo cancellation enabled, especially when running on laptops without headphones!
 
 Proceed to the [CLI Command Registry](/ops/cli-commands) to see all keyboard control routes!
+</ContentCard>

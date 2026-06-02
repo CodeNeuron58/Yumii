@@ -1,12 +1,17 @@
 ---
 title: "Troubleshooting Guide"
 description: "Resolve common issues, KMP runtime conflicts, and audio permissions."
+layout: "cards"
+icon: "stethoscope"
 ---
 
+<ContentCard>
 If you run into issues launching the dashboard, connecting your microphone, or getting Yumi's voice outputs, follow this comprehensive troubleshooting registry.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🛠️ Windows Issues
 
 ### Error: `KMP_DUPLICATE_LIB_OK`
@@ -15,12 +20,12 @@ If you run into issues launching the dashboard, connecting your microphone, or g
 *   **The Fix**: Ensure the environment variable is declared in your shell before starting.
     *   **PowerShell**:
         ```powershell
-        $env:KMP_DUPLICATE_LIB_OK="TRUE"
-        ```
+$env:KMP_DUPLICATE_LIB_OK="TRUE"
+```
     *   **Command Prompt**:
         ```cmd
-        set KMP_DUPLICATE_LIB_OK=TRUE
-        ```
+set KMP_DUPLICATE_LIB_OK=TRUE
+```
 
 ---
 
@@ -29,7 +34,9 @@ If you run into issues launching the dashboard, connecting your microphone, or g
 *   **The Fix**: Right-click your terminal emulator (e.g. PowerShell) and run it as a standard user (not Administrator). Windows Credential Manager sometimes locks access to administrative terminals for security.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🎙️ Microphone & Audio Issues
 
 ### Speech Not Detected (`[Voice Activity Detected]` is missing)
@@ -40,7 +47,9 @@ If you run into issues launching the dashboard, connecting your microphone, or g
     3.  Click the WebUI pink button **"Connect & Start Audio Context"** to ensure the WebSocket pipeline wakes up.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🔑 API & Secret Keys Issues
 
 ### Authentication Failures (ElevenLabs or Groq)
@@ -49,8 +58,9 @@ If you run into issues launching the dashboard, connecting your microphone, or g
     1.  API keys are saved in your OS Keychain, not in `.env` files.
     2.  Re-run the configuration wizard to overwrite corrupt keys:
         ```bash
-        yumi --config
-        ```
+yumi --config
+```
     3.  Select **Configure Senses** and re-paste your active credentials.
 
 Proceed to the [Performance Tuning](/ops/performance-tuning) page to reduce latency!
+</ContentCard>

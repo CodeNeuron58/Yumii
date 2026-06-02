@@ -1,12 +1,17 @@
 ---
 title: "Voice Synthesis & Lip Sync"
 description: "How Yumi streams voice audio and calculates Root Mean Square waveform values for high-fidelity lip sync."
+layout: "cards"
+icon: "volume-2"
 ---
 
+<ContentCard>
 Yumi leverages modern Text-to-Speech (TTS) streaming APIs to produce warm, natural vocal responses. Once audio is generated, she synchronizes her mouth movements in real time.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 1. Streaming Audio Pipeline
 
 Yumi supports two streaming TTS providers:
@@ -19,7 +24,9 @@ Yumi supports two streaming TTS providers:
 *   **Method**: High-performance alternative streaming engine, delivering high-fidelity vocal tracks in real-time.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 2. Real-Time RMS Lip-Syncing
 
 Once the browser WebUI receives the audio chunks, it feeds the stream into a Web Audio API `AudioContext` and routes it through an `AnalyserNode`.
@@ -27,7 +34,7 @@ Once the browser WebUI receives the audio chunks, it feeds the stream into a Web
 To synchronize Yumi's mouth openings to the actual spoken sounds, a high-frequency `requestAnimationFrame` loop calculates the **Root Mean Square (RMS)** amplitude of the playing audio waveform in real time.
 
 ```
-  [ Playing Audio ] ──► [ AnalyserNode ] ──► [ Compute RMS Amplitude ]
+[ Playing Audio ] ──► [ AnalyserNode ] ──► [ Compute RMS Amplitude ]
                                                       │
   [ Live2D Parameter MouthOpenY ] ◄── [ Map 0.0 - 1.0 ] ◄───────┘
 ```
@@ -57,3 +64,4 @@ live2dModel.internalModel.coreModel.setParameterValueById("ParamMouthOpenY", mou
 *   **Expressiveness**: Whispers or quiet syllables result in small mouth openings, while loud exclamations result in fully open animations, perfectly matching the voice's emotional tone!
 
 Proceed to the [Customization section](/customization/adding-avatars) to learn how to add custom character avatars!
+</ContentCard>

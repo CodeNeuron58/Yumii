@@ -10,8 +10,10 @@ import DocsHero from '../../components/docs/DocsHero';
 import DocsCard from '../../components/docs/DocsCard';
 import FeatureList from '../../components/docs/FeatureList';
 import Callout from '../../components/docs/Callout';
-import StepsList from '../../components/docs/StepsList';
+import StepsList, { Step } from '../../components/docs/StepsList';
 import MascotHero from '../../components/docs/MascotHero';
+import ContentCard from '../../components/docs/ContentCard';
+import CodeCard from '../../components/docs/CodeCard';
 
 const IconMap: Record<string, React.FC<any>> = {
   rocket: Rocket,
@@ -38,10 +40,13 @@ const components = {
   SectionContainer,
   DocsHero,
   MascotHero,
+  ContentCard,
   DocsCard,
   FeatureList,
   Callout,
   StepsList,
+  Step,
+  CodeCard,
   AccordionGroup: ({ children }: any) => <div className="accordion-group">{children}</div>,
   Accordion: ({ title, children }: any) => (
     <details className="accordion">
@@ -65,8 +70,18 @@ const components = {
     if (codeElement && codeElement.type === 'code') {
       const languageClass = codeElement.props.className || '';
       const language = languageClass.replace(/language-/, '') || 'bash';
-      const codeContent = codeElement.props.children || '';
-      return <CodeBlock language={language}>{codeContent}</CodeBlock>;
+      
+      let codeContent = codeElement.props.children || '';
+      if (typeof codeContent !== 'string') {
+        if (Array.isArray(codeContent)) {
+          codeContent = codeContent.map((c: any) => typeof c === 'string' ? c : c?.props?.children || '').join('');
+        } else if (typeof codeContent === 'object') {
+          codeContent = codeContent?.props?.children || '';
+        }
+      }
+      codeContent = String(codeContent);
+      
+      return <CodeCard language={language} code={codeContent} />;
     }
     return <pre {...props} />;
   },
@@ -103,13 +118,13 @@ export default function Page({ params }: { params: { slug?: string[] } }) {
   const { content, data } = matter(fileContent);
 
   return (
-    <SectionContainer>
+    <SectionContainer className={data.layout === 'cards' ? 'layout-cards' : ''}>
       {data.sidebarTitle && (
         <div className="breadcrumb">
           <span className="badge">{data.sidebarTitle.toUpperCase()}</span>
         </div>
       )}
-      {data.title && !data.hideHero && <DocsHero title={data.title} subtitle={data.description} />}
+      {data.title && !data.hideHero && <DocsHero title={data.title} subtitle={data.description} icon={data.icon} />}
       <div className="text-content">
         <MDXRemote source={content} components={components} />
       </div>

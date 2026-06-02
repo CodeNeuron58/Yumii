@@ -1,20 +1,25 @@
 ---
 title: "Voice Activity Detection (VAD)"
 description: "How Silero VAD processes audio streams to detect human speech in real time."
+layout: "cards"
+icon: "activity"
 ---
 
+<ContentCard>
 Yumi does not use static sound threshold levels to listen to your voice. Standard volume thresholds easily fail when you click a mechanical keyboard, sigh, or have a fan running in the background.
 
 Instead, Yumi utilizes **Silero VAD**, a lightweight, high-performance neural speech detector.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Technical Mechanics of Silero VAD
 
 Silero VAD is loaded locally inside `src/yumi/audio/stt.py` using `torch.hub`. It runs a highly optimized 4-layer convolutional neural network that analyzes incoming audio chunks and outputs a speech probability score between `0.0` and `1.0`.
 
 ```
-  [ Mic Stream ] ──► [ 512-sample Chunks ] ──► [ Silero VAD Model ] ──► Probability >= 0.5?
+[ Mic Stream ] ──► [ 512-sample Chunks ] ──► [ Silero VAD Model ] ──► Probability >= 0.5?
                                                                                │
   [ Trigger STT ] ◄── [ Speech Boundary Finalized ] ◄──────────────────────────┘
 ```
@@ -24,7 +29,9 @@ Silero VAD is loaded locally inside `src/yumi/audio/stt.py` using `torch.hub`. I
 3.  **Silence Confirmation**: When the probability drops below `0.35` for more than **500 milliseconds**, Yumi registers that **speech has ended**, packages the accumulated audio buffer, and triggers the transcription pipeline.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Speech Interruption (Barge-In)
 
 The VAD is also the trigger for the **barge-in** mechanism.
@@ -36,3 +43,4 @@ Because the VAD runs continuously (even while Yumi is active and speaking), she 
 4.  The browser instantly aborts the current audio node, closes Yumi's lips, and transitions back to listening, ready for your new input.
 
 Proceed to the [Local Whisper](/senses/local-whisper) page to see how this speech is transcribed offline!
+</ContentCard>

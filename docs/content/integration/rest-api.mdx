@@ -1,12 +1,17 @@
 ---
 title: "FastAPI REST API Reference"
 description: "A complete mapping of Yumi's FastAPI routes, static mount configurations, and local servers."
+layout: "cards"
+icon: "webhook"
 ---
 
+<ContentCard>
 Yumi is driven by a lightweight **FastAPI** backend (`src/yumi/api/server.py`). Alongside the real-time WebSocket connection, Yumi serves REST endpoints to mount folders and serve assets.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 1. Asset Mounting & Serving
 
 Yumi bundles her frontend interface and exposes custom folders securely.
@@ -22,7 +27,9 @@ Yumi bundles her frontend interface and exposes custom folders securely.
 *   **Description**: Exposes your custom Live2D model directories located in `~/.yumi/avatar/` to the PixiJS loading runtime.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 2. CORS Configurations
 
 To allow developers to build secondary WebUI interfaces (e.g. mobile overlays or OBS widget overlays), Yumi implements permissive **CORS** configurations:
@@ -40,3 +47,4 @@ app.add_middleware(
 This guarantees you can connect to `ws://localhost:8000/ws` from any local development host or OBS browser source cleanly without safety crashes!
 
 Proceed to the [Model Context Protocol (MCP)](/integration/mcp-server) page to expose her brain tools globally!
+</ContentCard>

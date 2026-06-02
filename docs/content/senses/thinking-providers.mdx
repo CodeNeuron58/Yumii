@@ -1,12 +1,17 @@
 ---
 title: "Thinking (LLM) Providers"
 description: "A comparison of LLM engines that drive Yumi's intelligence and persona responses."
+layout: "cards"
+icon: "brain-circuit"
 ---
 
+<ContentCard>
 Yumi is compatible with three major Large Language Model providers. You can choose which model acts as her "Mind" depending on your speed, cost, and intelligence preferences.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 1. Groq (Llama-3.3-70b-versatile)
 *   **The Vibe**: Ultra-Fast, Conversational, Efficient.
 *   **Speed**: Sub-300ms time-to-first-token. It feels incredibly responsive, almost like speaking to a real person.
@@ -14,7 +19,9 @@ Yumi is compatible with three major Large Language Model providers. You can choo
 *   **Best For**: Everyday standard conversations and fast question-answering.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 2. OpenAI (GPT-4o)
 *   **The Vibe**: Highly Intelligent, Logical, Structured.
 *   **Speed**: Moderate (~800ms - 1.2s response time).
@@ -22,7 +29,9 @@ Yumi is compatible with three major Large Language Model providers. You can choo
 *   **Best For**: Accurate complex reasoning, advanced task execution, and precise tool calling.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 3. Anthropic (Claude-3.5-Sonnet)
 *   **The Vibe**: Deeply Emotional, Nuanced, creative roleplay.
 *   **Speed**: Moderate (~1s - 1.5s response time).
@@ -30,7 +39,9 @@ Yumi is compatible with three major Large Language Model providers. You can choo
 *   **Best For**: Rich, immersive roleplay. Claude excels at maintaining subtle subtext, matching custom personalities, and simulating genuine empathy.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Model Initialization & Caching (`llm.py`)
 
 To optimize system memory and speed, Yumi implements **lazy instantiation** and **caching** of the LLM agents inside `src/yumi/agent/llm.py`:
@@ -40,3 +51,4 @@ To optimize system memory and speed, Yumi implements **lazy instantiation** and 
 *   Subsequent responses or personality switches back to previously loaded personas are instantaneous, requiring zero compile overhead!
 
 Proceed to [Structured Outputs](/senses/structured-outputs) to see how the LLM controls the Live2D body animations!
+</ContentCard>

@@ -1,8 +1,11 @@
 ---
 title: "Personality Prompts"
 description: "How Yumi manages system prompts and custom text personas under the hood."
+layout: "cards"
+icon: "message-square-text"
 ---
 
+<ContentCard>
 Yumi leverages the flexibility of LLM system prompts to enforce distinct personalities. All system prompts are stored in structured text files inside the package assets:
 
 *   **Prompt Directory**: `src/yumi/assets/prompts/`
@@ -15,7 +18,9 @@ Yumi leverages the flexibility of LLM system prompts to enforce distinct persona
     *   `dandere.txt` — Shy, quiet, introverted.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Technical Prompts Structure
 
 If you open one of the prompt files (e.g. `caring.txt`), you will see a detailed set of roleplay instructions:
@@ -25,7 +30,9 @@ If you open one of the prompt files (e.g. `caring.txt`), you will see a detailed
 3.  **Behavior Constraints**: Directs the agent to remain conversational, not sound like an AI assistant, and keep spoken outputs short.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Under the Hood: Tool Prompt Injections (`llm.py`)
 
 When loading an agent, Yumi's engine does not just send the raw text prompt file. To satisfy the WebSocket and Live2D sync requirements, `src/yumi/agent/llm.py` appends a **strict tool constraint** (`_TOOL_HINT`):
@@ -42,3 +49,4 @@ _TOOL_HINT = (
 This prevents the LLM from returning raw Markdown, bullets, or paragraphs that are too long for real-time speech synthesis, guaranteeing beautiful, snappy responses.
 
 Proceed to the [Creating a Custom Persona](/customization/custom-persona) page to build your own character from scratch!
+</ContentCard>

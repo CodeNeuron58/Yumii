@@ -1,14 +1,19 @@
 ---
 title: "Local Whisper (Offline STT)"
 description: "Configure local, private speech-to-text processing on your CPU using faster-whisper."
+layout: "cards"
+icon: "hard-drive"
 ---
 
+<ContentCard>
 If you want a fully private, offline companion experience, Yumi's local speech-to-text pipeline runs entirely on your own machine. No voice data or recordings are transmitted to the cloud.
 
 This is powered by **`faster-whisper`**, a highly optimized translation of OpenAI's Whisper model utilizing CTranslate2.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Model Sizes & Quantization
 
 To run Whisper efficiently on home CPUs, `faster-whisper` quantizes the floating-point weights into 8-bit integers (`int8`). This reduces the memory footprint and accelerates matrix multiplications on standard processors by up to 4×.
@@ -22,7 +27,9 @@ When attuning Yumi, you can choose from three model scales:
 | **`small`** | ~460 MB | ~800 MB | ~1 - 2.5s | Highly accurate; requires modern multi-core CPU. |
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Speed Optimizations inside Yumi
 
 To keep local transcription latencies under 1 second, Yumi implements specific greedy configurations inside `src/yumi/audio/stt.py`:
@@ -31,3 +38,4 @@ To keep local transcription latencies under 1 second, Yumi implements specific g
 *   **VAD Pre-Filtering**: Raw audio is already trimmed of leading/trailing silence by Silero VAD before it is fed to Whisper. Whisper does not waste CPU cycles analyzing silent audio frames.
 
 Proceed to the [Groq Whisper](/senses/groq-whisper) page to see how cloud acceleration reduces this latency even further!
+</ContentCard>

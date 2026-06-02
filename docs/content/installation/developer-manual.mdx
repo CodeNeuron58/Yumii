@@ -1,10 +1,15 @@
 ---
 title: "Developer Manual (Manual Install)"
 description: "How to set up, build, and run Yumi manually from the source repository."
+layout: "cards"
+icon: "book-open"
 ---
 
+<ContentCard>
 If you are a developer looking to contribute to Yumi, write custom tools, or tweak her LangGraph architecture, you should install her manually from source.
+</ContentCard>
 
+<ContentCard>
 ## 1. Prerequisites
 
 Ensure you have the following tools installed:
@@ -22,7 +27,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 2. Clone & Sync
 
 Clone the repository and sync the virtual environment. `uv` handles virtualenv creation automatically under the hood:
@@ -38,7 +45,9 @@ uv sync
 </Info>
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 3. Activate the Environment
 
 To make the global `yumi` command available in your current terminal session:
@@ -65,3 +74,4 @@ uv run yumi
 ```
 
 Proceed to [WSL2 Installation](/installation/wsl2) or [Core Senses](/senses/vad) to learn more!
+</ContentCard>

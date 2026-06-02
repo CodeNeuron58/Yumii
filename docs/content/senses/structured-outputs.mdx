@@ -1,14 +1,19 @@
 ---
 title: "Structured Outputs & Expression Control"
 description: "How Yumi utilizes Pydantic to command physical motions and expressions on the Live2D model."
+layout: "cards"
+icon: "braces"
 ---
 
+<ContentCard>
 Yumi is not just a voice text reader. To feel like an active presence, she must move her body, blink, gesture, and show emotions that match the words she says.
 
 This co-expressive capability is achieved via **Structured Outputs** bound through Pydantic.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## The YumiResponse Schema
 
 Instead of returning raw text paragraphs, the LLM is forced (using native tool calling / structured response APIs) to populate the `YumiResponse` schema defined in `src/yumi/agent/llm.py`:
@@ -24,7 +29,9 @@ class YumiResponse(BaseModel):
 *   **Expression Restrictions**: The prompt restricts the LLM to select ONLY from the valid expressions and motion states supported by the active avatar model.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## How the WebUI Executes the Emotion
 
 When the structured response is returned by the LangGraph workflow:
@@ -32,7 +39,7 @@ When the structured response is returned by the LangGraph workflow:
 2.  The browser client receives the JSON payload.
 3.  The frontend client translates these generic states using `EXPRESSION_MAP` and `MOTION_MAP`:
     ```javascript
-    const EXPRESSION_MAP = {
+const EXPRESSION_MAP = {
         "smile": "baozhen",
         "angry": "angry",
         "sad": "cry",
@@ -41,13 +48,14 @@ When the structured response is returned by the LangGraph workflow:
         "shy": "qizi1",
         "normal": null
     };
-    ```
+```
 4.  It immediately feeds these parameter identifiers to the PixiJS Live2D model renderer:
     ```javascript
-    live2dModel.expression("baozhen"); // Plays the smile expression
+live2dModel.expression("baozhen"); // Plays the smile expression
     live2dModel.motion("nod");         // Triggers a nodding motion
-    ```
+```
 
 This results in Yumi smiling, nodding, or looking shy *exactly* at the moment she begins speaking her thoughts!
 
 Proceed to [Voice Synthesis](/senses/voice-synthesis) to see how her voice audio is generated and synced!
+</ContentCard>

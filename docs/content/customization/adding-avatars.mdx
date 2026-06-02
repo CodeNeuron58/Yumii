@@ -1,14 +1,19 @@
 ---
 title: "Adding Custom Live2D Avatars"
 description: "How to download, structure, and mount custom Live2D Cubism models for Yumi."
+layout: "cards"
+icon: "image"
 ---
 
+<ContentCard>
 Yumi is designed to support custom Live2D avatars. You are not locked into the default visual look! You can download any Cubism 4 compatible model (from creators on platforms like **Booth.pm** or **Nizima**) and load it directly.
 
 Follow this guide to swap Yumi's visual appearance.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 1. Structure Your Model Folder
 
 Live2D Cubism models are exported as a bundle of assets. Yumi requires the model to follow the standard Cubism 4 layout. 
@@ -20,7 +25,9 @@ Ensure your downloaded model folder contains:
 *   A `motions/` and `expressions/` subfolder (containing `.motion3.json` and `.exp3.json` files).
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 2. Place in Yumi's Avatar Directory
 
 For security and modularity, Yumi loads custom avatars from a specific system-level directory:
@@ -38,7 +45,9 @@ Create a subdirectory matching your character's name and paste all files inside 
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 3. Update the WebUI Loader
 
 Once your custom model is placed in the folder, you must instruct the HTML5 frontend to compile and load it.
@@ -47,12 +56,13 @@ Once your custom model is placed in the folder, you must instruct the HTML5 fron
     `src/yumi/assets/webui/index.html`
 2.  Locate the line defining `modelUrl` (around line 111):
     ```javascript
-    const modelUrl = "/Yumi_Avatar/huohuo.model3.json";
-    ```
+const modelUrl = "/Yumi_Avatar/huohuo.model3.json";
+```
 3.  Replace `huohuo.model3.json` with the exact filename of your new custom model's `.model3.json` file:
     ```javascript
-    const modelUrl = "/Yumi_Avatar/my_custom_waifu.model3.json";
-    ```
+const modelUrl = "/Yumi_Avatar/my_custom_waifu.model3.json";
+```
 4.  Save the file and refresh your browser! Yumi's backend automatically mounts `~/.yumi/avatar/` to the web server under `/Yumi_Avatar`, so your new model will compile and load instantly!
 
 Proceed to the [Parameter Mapping](/customization/parameter-mapping) page to customize how she emotes!
+</ContentCard>

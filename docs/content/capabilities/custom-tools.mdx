@@ -1,14 +1,19 @@
 ---
 title: "Writing Custom Tools"
 description: "A step-by-step tutorial on extending Yumi's brain with new Python capabilities."
+layout: "cards"
+icon: "hammer"
 ---
 
+<ContentCard>
 Want to let Yumi check your local weather, look at your calendar, or play your favorite Spotify playlist? 
 
 You can easily write custom tools in Python and expose them directly to her LangGraph agent. Follow this tutorial to build one.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 1: Write Your Python Tool
 
 Open the tools initialization file or add a new file inside:
@@ -43,7 +48,9 @@ async def get_current_weather(location: str) -> str:
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 2: Register Your Tool
 
 To make Yumi's LLM aware of the weather tool, add it to the tools list inside `src/yumi/tools/__init__.py`:
@@ -60,7 +67,9 @@ tools = [
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Step 3: Run and Test
 
 That's it! When you run `yumi wake-up` and start your conversation:
@@ -70,3 +79,4 @@ That's it! When you run `yumi wake-up` and start your conversation:
 3.  The backend runs your local python request, passes the result back, and she speaks the answer with a matching smile!
 
 Proceed to the [Integration section](/integration/websocket-protocol) to see how to connect other clients to Yumi!
+</ContentCard>

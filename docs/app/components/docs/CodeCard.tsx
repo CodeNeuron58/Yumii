@@ -1,14 +1,15 @@
 import React from 'react';
 import { codeToHtml } from 'shiki';
-import CopyButton from './CopyButton';
+import CopyButton from '../../CopyButton';
 
-interface CodeBlockProps {
+interface CodeCardProps {
   language?: string;
-  children: string;
+  code: string;
 }
 
-export default async function CodeBlock({ language = 'bash', children }: CodeBlockProps) {
-  const codeString = typeof children === 'string' ? children.trim() : String(children).trim();
+export default async function CodeCard({ language = 'bash', code = '' }: CodeCardProps) {
+  console.log("CodeCard received code:", typeof code, code);
+  const codeString = code ? code.trim() : '';
   
   const displayLang = language === 'bash' || language === 'sh' 
     ? 'bash' 
@@ -27,9 +28,9 @@ export default async function CodeBlock({ language = 'bash', children }: CodeBlo
   }
 
   return (
-    <div className="command-block">
-      <div className="command-block-body" dangerouslySetInnerHTML={{ __html: html }} />
-      <div className="command-block-actions">
+    <div className="code-card">
+      <div className="code-card-body" dangerouslySetInnerHTML={{ __html: html }} />
+      <div className="code-card-actions">
         <CopyButton code={codeString} />
       </div>
     </div>

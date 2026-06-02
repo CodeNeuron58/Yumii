@@ -687,6 +687,32 @@ pre {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.docs-section-container.layout-cards {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 18px 0 40px;
+}
+
+.layout-cards .docs-hero {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 32px;
+  padding-right: 32px;
+  margin-top: 0;
+  padding-top: 16px;
+  border: none;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.layout-cards .breadcrumb {
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
 @media (max-width: 760px) {
   .docs-section-container {
     padding: 24px 20px;
@@ -804,13 +830,32 @@ h1#yumi,
   z-index: -1;
 }
 
+.docs-hero-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.docs-hero-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(72, 255, 171, 0.08);
+  border: 1px solid rgba(72, 255, 171, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-accent);
+}
+
 .docs-hero-title {
   font-family: var(--font-header);
   font-size: 2.4rem;
   font-weight: 600;
   letter-spacing: -0.03em;
   color: #ffffff;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .docs-hero-subtitle {
@@ -928,7 +973,21 @@ h1#yumi,
 .docs-feature-list.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .docs-feature-list.cols-4 { grid-template-columns: repeat(4, 1fr); }
 
-/* Docs Card */
+.content-card {
+  background: rgba(14, 18, 23, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 24px 32px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 760px) {
+  .content-card {
+    padding: 20px 24px;
+  }
+}
+
+/* Typography */
 .docs-card {
   position: relative;
   background: rgba(14, 18, 23, 0.5);
@@ -1181,6 +1240,44 @@ h1#yumi,
 }
 .docs-step-item:last-child .docs-step-content {
   padding-bottom: 0;
+}
+
+/* New Icon-based Steps */
+.docs-step-item.with-icon {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.docs-step-item.with-icon:first-child {
+  padding-top: 8px;
+}
+.docs-step-item.with-icon:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.docs-step-icon-wrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(72, 255, 171, 0.05);
+  border: 1px solid rgba(72, 255, 171, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-accent);
+  flex-shrink: 0;
+}
+.docs-step-item.with-icon .docs-step-content {
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.docs-step-title {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .accordion-group {
@@ -1756,38 +1853,33 @@ li code {
 
 /* Command Block (Premium Code Snippets) */
 .command-block {
-  background: rgba(13, 17, 23, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #06080a; /* Very dark background to pop off the card */
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   overflow: hidden;
   margin: 24px 0;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
-}
-
-.command-block-header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4); /* Inner shadow for depth */
 }
 
-.command-block-lang {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: lowercase;
+.command-block-actions {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
 }
 
 .command-copy-btn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
+  padding: 8px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1796,15 +1888,20 @@ li code {
 
 .command-copy-btn:hover {
   color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .command-copy-btn.copied {
   color: #4ade80; /* Success green */
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(74, 222, 128, 0.1);
 }
 
 .command-block-body {
-  padding: 16px;
+  padding: 20px 24px;
+  padding-right: 64px; /* Give room for absolute copy button */
+  flex: 1;
   overflow-x: auto;
 }
 
@@ -1815,6 +1912,46 @@ li code {
 }
 
 .command-block-body code {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+/* Code Card Component */
+.code-card {
+  background: #06080a; /* Deep dark black */
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 24px 0;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.code-card-actions {
+  position: absolute;
+  right: 12px;
+  top: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.code-card-body {
+  padding: 16px 20px;
+  padding-right: 64px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.code-card-body pre {
+  margin: 0;
+  background: transparent !important; 
+  padding: 0 !important;
+}
+
+.code-card-body code {
   font-family: var(--font-mono);
   font-size: 0.85rem;
   line-height: 1.6;

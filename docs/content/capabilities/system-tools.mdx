@@ -1,12 +1,17 @@
 ---
 title: "Built-in System Tools"
 description: "How Yumi utilizes LangChain tools to interact with your system."
+layout: "cards"
+icon: "settings"
 ---
 
+<ContentCard>
 Yumi is equipped with tool-calling capabilities. When she needs to fetch external data or run a task, she can execute functional tools in the background before formulating her final spoken response.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🛠️ The Time Tool Example
 
 Yumi's default system tool is `get_current_time`, which is loaded inside `src/yumi/tools/` and exposed to the LLM agent registry inside `llm.py`.
@@ -21,9 +26,12 @@ Yumi's default system tool is `get_current_time`, which is loaded inside `src/yu
     *   `motion`: `"nod"`
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Modifying Existing Tools
 
 Tools are declared inside `src/yumi/tools/` as standard LangChain structured tools. You can adjust parameters or update prompts easily.
 
 To see how to write completely new custom tools (like weather checkers or computer controls), proceed to the [Writing Custom Tools](/capabilities/custom-tools) page!
+</ContentCard>

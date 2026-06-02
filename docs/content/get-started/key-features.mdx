@@ -1,31 +1,42 @@
 ---
 title: "Key Features"
 description: "A detailed breakdown of the features that make Yumi a unique companion."
+layout: "cards"
+icon: "star"
 ---
 
+<ContentCard>
 Yumi is engineered with an emphasis on local performance, visual fluidness, and cryptographic security.
+</ContentCard>
 
+<ContentCard>
 ## 🎙️ Real-time Voice Capture (VAD & STT)
 *   **Zero-Config Microphone Streams**: Handled via standard HTML5 media devices over WebSockets.
 *   **Silero Neural speech detection**: Runs locally on CPU with extremely high accuracy, ignoring keyboard clicks and room echoes.
 *   **Ultra-Fast Whisper Inference**: Choose local Faster-Whisper (quantized to `int8` for fast CPU processing) or Cloud-based Groq Whisper for 150ms transcription latencies.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🧠 State-of-the-Art Brain (LangGraph)
 *   **Structured Output Control**: Leverages Pydantic schemas to bound LLM output format strictly, preventing structural errors.
 *   **Tool Integration**: LangChain tools allow Yumi to call local system tools, fetch weather, read dates, and coordinate functions.
 *   **Hot-Swappable Persona Matrix**: Instantly change Yumi's behavior mid-sentence. Features six customized personalities.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🗣️ Lifelike Lip Sync & Expressive Visuals (Live2D)
 *   **Sub-Second Streaming Audio**: ElevenLabs or CAMB.ai streaming audio chunks are pushed over WebSockets directly to the web client.
 *   **Real-time Waveform RMS Lip Sync**: Computes the amplitude of playing sound buffers on the fly to open/close her mouth naturally in perfect sync with the voice.
 *   **Fluid Visuals**: Powered by PixiJS 6 and Cubism SDK for high-performance GPU-accelerated rendering inside the browser.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🔐 Hardware-Encrypted Security (OS Keychain)
 *   **Zero Plaintext Keys on Disk**: Unlike common setups that write API keys to `.env` or configuration JSON files, Yumi leverages the `keyring` package.
 *   **OS-Level Vault Storage**: Saves keys securely inside:
@@ -34,3 +45,4 @@ Yumi is engineered with an emphasis on local performance, visual fluidness, and 
     *   **Linux**: GNOME Keyring / KWallet via `libsecret`.
 
 Ready to get started? Head directly to [Attuning Senses](/get-started/attuning-senses) to set up your APIs!
+</ContentCard>

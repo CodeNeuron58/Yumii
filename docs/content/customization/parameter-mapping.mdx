@@ -1,14 +1,19 @@
 ---
 title: "Expression & Motion Parameter Mapping"
 description: "How to bind LLM-generated emotions to custom Live2D physics parameters in the browser client."
+layout: "cards"
+icon: "sliders-horizontal"
 ---
 
+<ContentCard>
 When the LLM outputs a structured emotion like `expression: "shy"` or `motion: "nod"`, Yumi's frontend must map these abstract terms to the specific animation and expression files defined inside your custom Live2D model.
 
 Here is how to customize this parameter mapping to support any avatar.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Modifying the Expression Map
 
 Open `src/yumi/assets/webui/index.html` and locate the `EXPRESSION_MAP` configuration (around line 123):
@@ -30,11 +35,13 @@ const EXPRESSION_MAP = {
 *   The **Values** (`baozhen`, `angry`, `cry`, etc.) represent the exact **filenames** of the `.exp3.json` expression files located inside your custom model folder (without the `.exp3.json` file extension).
 *   If your model has a custom blush expression named `blush.exp3.json` that you want to trigger when she is `shy`, update the map:
     ```javascript
-    "shy": "blush",
-    ```
+"shy": "blush",
+```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## Modifying the Motion Map
 
 Similarly, locate `MOTION_MAP` (around line 134):
@@ -56,9 +63,10 @@ const MOTION_MAP = {
 *   The **Values** represent the **motion group names** defined in your model's `.model3.json` file under the `"Groups"` or `"Motions"` definitions.
 *   If your custom model features a specific waving motion group named `"wave"`, and you want Yumi to play it during greetings, update the map:
     ```javascript
-    "greeting": "wave",
-    ```
+"greeting": "wave",
+```
 
 Save `index.html` and reload the browser tab. Yumi will now animate your custom models with complete anatomical precision!
 
 Proceed to the [Personality Prompts](/customization/personality-prompts) page to customize her voice lines!
+</ContentCard>

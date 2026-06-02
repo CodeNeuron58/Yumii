@@ -1,8 +1,11 @@
 ---
 title: "WebSocket Events Protocol"
 description: "A complete schema specification of binary audio streams and JSON events exchanged with Yumi's backend."
+layout: "cards"
+icon: "cable"
 ---
 
+<ContentCard>
 Yumi leverages a real-time WebSocket connection to transmit raw user microphone audio, system status updates, synthesized speech segments, and emotional visuals.
 
 *   **Default Endpoint**: `ws://localhost:8000/ws`
@@ -11,7 +14,9 @@ Yumi leverages a real-time WebSocket connection to transmit raw user microphone 
     *   **Server to Client**: Transmits **JSON event payloads** and **base64-encoded audio frames**.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 1. Client to Server (Input)
 
 ### Raw Microphone Chunks
@@ -20,7 +25,9 @@ Yumi leverages a real-time WebSocket connection to transmit raw user microphone 
 *   **Interval**: Sent every 250 - 300 milliseconds.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 2. Server to Client (Output)
 
 The backend streams structured JSON events to all active WebSocket connections.
@@ -78,3 +85,4 @@ Fired when a cloud provider fails or credentials are invalid, displaying the iss
 ```
 
 Proceed to the [REST API Reference](/integration/rest-api) page to learn about HTTP endpoints!
+</ContentCard>

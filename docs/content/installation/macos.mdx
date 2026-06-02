@@ -1,10 +1,15 @@
 ---
 title: "macOS Installation"
 description: "How to set up and run Yumi natively on macOS (Intel and Apple Silicon)."
+layout: "cards"
+icon: "command"
 ---
 
+<ContentCard>
 Yumi is fully compatible with macOS, operating natively on both Intel (x86_64) and Apple Silicon (M1/M2/M3) architectures.
+</ContentCard>
 
+<ContentCard>
 ## ⚡ One-Line Quick Install
 
 Open a standard Terminal window and run the automated bash installation script:
@@ -22,7 +27,9 @@ curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh |
 6.  Pins a global shell alias so typing `yumi` works everywhere.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🛠️ macOS Audio Permissions & Dependencies
 
 Because of macOS's strict sandbox security, a couple of steps are required to ensure audio capture and keyring storage work flawlessly:
@@ -39,3 +46,4 @@ Apple Silicon chips include hardware matrix coprocessors (AMX) that accelerate l
 *   **Keyring Security**: Yumi securely commits your API keys to the **macOS Keychain Access** utility. The first time she queries the keychain, macOS will display a secure system dialog asking for your password or TouchID to authorize access. Select **Always Allow**.
 
 Proceed to the [Linux Installation](/installation/linux) or [Core Senses](/senses/vad) sections to learn more!
+</ContentCard>

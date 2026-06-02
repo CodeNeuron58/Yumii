@@ -1,8 +1,11 @@
 ---
 title: "Quickstart"
 description: "Give Yumi her senses and wake her up in under 2 minutes."
+layout: "cards"
+icon: "rocket"
 ---
 
+<ContentCard>
 ## Prerequisites
 
 Before meeting Yumi, ensure you have the following installed on your machine:
@@ -18,8 +21,10 @@ Before meeting Yumi, ensure you have the following installed on your machine:
     Required to speak to Yumi. Ensure permissions are enabled.
   </DocsCard>
 </FeatureList>
+</ContentCard>
 
-## 1. Installation
+<ContentCard>
+## <span style={{ color: 'var(--text-accent)' }}>1. Installation</span>
 
 First, clone the Yumi repository to your local machine and navigate into the directory.
 
@@ -37,7 +42,9 @@ uv sync
 <Callout type="warning" title="Warning: Do not use pip">
   Do not use `pip install`. Yumi pins `torch` to a CPU-only build to keep the installation light. Using pip will try to download the full 2 GB CUDA version.
 </Callout>
+</ContentCard>
 
+<ContentCard>
 ## 2. Attunement (First-Time Setup)
 
 Yumi needs an LLM to think and a Text-to-Speech provider to speak. 
@@ -78,18 +85,22 @@ Since this is your first time, Yumi will automatically guide you through her **A
 <Callout type="success" title="Local First Security">
   Keys are stored securely in your local environment file (`.env`). They are never transmitted anywhere except directly to the providers you chose.
 </Callout>
+</ContentCard>
 
+<ContentCard>
 ## 3. Waking Her Up
 
 Once configured, simply select **"🌸 Wake Yumi Up"** from the main dashboard menu (or run `uv run yumi wake-up`).
 
 <StepsList>
-  <div>The backend server will initialize and listen on port `8000`.</div>
-  <div>A browser tab will automatically open to `http://localhost:8000/`.</div>
-  <div>Allow microphone permissions if prompted by your browser.</div>
-  <div>Say hello to Yumi!</div>
+  <Step icon="terminal" title="The backend server will initialize and listen on port 8000." />
+  <Step icon="monitor" title="A browser tab will automatically open to http://localhost:8000/." />
+  <Step icon="waveform-lines" title="Allow microphone permissions if prompted by your browser." />
+  <Step icon="face-smile" title="Say hello to Yumi!" />
 </StepsList>
+</ContentCard>
 
+<ContentCard>
 ## Troubleshooting
 
 <AccordionGroup>
@@ -100,3 +111,4 @@ Once configured, simply select **"🌸 Wake Yumi Up"** from the main dashboard m
     Check the terminal output. If you don't see `[Voice Activity Detected]`, your microphone might be muted or not set as the default system input device.
   </Accordion>
 </AccordionGroup>
+</ContentCard>

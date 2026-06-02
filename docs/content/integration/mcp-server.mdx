@@ -1,14 +1,19 @@
 ---
 title: "Model Context Protocol (MCP)"
 description: "How to configure Yumi as an MCP server to share local tools with external LLM apps."
+layout: "cards"
+icon: "server"
 ---
 
+<ContentCard>
 Yumi supports the **Model Context Protocol (MCP)**, a standard created to let AI tools safely expose local capabilities (like terminal commands or system states) to third-party LLM clients.
 
 By activating her MCP bridge, you can connect Yumi's registry of system tools directly into apps like **Claude Desktop** or **Cursor**.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🛠️ Step 1: Initialize Yumi's MCP Endpoint
 
 Yumi implements an MCP transport layer in her backend package under `src/yumi/mcp/`. 
@@ -21,7 +26,9 @@ uv run yumi mcp start
 This establishes an MCP server pipeline listening on standard inputs/outputs (stdio), ready to receive tool executions.
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 💻 Step 2: Configure Claude Desktop Integration
 
 To let your desktop AI chat utilize Yumi's tools, register her in your local Claude config file:
@@ -50,7 +57,9 @@ Add Yumi to your `"mcpServers"` object:
 ```
 
 ---
+</ContentCard>
 
+<ContentCard>
 ## 🚀 Step 3: Test the Connection
 
 1.  Restart **Claude Desktop**.
@@ -59,3 +68,4 @@ Add Yumi to your `"mcpServers"` object:
 4.  Claude will call Yumi's `get_current_time` tool securely in the background, return the output, and display the result.
 
 Proceed to the [Ops & Reference section](/ops/troubleshooting) to troubleshoot and optimize performance!
+</ContentCard>
