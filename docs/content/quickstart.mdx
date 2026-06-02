@@ -7,11 +7,17 @@ description: "Give Yumi her senses and wake her up in under 2 minutes."
 
 Before meeting Yumi, ensure you have the following installed on your machine:
 
-- **Python 3.12+**
-- **A modern web browser** (Chrome, Edge, Firefox)
-- **Microphone access** enabled on your system.
-
----
+<FeatureList cols={3}>
+  <DocsCard title="Python 3.12+" icon="rocket">
+    Ensure you have the latest Python version installed on your machine.
+  </DocsCard>
+  <DocsCard title="Modern Browser" icon="layout-dashboard">
+    Chrome, Edge, or Firefox are recommended for WebGL.
+  </DocsCard>
+  <DocsCard title="Microphone" icon="waveform-lines">
+    Required to speak to Yumi. Ensure permissions are enabled.
+  </DocsCard>
+</FeatureList>
 
 ## 1. Installation
 
@@ -28,8 +34,9 @@ Install the dependencies using `uv` (required — do NOT use pip):
 uv sync
 ```
 
-> **Note:** Do not use `pip install`. Yumi pins `torch` to a CPU-only build.
-> Using pip will try to download the full 2 GB CUDA version.
+<Callout type="warning" title="Warning: Do not use pip">
+  Do not use `pip install`. Yumi pins `torch` to a CPU-only build to keep the installation light. Using pip will try to download the full 2 GB CUDA version.
+</Callout>
 
 ## 2. Attunement (First-Time Setup)
 
@@ -53,26 +60,35 @@ Or without activating:
 uv run yumi
 ```
 
-> **Tip:** After activation, you can just type `yumi` for the rest of your terminal session.
-> If you used the one-line installer, `yumi` always works globally without activation.
+<Callout type="info" title="Global Execution">
+  After activation, you can just type `yumi` for the rest of your terminal session. If you used the one-line installer, `yumi` always works globally without activation.
+</Callout>
 
 Since this is your first time, Yumi will automatically guide you through her **Attunement** process. You will be prompted to provide:
 
-1. **LLM API Key** (We highly recommend [Groq](https://console.groq.com/) for its blazing fast speed).
-2. **TTS API Key** (We recommend [ElevenLabs](https://elevenlabs.io/) for lifelike expression).
+<FeatureList cols={2}>
+  <DocsCard title="LLM API Key" icon="cube">
+    We highly recommend [Groq](https://console.groq.com/) for its blazing fast speed.
+  </DocsCard>
+  <DocsCard title="TTS API Key" icon="face-smile">
+    We recommend [ElevenLabs](https://elevenlabs.io/) for lifelike expression.
+  </DocsCard>
+</FeatureList>
 
-<Info>
-  Keys are stored securely in your local environment. They are never transmitted anywhere except directly to the providers you chose.
-</Info>
+<Callout type="success" title="Local First Security">
+  Keys are stored securely in your local environment file (`.env`). They are never transmitted anywhere except directly to the providers you chose.
+</Callout>
 
 ## 3. Waking Her Up
 
 Once configured, simply select **"🌸 Wake Yumi Up"** from the main dashboard menu (or run `uv run yumi wake-up`).
 
-1. The backend server will initialize on port `8000`.
-2. A browser tab will automatically open to `http://localhost:8000/`.
-3. Allow microphone permissions if prompted.
-4. Say hello!
+<StepsList>
+  <div>The backend server will initialize and listen on port `8000`.</div>
+  <div>A browser tab will automatically open to `http://localhost:8000/`.</div>
+  <div>Allow microphone permissions if prompted by your browser.</div>
+  <div>Say hello to Yumi!</div>
+</StepsList>
 
 ## Troubleshooting
 

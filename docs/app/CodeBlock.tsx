@@ -1,44 +1,38 @@
-'use client';
-
-import React, { useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import React from 'react';
+import { codeToHtml } from 'shiki';
+import CopyButton from './CopyButton';
 
 interface CodeBlockProps {
   language?: string;
   children: string;
 }
 
-export default function CodeBlock({ language = 'bash', children }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false);
-
-  const codeString = typeof children === 'string' 
-    ? children.trim() 
-    : children;
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(codeString);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy code: ', err);
-    }
-  };
-
-  // Nice capitalized language display
+export default async function CodeBlock({ language = 'bash', children }: CodeBlockProps) {
+  const codeString = typeof children === 'string' ? children.trim() : String(children).trim();
+  
   const displayLang = language === 'bash' || language === 'sh' 
-    ? 'BASH' 
+    ? 'bash' 
     : language === 'powershell' || language === 'ps1' 
-    ? 'POWERSHELL' 
-    : language.toUpperCase();
+    ? 'powershell' 
+    : language;
+
+  let html = '';
+  try {
+    html = await codeToHtml(codeString, {
+      lang: displayLang,
+      theme: 'github-dark' 
+    });
+  } catch (e) {
+    html = `<pre><code>${codeString}</code></pre>`;
+  }
 
   return (
-    <div className="custom-code-block">
-      <div className="code-block-content">
-        <pre>
-          <code>{codeString}</code>
-        </pre>
+    <div className="command-block">
+      <div className="command-block-header">
+        <div className="command-block-lang">{displayLang}</div>
+        <CopyButton code={codeString} />
       </div>
+      <div className="command-block-body" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
 }

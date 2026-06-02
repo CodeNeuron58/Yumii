@@ -1,44 +1,44 @@
 ---
 title: "Yumi"
-sidebarTitle: "Overview"
+description: "Real-time AI companion for terminal-native interaction."
+hideHero: true
 ---
 
-<div className="subtitle">
-  Real-time <span className="highlight">AI companion</span> for terminal-native interaction.
-</div>
+<MascotHero 
+  title="Yumi" 
+  subtitle="Real-time AI companion for terminal-native interaction." 
+/>
 
-<HeroSection />
-
-<CardGroup cols={4}>
-  <Card
+<FeatureList cols={4}>
+  <DocsCard
     title="Get Started"
     icon="rocket"
     href="/quickstart"
   >
     Install Yumi locally and launch your companion.
-  </Card>
-  <Card
+  </DocsCard>
+  <DocsCard
     title="Core Senses"
     icon="waveform-lines"
     href="/senses/vad"
   >
     Configure Voice Activity Detection, STT, and TTS.
-  </Card>
-  <Card
+  </DocsCard>
+  <DocsCard
     title="Personalities"
     icon="face-smile"
     href="/customization/personality-prompts"
   >
     Explore Yumi's personas and emotional tones.
-  </Card>
-  <Card
+  </DocsCard>
+  <DocsCard
     title="Capabilities"
     icon="cube"
     href="/capabilities/system-tools"
   >
     Extend Yumi with system tools and persistent memory.
-  </Card>
-</CardGroup>
+  </DocsCard>
+</FeatureList>
 
 ## What is Yumi?
 
@@ -51,11 +51,23 @@ dynamically, and synchronizes her facial expressions to the emotional tone of he
 
 ## Key Features
 
-* **Real-time Voice Recognition:** Captures and processes your voice seamlessly using local, low-latency Whisper models.
-* **Lifelike Voice Synthesis:** Utilizes ElevenLabs TTS for incredibly realistic, high-quality, and expressive voice generation.
-* **Dynamic Visuals:** Brought to life using HTML5, WebSockets, and Live2D, Yumi reacts to your conversations with fluid body movements.
-* **Emotional Intelligence:** Powered by LLMs (Groq, OpenAI, Anthropic), Yumi's expressions dynamically change based on the emotional context of the dialogue.
-* **Interactive Terminal Dashboard:** A beautiful, fully interactive CLI to configure and launch her easily.
+<FeatureList cols={2}>
+  <DocsCard title="Real-time Voice Recognition" icon="waveform-lines">
+    Captures and processes your voice seamlessly using local, low-latency Whisper models.
+  </DocsCard>
+  <DocsCard title="Lifelike Voice Synthesis" icon="face-smile">
+    Utilizes ElevenLabs TTS for incredibly realistic, high-quality, and expressive voice generation.
+  </DocsCard>
+  <DocsCard title="Dynamic Visuals" icon="cube">
+    Brought to life using HTML5, WebSockets, and Live2D, Yumi reacts to your conversations with fluid body movements.
+  </DocsCard>
+  <DocsCard title="Emotional Intelligence" icon="rocket">
+    Powered by LLMs (Groq, OpenAI, Anthropic), Yumi's expressions dynamically change based on the emotional context of the dialogue.
+  </DocsCard>
+  <DocsCard title="Interactive Terminal Dashboard" icon="layout-dashboard">
+    A beautiful, fully interactive CLI to configure and launch her easily.
+  </DocsCard>
+</FeatureList>
 
 ## The Architecture
 
