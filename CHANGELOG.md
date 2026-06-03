@@ -34,9 +34,8 @@ against the current engine yet.
   gradient vision reader, and a guided first-run Attunement wizard.
 - One-line installers for Windows (`install.ps1`) and macOS / Linux
   (`install.sh`) that pin `torch` to the CPU-only wheel index.
-- 31 unit tests covering the audio pipeline, credential store, global
-  config, personality manager, conversation state contract, and a
-  smoke-test pass for every top-level module.
+- 24 unit tests covering the audio pipeline, credential store, global
+  config, personality manager, and conversation state contract.
 
 ### Changed
 - `uv` is the only supported package manager. `pip` will try to
