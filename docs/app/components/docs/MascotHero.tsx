@@ -20,7 +20,7 @@ export default function MascotHero({ title, subtitle }: MascotHeroProps) {
         <img
           src="/docs/mascot.png"
           className="mascot-hero-img"
-          alt="Yumi"
+          alt="Yumii"
         />
         <div className="mascot-hero-fade"></div>
       </div>

@@ -1,12 +1,12 @@
 ---
 title: "Voice Synthesis & Lip Sync"
-description: "How Yumi streams voice audio and calculates Root Mean Square waveform values for high-fidelity lip sync."
+description: "How Yumii streams voice audio and calculates Root Mean Square waveform values for high-fidelity lip sync."
 layout: "cards"
 icon: "volume-2"
 ---
 
 <ContentCard>
-Yumi leverages modern Text-to-Speech (TTS) streaming APIs to produce warm, natural vocal responses. Once audio is generated, she synchronizes her mouth movements in real time.
+Yumii leverages modern Text-to-Speech (TTS) streaming APIs to produce warm, natural vocal responses. Once audio is generated, she synchronizes her mouth movements in real time.
 
 ---
 </ContentCard>
@@ -14,11 +14,11 @@ Yumi leverages modern Text-to-Speech (TTS) streaming APIs to produce warm, natur
 <ContentCard>
 ## 1. Streaming Audio Pipeline
 
-Yumi supports two streaming TTS providers:
+Yumii supports two streaming TTS providers:
 
 ### ElevenLabs
-*   **Method**: Streams audio chunks in real-time. Yumi requests the raw audio bytes (typically `mp3` or `pcm_24000` formats) over an active HTTP stream.
-*   **WebSocket broadcast**: As bytes arrive from the API, Yumi streams them directly to the browser via the WebSocket in raw binary audio chunks (`audio_chunk`).
+*   **Method**: Streams audio chunks in real-time. Yumii requests the raw audio bytes (typically `mp3` or `pcm_24000` formats) over an active HTTP stream.
+*   **WebSocket broadcast**: As bytes arrive from the API, Yumii streams them directly to the browser via the WebSocket in raw binary audio chunks (`audio_chunk`).
 
 ### CAMB.ai
 *   **Method**: High-performance alternative streaming engine, delivering high-fidelity vocal tracks in real-time.
@@ -31,7 +31,7 @@ Yumi supports two streaming TTS providers:
 
 Once the browser WebUI receives the audio chunks, it feeds the stream into a Web Audio API `AudioContext` and routes it through an `AnalyserNode`.
 
-To synchronize Yumi's mouth openings to the actual spoken sounds, a high-frequency `requestAnimationFrame` loop calculates the **Root Mean Square (RMS)** amplitude of the playing audio waveform in real time.
+To synchronize Yumii's mouth openings to the actual spoken sounds, a high-frequency `requestAnimationFrame` loop calculates the **Root Mean Square (RMS)** amplitude of the playing audio waveform in real time.
 
 ```
 [ Playing Audio ] ──► [ AnalyserNode ] ──► [ Compute RMS Amplitude ]
@@ -44,7 +44,7 @@ The mathematical computation executed in `index.html` is:
 $$\text{RMS} = \sqrt{\frac{1}{N}\sum_{i=1}^{N} x_i^2}$$
 
 ```javascript
-// JavaScript implementation in Yumi's WebUI
+// JavaScript implementation in Yumii's WebUI
 const pcmData = new Float32Array(analyser.fftSize);
 analyser.getFloatTimeDomainData(pcmData);
 

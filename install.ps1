@@ -1,12 +1,12 @@
-# Yumi Installer for Windows (PowerShell)
-# Usage: irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.ps1 | iex
+# Yumii Installer for Windows (PowerShell)
+# Usage: irm https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "  ________________________________________" -ForegroundColor Magenta
 Write-Host "  |                                      |" -ForegroundColor Magenta
-Write-Host "  |    Yumi  Installation Script        |" -ForegroundColor Magenta
+Write-Host "  |    Yumii  Installation Script        |" -ForegroundColor Magenta
 Write-Host "  |    Real-Time AI Companion            |" -ForegroundColor Magenta
 Write-Host "  |______________________________________|" -ForegroundColor Magenta
 Write-Host ""
@@ -70,24 +70,24 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     $gitVer = git --version 2>&1
     Write-Host "    Found $gitVer" -ForegroundColor Green
 }
-# Step 3: Install Yumi
-Write-Host "[3/3] Installing Yumi..." -ForegroundColor Cyan
+# Step 3: Install Yumii
+Write-Host "[3/3] Installing Yumii..." -ForegroundColor Cyan
 Write-Host "    (Downloading dependencies, this may take a few minutes)" -ForegroundColor DarkGray
 
 try {
-    uv tool install git+https://github.com/CodeNeuron58/Yumi.git
+    uv tool install git+https://github.com/CodeNeuron58/Yumii.git
 } catch {
     Write-Host ""
     Write-Host "  ERROR: Installation failed." -ForegroundColor Red
-    Write-Host "  Try manually: uv tool install git+https://github.com/CodeNeuron58/Yumi.git" -ForegroundColor Yellow
+    Write-Host "  Try manually: uv tool install git+https://github.com/CodeNeuron58/Yumii.git" -ForegroundColor Yellow
     exit 1
 }
 
 Write-Host ""
-Write-Host "  Yumi has been installed!" -ForegroundColor Green
+Write-Host "  Yumii has been installed!" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Run her with:" -ForegroundColor White
-Write-Host "      yumi" -ForegroundColor Magenta
+Write-Host "      yumii" -ForegroundColor Magenta
 Write-Host ""
-Write-Host "  GitHub: https://github.com/CodeNeuron58/Yumi" -ForegroundColor DarkGray
+Write-Host "  GitHub: https://github.com/CodeNeuron58/Yumii" -ForegroundColor DarkGray
 Write-Host ""

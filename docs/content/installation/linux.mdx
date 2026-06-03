@@ -1,12 +1,12 @@
 ---
 title: "Linux Installation"
-description: "How to set up and run Yumi on Ubuntu, Debian, Fedora, and Arch Linux."
+description: "How to set up and run Yumii on Ubuntu, Debian, Fedora, and Arch Linux."
 layout: "cards"
 icon: "cpu"
 ---
 
 <ContentCard>
-Yumi is fully compatible with standard Linux distributions. Since she leverages local audio processing libraries, certain system-level dependencies must be installed first.
+Yumii is fully compatible with standard Linux distributions. Since she leverages local audio processing libraries, certain system-level dependencies must be installed first.
 </ContentCard>
 
 <ContentCard>
@@ -15,7 +15,7 @@ Yumi is fully compatible with standard Linux distributions. Since she leverages 
 Open your terminal and execute:
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.sh | sh
 ```
 
 ---
@@ -24,7 +24,7 @@ curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh
 <ContentCard>
 ## 🛠️ Required System Dependencies
 
-Before Yumi can capture mic streams on Linux, you must install development headers for `portaudio` and `asound`, which are used by Python’s `sounddevice` package.
+Before Yumii can capture mic streams on Linux, you must install development headers for `portaudio` and `asound`, which are used by Python’s `sounddevice` package.
 
 ### Ubuntu / Debian
 ```bash
@@ -42,7 +42,7 @@ sudo dnf install -y portaudio-devel alsa-lib-devel git
 sudo pacman -Sy portaudio alsa-lib git
 ```
 
-> **Do not install `python3-pip`.** Yumi is managed exclusively by `uv`.
+> **Do not install `python3-pip`.** Yumii is managed exclusively by `uv`.
 > The installer script installs `uv` for you, and `uv tool install` then
 > handles the rest. Mixing `pip` and `uv` will try to download the full
 > 2 GB CUDA build of `torch` and likely fail.
@@ -53,7 +53,7 @@ sudo pacman -Sy portaudio alsa-lib git
 <ContentCard>
 ## 🔐 Keyring & Secrets Management on Linux
 
-Yumi secures your API credentials using the OS keychain via the `keyring` Python library. 
+Yumii secures your API credentials using the OS keychain via the `keyring` Python library. 
 
 Depending on your desktop environment, ensure the following is configured:
 *   **GNOME Desktop**: Uses `gnome-keyring`. It works automatically.

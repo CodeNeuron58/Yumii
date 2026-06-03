@@ -6,7 +6,7 @@ icon: "stethoscope"
 ---
 
 <ContentCard>
-If you run into issues launching the dashboard, connecting your microphone, or getting Yumi's voice outputs, follow this comprehensive troubleshooting registry.
+If you run into issues launching the dashboard, connecting your microphone, or getting Yumii's voice outputs, follow this comprehensive troubleshooting registry.
 
 ---
 </ContentCard>
@@ -40,7 +40,7 @@ set KMP_DUPLICATE_LIB_OK=TRUE
 ## 🎙️ Microphone & Audio Issues
 
 ### Speech Not Detected (`[Voice Activity Detected]` is missing)
-*   **Symptom**: You talk to Yumi but nothing happens, and your terminal console does not register speech.
+*   **Symptom**: You talk to Yumii but nothing happens, and your terminal console does not register speech.
 *   **The Fix**:
     1.  Verify that your default system recording device is unmuted and capturing audio.
     2.  If running inside a browser overlay (like OBS or Custom Chrome), ensure that browser page has been granted **Microphone Access**.
@@ -53,12 +53,12 @@ set KMP_DUPLICATE_LIB_OK=TRUE
 ## 🔑 API & Secret Keys Issues
 
 ### Authentication Failures (ElevenLabs or Groq)
-*   **Symptom**: Subtitles show error messages or Yumi responds with fallback dialogue.
+*   **Symptom**: Subtitles show error messages or Yumii responds with fallback dialogue.
 *   **The Fix**:
     1.  API keys are saved in your OS Keychain, not in `.env` files.
     2.  Re-run the configuration wizard to overwrite corrupt keys:
         ```bash
-yumi --config
+yumii --config
 ```
     3.  Select **Configure Senses** and re-paste your active credentials.
 

@@ -1,12 +1,12 @@
 ---
 title: "Structured Outputs & Expression Control"
-description: "How Yumi utilizes Pydantic to command physical motions and expressions on the Live2D model."
+description: "How Yumii utilizes Pydantic to command physical motions and expressions on the Live2D model."
 layout: "cards"
 icon: "braces"
 ---
 
 <ContentCard>
-Yumi is not just a voice text reader. To feel like an active presence, she must move her body, blink, gesture, and show emotions that match the words she says.
+Yumii is not just a voice text reader. To feel like an active presence, she must move her body, blink, gesture, and show emotions that match the words she says.
 
 This co-expressive capability is achieved via **Structured Outputs** bound through Pydantic.
 
@@ -14,12 +14,12 @@ This co-expressive capability is achieved via **Structured Outputs** bound throu
 </ContentCard>
 
 <ContentCard>
-## The YumiResponse Schema
+## The YumiiResponse Schema
 
-Instead of returning raw text paragraphs, the LLM is forced (using native tool calling / structured response APIs) to populate the `YumiResponse` schema defined in `src/yumi/agent/llm.py`:
+Instead of returning raw text paragraphs, the LLM is forced (using native tool calling / structured response APIs) to populate the `YumiiResponse` schema defined in `src/yumii/agent/llm.py`:
 
 ```python
-class YumiResponse(BaseModel):
+class YumiiResponse(BaseModel):
     response_text: str  # The spoken reply (concise, <= 3 sentences)
     expression: str     # smile, angry, sad, surprise, scared, shy, normal
     motion: str         # nod, shakehead, tilthead, fidget, forward, lookaway, greeting, idle
@@ -55,7 +55,7 @@ live2dModel.expression("smile"); // Plays the smile expression
     live2dModel.motion("nod");         // Triggers a nodding motion
 ```
 
-This results in Yumi smiling, nodding, or looking shy *exactly* at the moment she begins speaking her thoughts!
+This results in Yumii smiling, nodding, or looking shy *exactly* at the moment she begins speaking her thoughts!
 
 Proceed to [Voice Synthesis](/senses/voice-synthesis) to see how her voice audio is generated and synced!
 </ContentCard>

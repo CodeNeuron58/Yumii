@@ -750,7 +750,7 @@ h1 {
   text-wrap: balance;
 }
 
-h1#yumi,
+h1#yumii,
 .front-title {
   font-family: var(--font-display) !important;
   font-size: clamp(2.5rem, 6vw, 3.8rem) !important;

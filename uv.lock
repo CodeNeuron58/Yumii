@@ -3841,7 +3841,7 @@ wheels = [
 ]
 
 [[package]]
-name = "yumi"
+name = "yumii"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

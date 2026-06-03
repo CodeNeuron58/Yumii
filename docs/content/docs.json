@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Yumi",
+  "name": "Yumii",
   "theme": "maple",
   "fonts": {
     "family": "Sora",
@@ -18,8 +18,8 @@
     "css": ["globals.css"]
   },
   "logo": {
-    "dark": "/images/yumi-nav.png",
-    "light": "/images/yumi-nav.png"
+    "dark": "/images/yumii-nav.png",
+    "light": "/images/yumii-nav.png"
   },
   "favicon": "/favicon.svg",
   "colors": {
@@ -31,7 +31,7 @@
     {
       "name": "GitHub",
       "icon": "github",
-      "url": "https://github.com/CodeNeuron58/Yumi"
+      "url": "https://github.com/CodeNeuron58/Yumii"
     },
     {
       "name": "Discord",
@@ -49,7 +49,7 @@
             "group": "Overview",
             "pages": [
               "introduction",
-              "get-started/what-is-yumi",
+              "get-started/what-is-yumii",
               "get-started/showcase",
               "get-started/key-features"
             ]
@@ -193,7 +193,7 @@
     ]
   },
   "footerSocials": {
-    "github": "https://github.com/CodeNeuron58/Yumi",
+    "github": "https://github.com/CodeNeuron58/Yumii",
     "discord": "https://discord.gg/YOUR_DISCORD_INVITE"
   }
 }

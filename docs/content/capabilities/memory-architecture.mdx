@@ -1,6 +1,6 @@
 ---
 title: "State & Memory Architecture"
-description: "How Yumi maintains conversational memory in v1 — and what is planned for v1.1."
+description: "How Yumii maintains conversational memory in v1 — and what is planned for v1.1."
 layout: "cards"
 icon: "network"
 ---
@@ -8,8 +8,8 @@ icon: "network"
 <ContentCard>
 ## What v0.1.0 actually does
 
-Yumi v0.1.0 uses **LangGraph's `InMemorySaver`** checkpointer
-(`src/yumi/agent/graph.py`):
+Yumii v0.1.0 uses **LangGraph's `InMemorySaver`** checkpointer
+(`src/yumii/agent/graph.py`):
 
 ```python
 from langgraph.checkpoint.memory import InMemorySaver
@@ -23,7 +23,7 @@ This means:
 * Conversation history is preserved **for the lifetime of one running
   server process**.
 * The checkpointer is keyed by `thread_id`. The current engine uses a
-  single hardcoded thread (`yumi_session_1`), so all WebSocket clients
+  single hardcoded thread (`yumii_session_1`), so all WebSocket clients
   share the same history.
 * **Restarting the server clears all memory.** There is no disk-backed
   storage in v1.
@@ -44,7 +44,7 @@ storage layers:
 
 1. **Conversation log** — every `(turn_id, role, content, timestamp)`
    tuple appended to a SQLite database at
-   `~/.yumi/memory/conversations.db`. Append-only.
+   `~/.yumii/memory/conversations.db`. Append-only.
 2. **User facts** — a `UserFacts` table
    `(user_id, key, value, source_turn_id, last_seen)` populated by a
    lightweight extraction step (probably an LLM pass at the end of each
@@ -76,7 +76,7 @@ cleanest path is to fork `graph.py` and swap the checkpointer:
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 async with AsyncSqliteSaver.from_conn_string(
-    "~/.yumi/memory/checkpoints.db"
+    "~/.yumii/memory/checkpoints.db"
 ) as saver:
     app = workflow.compile(checkpointer=saver)
 ```

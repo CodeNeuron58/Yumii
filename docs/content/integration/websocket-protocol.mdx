@@ -1,12 +1,12 @@
 ---
 title: "WebSocket Events Protocol"
-description: "A complete schema specification of binary audio streams and JSON events exchanged with Yumi's backend."
+description: "A complete schema specification of binary audio streams and JSON events exchanged with Yumii's backend."
 layout: "cards"
 icon: "cable"
 ---
 
 <ContentCard>
-Yumi leverages a real-time WebSocket connection to transmit raw user microphone audio, system status updates, synthesized speech segments, and emotional visuals.
+Yumii leverages a real-time WebSocket connection to transmit raw user microphone audio, system status updates, synthesized speech segments, and emotional visuals.
 
 *   **Default Endpoint**: `ws://localhost:8000/ws`
 *   **Data Types**:
@@ -33,7 +33,7 @@ Yumi leverages a real-time WebSocket connection to transmit raw user microphone 
 The backend streams structured JSON events to all active WebSocket connections.
 
 ### A. Speech Interruption (`interrupt`)
-Fired instantly when the local VAD detects speech onset while Yumi is speaking:
+Fired instantly when the local VAD detects speech onset while Yumii is speaking:
 ```json
 {
   "type": "interrupt"
@@ -64,10 +64,10 @@ Fired once the complete TTS vocal track has finished streaming, signaling the cl
 ---
 
 ### D. Legacy Static Audio Package
-If using static TTS providers like ElevenLabs (non-streaming), Yumi transmits the full package in a single transaction:
+If using static TTS providers like ElevenLabs (non-streaming), Yumii transmits the full package in a single transaction:
 ```json
 {
-  "text": "Hello! I am Yumi, your companion.",
+  "text": "Hello! I am Yumii, your companion.",
   "expression": "smile",
   "motion": "greeting",
   "audio": "UklGRtbY... [Full base64 MP3/WAV binary payload]"

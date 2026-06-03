@@ -1,4 +1,4 @@
-"""Backward-compatibility wrapper for starting the Yumi API server."""
+"""Backward-compatibility wrapper for starting the Yumii API server."""
 
 import os
 
@@ -8,7 +8,7 @@ if __name__ == "__main__":
     import uvicorn
 
     # Import the FastAPI app from the new modular structure
-    from yumi.api.server import app
+    from yumii.api.server import app
 
-    print("Starting Yumi server from backward-compatibility wrapper...")
+    print("Starting Yumii server from backward-compatibility wrapper...")
     uvicorn.run(app, host="0.0.0.0", port=8000)

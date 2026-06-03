@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from yumi.core import global_config
+from yumii.core import global_config
 
 
 @pytest.fixture

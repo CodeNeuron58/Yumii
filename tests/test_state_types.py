@@ -4,7 +4,7 @@ These tests pin the shape of `MainState` so that any future change to
 the conversation state is intentional and visible in code review.
 """
 
-from yumi.core.types import PERSONALITY_TYPE, MainState
+from yumii.core.types import PERSONALITY_TYPE, MainState
 
 
 def test_main_state_has_required_fields() -> None:

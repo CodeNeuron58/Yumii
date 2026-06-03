@@ -1,6 +1,6 @@
-# How to Contribute to Yumi
+# How to Contribute to Yumii
 
-Thank you for your interest in contributing! Yumi is designed to be open and modular.
+Thank you for your interest in contributing! Yumii is designed to be open and modular.
 
 ## Prerequisites
 
@@ -16,8 +16,8 @@ Thank you for your interest in contributing! Yumi is designed to be open and mod
 
 1. Fork the repository on GitHub and clone your fork:
    ```bash
-   git clone https://github.com/CodeNeuron58/Yumi.git
-   cd Yumi
+   git clone https://github.com/CodeNeuron58/Yumii.git
+   cd Yumii
    ```
 
 2. Install all dependencies (including dev tools):
@@ -28,19 +28,19 @@ Thank you for your interest in contributing! Yumi is designed to be open and mod
    > CPU-only wheel index via `[tool.uv.sources]` in `pyproject.toml`.
    > Regular pip will download the full CUDA build (~2 GB) or fail.
 
-3. Run Yumi to set up your API keys. Either activate the venv first:
+3. Run Yumii to set up your API keys. Either activate the venv first:
    ```bash
    # Windows
    .venv\Scripts\activate
-   yumi
+   yumii
 
    # macOS / Linux
    source .venv/bin/activate
-   yumi
+   yumii
    ```
    Or skip activation:
    ```bash
-   uv run yumi
+   uv run yumii
    ```
    The first-run wizard stores your keys securely in your OS keychain.
    Do **not** create a `.env` file — it will have no effect.
@@ -61,7 +61,7 @@ Run all three before opening a PR. Make sure to add tests for any new functional
 ## Project Structure
 
 ```
-src/yumi/
+src/yumii/
   agent/          # LangGraph state machine + LLM agent
   api/            # FastAPI server + WebSocket broadcast
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
@@ -74,7 +74,7 @@ src/yumi/
   cli.py          # Typer CLI entry point
 ```
 
-> Avatar files go in `~/.yumi/avatar/` (user-provided, not bundled in the package).
+> Avatar files go in `~/.yumii/avatar/` (user-provided, not bundled in the package).
 
 ## Pull Requests
 

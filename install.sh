@@ -1,10 +1,10 @@
 #!/bin/sh
-# Yumi Installer for macOS / Linux
-# Usage: curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
+# Yumii Installer for macOS / Linux
+# Usage: curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.sh | sh
 
 set -e
 
-REPO="https://github.com/CodeNeuron58/Yumi.git"
+REPO="https://github.com/CodeNeuron58/Yumii.git"
 PINK='\033[1;35m'
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 echo ""
 printf "${PINK}  ________________________________________${NC}\n"
 printf "${PINK}  |                                      |${NC}\n"
-printf "${PINK}  |    Yumi  Installation Script        |${NC}\n"
+printf "${PINK}  |    Yumii  Installation Script        |${NC}\n"
 printf "${PINK}  |    Real-Time AI Companion            |${NC}\n"
 printf "${PINK}  |______________________________________|${NC}\n"
 echo ""
@@ -80,8 +80,8 @@ else
     printf "    ${GREEN}Found $GIT_VER${NC}\n"
 fi
 
-# ── Step 3: Install Yumi ─────────────────────────────────────────────────────
-printf "${CYAN}[3/3] Installing Yumi...${NC}\n"
+# ── Step 3: Install Yumii ─────────────────────────────────────────────────────
+printf "${CYAN}[3/3] Installing Yumii...${NC}\n"
 printf "    ${GRAY}(Downloading CPU-only PyTorch + dependencies, this may take a few minutes)${NC}\n"
 
 if ! uv tool install "git+${REPO}"; then
@@ -93,10 +93,10 @@ fi
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
-printf "  ${GREEN}✅  Yumi has been installed!${NC}\n"
+printf "  ${GREEN}✅  Yumii has been installed!${NC}\n"
 echo ""
 printf "  Run her with:\n"
-printf "      ${PINK}yumi${NC}\n"
+printf "      ${PINK}yumii${NC}\n"
 echo ""
-printf "  ${GRAY}GitHub:  https://github.com/CodeNeuron58/Yumi${NC}\n"
+printf "  ${GRAY}GitHub:  https://github.com/CodeNeuron58/Yumii${NC}\n"
 echo ""

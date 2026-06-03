@@ -1,12 +1,12 @@
 ---
 title: "macOS Installation"
-description: "How to set up and run Yumi natively on macOS (Intel and Apple Silicon)."
+description: "How to set up and run Yumii natively on macOS (Intel and Apple Silicon)."
 layout: "cards"
 icon: "command"
 ---
 
 <ContentCard>
-Yumi is fully compatible with macOS, operating natively on both Intel (x86_64) and Apple Silicon (M1/M2/M3) architectures.
+Yumii is fully compatible with macOS, operating natively on both Intel (x86_64) and Apple Silicon (M1/M2/M3) architectures.
 </ContentCard>
 
 <ContentCard>
@@ -15,13 +15,13 @@ Yumi is fully compatible with macOS, operating natively on both Intel (x86_64) a
 Open a standard Terminal window and run the automated bash installation script:
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.sh | sh
 ```
 
 ### What this script does:
 1.  Installs the `uv` package manager securely via the official Astral installer.
-2.  Runs `uv tool install git+https://github.com/CodeNeuron58/Yumi.git` — installs Yumi as a uv-managed tool (no manual clone, no separate venv). The CPU-only PyTorch wheel pin in `pyproject.toml` is honored automatically.
-3.  The `yumi` command becomes globally available — `uv tool install` puts it on `~/.local/bin` for you, no shell alias needed.
+2.  Runs `uv tool install git+https://github.com/CodeNeuron58/Yumii.git` — installs Yumii as a uv-managed tool (no manual clone, no separate venv). The CPU-only PyTorch wheel pin in `pyproject.toml` is honored automatically.
+3.  The `yumii` command becomes globally available — `uv tool install` puts it on `~/.local/bin` for you, no shell alias needed.
 
 ### Prerequisites
 
@@ -36,15 +36,15 @@ curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh
 Because of macOS's strict sandbox security, a couple of steps are required to ensure audio capture and keyring storage work flawlessly:
 
 ### 1. Terminal Microphone Permissions
-If you run Yumi through a terminal emulator (like Terminal, iTerm2, or VS Code), that app must be granted permission to access your microphone.
+If you run Yumii through a terminal emulator (like Terminal, iTerm2, or VS Code), that app must be granted permission to access your microphone.
 1.  Go to **System Settings > Privacy & Security > Microphone**.
 2.  Ensure your terminal app (e.g. `Terminal` or `iTerm2`) is toggled **ON**.
-3.  If Yumi still fails to hear you, try running her from a clean terminal window so macOS can trigger the native permission prompt.
+3.  If Yumii still fails to hear you, try running her from a clean terminal window so macOS can trigger the native permission prompt.
 
 ### 2. Apple Silicon (M1/M2/M3) Optimization
 Apple Silicon chips include hardware matrix coprocessors (AMX) that accelerate local speech recognition.
 *   **Performance**: If using **Local Whisper** on Apple Silicon, execution is extremely fast and light.
-*   **Keyring Security**: Yumi securely commits your API keys to the **macOS Keychain Access** utility. The first time she queries the keychain, macOS will display a secure system dialog asking for your password or TouchID to authorize access. Select **Always Allow**.
+*   **Keyring Security**: Yumii securely commits your API keys to the **macOS Keychain Access** utility. The first time she queries the keychain, macOS will display a secure system dialog asking for your password or TouchID to authorize access. Select **Always Allow**.
 
 Proceed to the [Linux Installation](/installation/linux) or [Core Senses](/senses/vad) sections to learn more!
 </ContentCard>

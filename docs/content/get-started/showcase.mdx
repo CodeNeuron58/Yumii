@@ -1,22 +1,22 @@
 ---
 title: "Showcase & Demos"
-description: "See Yumi in action and experience her real-time conversational capabilities."
+description: "See Yumii in action and experience her real-time conversational capabilities."
 layout: "cards"
 icon: "monitor-play"
 ---
 
 <ContentCard>
-Yumi is brought to life by bringing together multiple real-time pipelines. Below are core demonstrations of how she interacts, speaks, and switches personas on the fly.
+Yumii is brought to life by bringing together multiple real-time pipelines. Below are core demonstrations of how she interacts, speaks, and switches personas on the fly.
 </ContentCard>
 
 <ContentCard>
 ## Real-Time Conversation
 
-Unlike standard chatbots that require you to press buttons, Yumi streams audio continuously. As soon as you finish speaking, her Silero VAD triggers transcription, and she begins thinking.
+Unlike standard chatbots that require you to press buttons, Yumii streams audio continuously. As soon as you finish speaking, her Silero VAD triggers transcription, and she begins thinking.
 
 ```
-User: "Hey Yumi, what time is it?"
-Yumi: *Nods head, tilts slightly* "It's exactly 3:15 PM! Hope you are having a productive afternoon!"
+User: "Hey Yumii, what time is it?"
+Yumii: *Nods head, tilts slightly* "It's exactly 3:15 PM! Hope you are having a productive afternoon!"
 ```
 
 ---
@@ -25,7 +25,7 @@ Yumi: *Nods head, tilts slightly* "It's exactly 3:15 PM! Hope you are having a p
 <ContentCard>
 ## Personality Hot-Swapping
 
-Yumi supports six core personalities, which you can switch by simply asking her to change. Watch how her language, expressions, and posture shift immediately:
+Yumii supports six core personalities, which you can switch by simply asking her to change. Watch how her language, expressions, and posture shift immediately:
 
 ### 1. Caring (Default)
 *   **Vibe**: Empathetic, warm, encouraging.
@@ -48,12 +48,12 @@ Yumi supports six core personalities, which you can switch by simply asking her 
 <ContentCard>
 ## Barge-In (Speech Interruption)
 
-One of Yumi's most realistic features is **barge-in** (modeled after advanced voice systems like Gemini Live). 
+One of Yumii's most realistic features is **barge-in** (modeled after advanced voice systems like Gemini Live). 
 
-1.  While Yumi is speaking out loud, you can start talking.
+1.  While Yumii is speaking out loud, you can start talking.
 2.  The local **Silero VAD** instantly detects speech onset.
 3.  An `audio_start/interrupt` socket message is fired.
-4.  The WebUI instantly cuts the playing audio buffer, Yumi closes her mouth, and she transitions back into her listening state.
+4.  The WebUI instantly cuts the playing audio buffer, Yumii closes her mouth, and she transitions back into her listening state.
 
 This makes conversations feel like a dialogue rather than a series of one-way monologues.
 To experience this yourself, proceed to the [Your First Conversation](/get-started/first-conversation) guide.

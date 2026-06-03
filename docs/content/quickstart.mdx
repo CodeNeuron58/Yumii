@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Give Yumi her senses and wake her up in under 2 minutes."
+description: "Give Yumii her senses and wake her up in under 2 minutes."
 layout: "cards"
 icon: "rocket"
 ---
@@ -8,7 +8,7 @@ icon: "rocket"
 <ContentCard>
 ## Prerequisites
 
-Before meeting Yumi, ensure you have the following installed on your machine:
+Before meeting Yumii, ensure you have the following installed on your machine:
 
 <FeatureList cols={3}>
   <DocsCard title="Python 3.12+" icon="rocket">
@@ -18,7 +18,7 @@ Before meeting Yumi, ensure you have the following installed on your machine:
     Chrome, Edge, or Firefox are recommended for WebGL.
   </DocsCard>
   <DocsCard title="Microphone" icon="waveform-lines">
-    Required to speak to Yumi. Ensure permissions are enabled.
+    Required to speak to Yumii. Ensure permissions are enabled.
   </DocsCard>
 </FeatureList>
 </ContentCard>
@@ -26,11 +26,11 @@ Before meeting Yumi, ensure you have the following installed on your machine:
 <ContentCard>
 ## <span style={{ color: 'var(--text-accent)' }}>1. Installation</span>
 
-First, clone the Yumi repository to your local machine and navigate into the directory.
+First, clone the Yumii repository to your local machine and navigate into the directory.
 
 ```bash
-git clone https://github.com/CodeNeuron58/Yumi.git
-cd Yumi
+git clone https://github.com/CodeNeuron58/Yumii.git
+cd Yumii
 ```
 
 Install the dependencies using `uv` (required — do NOT use pip):
@@ -40,14 +40,14 @@ uv sync
 ```
 
 <Callout type="warning" title="Warning: Do not use pip">
-  Do not use `pip install`. Yumi pins `torch` to a CPU-only build to keep the installation light. Using pip will try to download the full 2 GB CUDA version.
+  Do not use `pip install`. Yumii pins `torch` to a CPU-only build to keep the installation light. Using pip will try to download the full 2 GB CUDA version.
 </Callout>
 </ContentCard>
 
 <ContentCard>
 ## 2. Attunement (First-Time Setup)
 
-Yumi needs an LLM to think and a Text-to-Speech provider to speak. 
+Yumii needs an LLM to think and a Text-to-Speech provider to speak. 
 
 Run the interactive dashboard.
 
@@ -55,23 +55,23 @@ If you activated your virtual environment:
 ```bash
 # Windows
 .venv\Scripts\activate
-yumi
+yumii
 
 # macOS / Linux
 source .venv/bin/activate
-yumi
+yumii
 ```
 
 Or without activating:
 ```bash
-uv run yumi
+uv run yumii
 ```
 
 <Callout type="info" title="Global Execution">
-  After activation, you can just type `yumi` for the rest of your terminal session. If you used the one-line installer, `yumi` always works globally without activation.
+  After activation, you can just type `yumii` for the rest of your terminal session. If you used the one-line installer, `yumii` always works globally without activation.
 </Callout>
 
-Since this is your first time, Yumi will automatically guide you through her **Attunement** process. You will be prompted to provide:
+Since this is your first time, Yumii will automatically guide you through her **Attunement** process. You will be prompted to provide:
 
 <FeatureList cols={2}>
   <DocsCard title="LLM API Key" icon="cube">
@@ -94,13 +94,13 @@ Since this is your first time, Yumi will automatically guide you through her **A
 <ContentCard>
 ## 3. Waking Her Up
 
-Once configured, simply select **"🌸 Wake Yumi Up"** from the main dashboard menu (or run `uv run yumi wake-up`).
+Once configured, simply select **"🌸 Wake Yumii Up"** from the main dashboard menu (or run `uv run yumii wake-up`).
 
 <StepsList>
   <Step icon="terminal" title="The backend server will initialize and listen on port 8000." />
   <Step icon="monitor" title="A browser tab will automatically open to http://localhost:8000/." />
   <Step icon="waveform-lines" title="Allow microphone permissions if prompted by your browser." />
-  <Step icon="face-smile" title="Say hello to Yumi!" />
+  <Step icon="face-smile" title="Say hello to Yumii!" />
 </StepsList>
 </ContentCard>
 
@@ -109,7 +109,7 @@ Once configured, simply select **"🌸 Wake Yumi Up"** from the main dashboard m
 
 <AccordionGroup>
   <Accordion title="I get a KMP_DUPLICATE_LIB_OK error">
-    This is common on Windows with `faster-whisper`. The Yumi CLI automatically attempts to patch this by setting the environment variable internally, but if it persists, ensure you don't have conflicting OpenMP libraries installed.
+    This is common on Windows with `faster-whisper`. The Yumii CLI automatically attempts to patch this by setting the environment variable internally, but if it persists, ensure you don't have conflicting OpenMP libraries installed.
   </Accordion>
   <Accordion title="She isn't responding to my voice">
     Check the terminal output. If you don't see `[Voice Activity Detected]`, your microphone might be muted or not set as the default system input device.

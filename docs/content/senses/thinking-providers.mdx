@@ -1,12 +1,12 @@
 ---
 title: "Thinking (LLM) Providers"
-description: "A comparison of LLM engines that drive Yumi's intelligence and persona responses."
+description: "A comparison of LLM engines that drive Yumii's intelligence and persona responses."
 layout: "cards"
 icon: "brain-circuit"
 ---
 
 <ContentCard>
-Yumi is compatible with three major Large Language Model providers. You can choose which model acts as her "Mind" depending on your speed, cost, and intelligence preferences.
+Yumii is compatible with three major Large Language Model providers. You can choose which model acts as her "Mind" depending on your speed, cost, and intelligence preferences.
 
 ---
 </ContentCard>
@@ -44,9 +44,9 @@ Yumi is compatible with three major Large Language Model providers. You can choo
 <ContentCard>
 ## Model Initialization & Caching (`llm.py`)
 
-To optimize system memory and speed, Yumi implements **lazy instantiation** and **caching** of the LLM agents inside `src/yumi/agent/llm.py`:
+To optimize system memory and speed, Yumii implements **lazy instantiation** and **caching** of the LLM agents inside `src/yumii/agent/llm.py`:
 
-*   When you switch personalities (e.g. from *Caring* to *Tsundere*), Yumi builds the prompt and compiles the LangChain agent for that personality.
+*   When you switch personalities (e.g. from *Caring* to *Tsundere*), Yumii builds the prompt and compiles the LangChain agent for that personality.
 *   She caches this instance inside `_agent_cache`. 
 *   Subsequent responses or personality switches back to previously loaded personas are instantaneous, requiring zero compile overhead!
 

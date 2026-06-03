@@ -1,17 +1,17 @@
 ---
 title: "Configuration & Schema Definitions"
-description: "A reference catalog of ~/.yumi/config.json configurations, settings defaults, and Pydantic models."
+description: "A reference catalog of ~/.yumii/config.json configurations, settings defaults, and Pydantic models."
 layout: "cards"
 icon: "file-json"
 ---
 
 <ContentCard>
-Yumi stores non-sensitive user preferences and sensory defaults inside a standard configuration directory in your home directory.
+Yumii stores non-sensitive user preferences and sensory defaults inside a standard configuration directory in your home directory.
 
 *   **Config Directory**:
-    *   **Windows**: `C:\Users\YourName\.yumi\`
-    *   **macOS / Linux**: `~/.yumi/`
-*   **Preferences File**: `~/.yumi/config.json`
+    *   **Windows**: `C:\Users\YourName\.yumii\`
+    *   **macOS / Linux**: `~/.yumii/`
+*   **Preferences File**: `~/.yumii/config.json`
 
 ---
 </ContentCard>
@@ -56,8 +56,8 @@ All sensitive credential strings are saved to the OS secure database under dedic
 <ContentCard>
 ## ⚙️ Pydantic Configuration Model Settings (`config.py`)
 
-On start, `src/yumi/core/config.py` runs a load script:
-1.  Queries the non-sensitive parameters from `~/.yumi/config.json`.
+On start, `src/yumii/core/config.py` runs a load script:
+1.  Queries the non-sensitive parameters from `~/.yumii/config.json`.
 2.  Queries the secure credentials from the OS Keychain.
 3.  Injects all values into `os.environ`.
 4.  Compiles the `Settings(BaseSettings)` Pydantic container:
@@ -70,5 +70,5 @@ class Settings(BaseSettings):
 
 This ensures that the entire code ecosystem has secure, seamless access to the configuration via the global `settings` object!
 
-You are now fully attuned to the operational mechanics of Yumi. Go ahead and start customizing your companion!
+You are now fully attuned to the operational mechanics of Yumii. Go ahead and start customizing your companion!
 </ContentCard>

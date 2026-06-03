@@ -1,4 +1,4 @@
-# 🌸 Yumi Roadmap
+# 🌸 Yumii Roadmap
 
 This document tracks what is **shipped**, what is **in progress**, and
 what is **planned**. Anything not listed under "Shipped" is not in the
@@ -33,13 +33,13 @@ persistent memory, and tool registry are all in place.
 The next release. Focus: **memory**.
 
 - **Persistent conversation log.** Append every turn to a SQLite
-  database at `~/.yumi/memory/conversations.db`. The log survives
+  database at `~/.yumii/memory/conversations.db`. The log survives
   server restarts. No vector store yet — keyword matching.
 - **User-facts table.** A `UserFacts` table stores small extracted
   facts ("user is vegetarian", "user's timezone is IST"). Populated
   by a periodic extraction step (likely an LLM pass at the end of
   each session).
-- **Per-WebSocket session IDs.** The current `yumi_session_1`
+- **Per-WebSocket session IDs.** The current `yumii_session_1`
   hardcoded thread becomes per-connection, so multiple browser tabs
   no longer share conversation history.
 - **A `/forget-me` CLI command** that wipes the local memory store,
@@ -65,11 +65,11 @@ The flagship release. Focus: **agentic capabilities**.
 - **Confirmation gates.** Side-effecting tools (anything that
   changes the world — sends email, books, orders) pause the engine
   and emit a `{"type": "confirmation_request"}` WebSocket event.
-  The frontend shows a "Yumi wants to do X. Approve?" overlay.
+  The frontend shows a "Yumii wants to do X. Approve?" overlay.
   Voice + button both work.
 - **MCP server transport.** Once the tool registry exists, expose it
   over the Model Context Protocol so Claude Desktop, Cursor, and
-  other clients can call Yumi's tools.
+  other clients can call Yumii's tools.
 - **A first real integration.** Likely Google Calendar (read-only)
   or Google Tasks — both have clean OAuth flows, real value, and no
   legal grey area.
@@ -84,7 +84,7 @@ The flagship release. Focus: **agentic capabilities**.
 - **Local TTS (Kokoro or similar).** A fully offline TTS provider
   for users who don't want to depend on ElevenLabs or CAMB.ai.
   Currently in research.
-- **Proactive reach-outs.** Yumi is currently 100% reactive. The
+- **Proactive reach-outs.** Yumii is currently 100% reactive. The
   vision is for her to occasionally check in unprompted ("It's been
   a long day — how are you holding up?"). This requires a scheduler
   and a permission model, both of which are open design questions.
@@ -93,8 +93,8 @@ The flagship release. Focus: **agentic capabilities**.
 
 ## 🗑️ Explicitly NOT planned
 
-- A web-only no-install version of Yumi. The whole point is local.
-- Closed-source cloud-hosted Yumi. The project's value is that
+- A web-only no-install version of Yumii. The whole point is local.
+- Closed-source cloud-hosted Yumii. The project's value is that
   every line of the brain is editable.
 - A mobile app. The browser-based Live2D client works on mobile
   browsers; a native app would be a different project.

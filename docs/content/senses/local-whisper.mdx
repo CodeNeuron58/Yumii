@@ -6,7 +6,7 @@ icon: "hard-drive"
 ---
 
 <ContentCard>
-If you want a fully private, offline companion experience, Yumi's local speech-to-text pipeline runs entirely on your own machine. No voice data or recordings are transmitted to the cloud.
+If you want a fully private, offline companion experience, Yumii's local speech-to-text pipeline runs entirely on your own machine. No voice data or recordings are transmitted to the cloud.
 
 This is powered by **`faster-whisper`**, a highly optimized translation of OpenAI's Whisper model utilizing CTranslate2.
 
@@ -18,7 +18,7 @@ This is powered by **`faster-whisper`**, a highly optimized translation of OpenA
 
 To run Whisper efficiently on home CPUs, `faster-whisper` quantizes the floating-point weights into 8-bit integers (`int8`). This reduces the memory footprint and accelerates matrix multiplications on standard processors by up to 4×.
 
-When attuning Yumi, you can choose from three model scales:
+When attuning Yumii, you can choose from three model scales:
 
 | Model Scale | Disk Footprint | CPU Memory Usage | Latency (Per Sentence) | Accuracy Vibe |
 | :--- | :--- | :--- | :--- | :--- |
@@ -30,9 +30,9 @@ When attuning Yumi, you can choose from three model scales:
 </ContentCard>
 
 <ContentCard>
-## Speed Optimizations inside Yumi
+## Speed Optimizations inside Yumii
 
-To keep local transcription latencies under 1 second, Yumi implements specific greedy configurations inside `src/yumi/audio/stt.py`:
+To keep local transcription latencies under 1 second, Yumii implements specific greedy configurations inside `src/yumii/audio/stt.py`:
 
 *   **Greedy Decoding (`beam_size=1`)**: Instead of exploring multiple transcription paths (beam search), the engine performs greedy decoding, selecting the absolute most probable token at each step. This drops latency significantly with a negligible accuracy trade-off.
 *   **VAD Pre-Filtering**: Raw audio is already trimmed of leading/trailing silence by Silero VAD before it is fed to Whisper. Whisper does not waste CPU cycles analyzing silent audio frames.

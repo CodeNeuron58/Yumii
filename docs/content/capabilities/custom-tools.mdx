@@ -1,12 +1,12 @@
 ---
 title: "Writing Custom Tools"
-description: "A step-by-step tutorial on extending Yumi's brain with new Python capabilities."
+description: "A step-by-step tutorial on extending Yumii's brain with new Python capabilities."
 layout: "cards"
 icon: "hammer"
 ---
 
 <ContentCard>
-Want to let Yumi check your local weather, look at your calendar, or play your favorite Spotify playlist? 
+Want to let Yumii check your local weather, look at your calendar, or play your favorite Spotify playlist? 
 
 You can easily write custom tools in Python and expose them directly to her LangGraph agent. Follow this tutorial to build one.
 
@@ -17,7 +17,7 @@ You can easily write custom tools in Python and expose them directly to her Lang
 ## Step 1: Write Your Python Tool
 
 Open the tools initialization file or add a new file inside:
-`src/yumi/tools/`
+`src/yumii/tools/`
 
 Let's write a simple **Weather Checker** tool using standard LangChain `@tool` decorators:
 
@@ -53,11 +53,11 @@ async def get_current_weather(location: str) -> str:
 <ContentCard>
 ## Step 2: Register Your Tool
 
-To make Yumi's LLM aware of the weather tool, add it to the tools list inside `src/yumi/tools/__init__.py`:
+To make Yumii's LLM aware of the weather tool, add it to the tools list inside `src/yumii/tools/__init__.py`:
 
 ```python
-from yumi.tools.time_tool import get_current_time
-from yumi.tools.weather_tool import get_current_weather  # Import your new tool
+from yumii.tools.time_tool import get_current_time
+from yumii.tools.weather_tool import get_current_weather  # Import your new tool
 
 # Expose as a combined list
 tools = [
@@ -72,11 +72,11 @@ tools = [
 <ContentCard>
 ## Step 3: Run and Test
 
-That's it! When you run `yumi wake-up` and start your conversation:
+That's it! When you run `yumii wake-up` and start your conversation:
 
-1.  Ask: *"Hey Yumi, what is the weather like in Paris?"*
-2.  Yumi's LLM will automatically decide to execute the `get_current_weather` tool with `location="Paris"`.
+1.  Ask: *"Hey Yumii, what is the weather like in Paris?"*
+2.  Yumii's LLM will automatically decide to execute the `get_current_weather` tool with `location="Paris"`.
 3.  The backend runs your local python request, passes the result back, and she speaks the answer with a matching smile!
 
-Proceed to the [Integration section](/integration/websocket-protocol) to see how to connect other clients to Yumi!
+Proceed to the [Integration section](/integration/websocket-protocol) to see how to connect other clients to Yumii!
 </ContentCard>

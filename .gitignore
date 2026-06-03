@@ -11,8 +11,8 @@ wheels/
 .env
 
 Trash/
-src/yumi/Yumi_Avatar/
-src/yumi/webui/test.html
+src/yumii/Yumii_Avatar/
+src/yumii/webui/test.html
 
 # Old docs backup
 docs-old/
@@ -24,7 +24,7 @@ docs/thought_process.md
 Experiments/
 *.wav
 
-# Assets — user-provided Live2D models live in ~/.yumi/avatar/, not here
+# Assets — user-provided Live2D models live in ~/.yumii/avatar/, not here
 assets/avatar/
 
 # IDE / OS clutter

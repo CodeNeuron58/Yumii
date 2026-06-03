@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Yumi will be documented in this file.
+All notable changes to Yumii will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
@@ -14,11 +14,11 @@ against the current engine yet.
 
 ### Added
 - Real-time voice conversation loop: Silero VAD → STT → LangGraph agent → TTS.
-- Live2D avatar driven by LLM structured output (`YumiResponse` with
+- Live2D avatar driven by LLM structured output (`YumiiResponse` with
   `response_text`, `expression`, `motion`).
 - Six built-in personalities: `caring`, `tsundere`, `genki`, `kuudere`,
   `yandere`, `dandere`. Personality prompts are plain text files in
-  `src/yumi/assets/prompts/`.
+  `src/yumii/assets/prompts/`.
 - Hot-swappable personality mid-conversation ("switch to tsundere").
 - Three LLM providers: Groq (default, Llama-3.3-70b), OpenAI (gpt-4o),
   Anthropic (claude-3-5-sonnet). Swappable via the Attunement wizard.
@@ -63,15 +63,15 @@ against the current engine yet.
 - **No planning / tool-execution agent loop.** A single LLM call
   produces one response. Multi-step tasks (e.g. "order food", "book
   a ride") are not supported. Planned for v2.0.
-- **No MCP server.** Yumi does not yet expose its tool registry over
+- **No MCP server.** Yumii does not yet expose its tool registry over
   the Model Context Protocol. Planned for v2.0.
-- **No multimodal vision.** Yumi cannot see your screen or webcam.
+- **No multimodal vision.** Yumii cannot see your screen or webcam.
   Planned for a post-v2.0 milestone.
 - **Single shared conversation.** All WebSocket clients share one
-  `thread_id` (`yumi_session_1`). Multi-user support is not in scope
+  `thread_id` (`yumii_session_1`). Multi-user support is not in scope
   for the v0.1.x line.
 
 ## [0.x] — pre-release history
 
-Prior to v0.1.0, Yumi was developed in a non-public form. Earlier
+Prior to v0.1.0, Yumii was developed in a non-public form. Earlier
 versions existed only as personal builds and were not tagged.

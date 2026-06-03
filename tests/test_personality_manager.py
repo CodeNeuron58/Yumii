@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from yumi.agent.personality_manager import (
+from yumii.agent.personality_manager import (
     PERSONALITY_DESCRIPTIONS,
     PersonalityManager,
     personality_manager,
@@ -13,7 +13,7 @@ from yumi.agent.personality_manager import (
 
 def test_all_six_personalities_have_files():
     """Every advertised personality must have a corresponding prompt file."""
-    prompts_dir = Path(__file__).parent.parent / "src" / "yumi" / "assets" / "prompts"
+    prompts_dir = Path(__file__).parent.parent / "src" / "yumii" / "assets" / "prompts"
     for name in PERSONALITY_DESCRIPTIONS:
         path = prompts_dir / f"{name}.txt"
         assert path.exists(), f"Missing prompt file: {path}"

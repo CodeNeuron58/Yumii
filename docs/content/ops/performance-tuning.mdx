@@ -6,7 +6,7 @@ icon: "gauge"
 ---
 
 <ContentCard>
-Yumi is optimized to run smoothly entirely on standard home CPUs, requiring no heavy discrete graphics cards (GPUs). To achieve sub-second response times, apply these performance tuning parameters.
+Yumii is optimized to run smoothly entirely on standard home CPUs, requiring no heavy discrete graphics cards (GPUs). To achieve sub-second response times, apply these performance tuning parameters.
 
 ---
 </ContentCard>
@@ -14,15 +14,15 @@ Yumi is optimized to run smoothly entirely on standard home CPUs, requiring no h
 <ContentCard>
 ## ⚡ 1. Accelerating Speech-to-Text (STT)
 
-Local transcription is typically the heaviest computational step in Yumi's sensory loop.
+Local transcription is typically the heaviest computational step in Yumii's sensory loop.
 
 ### A. Choose the Right Model Size
-To change model scales, run `yumi --config` and choose **Local Whisper**:
+To change model scales, run `yumii --config` and choose **Local Whisper**:
 *   **`tiny`**: Takes ~200ms to transcribe. Best for budget notebooks or single-board computers (Raspberry Pi 5).
 *   **`base`**: Takes ~500ms to transcribe. Highly accurate, handles standard phrasing easily. Recommended default.
 
 ### B. Adjust CPU Core Threads
-By default, `faster-whisper` dynamically selects the number of CPU threads based on your hardware configuration. If your CPU has limited cores, or is running hot, you can throttle thread counts in `src/yumi/audio/stt.py` to prevent CPU resource locks:
+By default, `faster-whisper` dynamically selects the number of CPU threads based on your hardware configuration. If your CPU has limited cores, or is running hot, you can throttle thread counts in `src/yumii/audio/stt.py` to prevent CPU resource locks:
 ```python
 # In stt.py initialization
 self.model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=4)
@@ -48,7 +48,7 @@ The size of your system prompt and the length of your active chat history can de
 <ContentCard>
 ## 🗣️ 3. Audio Client Echo Cancellation
 
-To prevent Yumi from "hearing herself" talk through your laptop speakers (which would trigger the local VAD, interrupt her voice, and launch a feedback loop), Yumi implements strict audio constraints on the client mic:
+To prevent Yumii from "hearing herself" talk through your laptop speakers (which would trigger the local VAD, interrupt her voice, and launch a feedback loop), Yumii implements strict audio constraints on the client mic:
 
 ```javascript
 // WebUI microphone configuration in index.html

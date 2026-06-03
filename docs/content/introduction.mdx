@@ -1,11 +1,11 @@
 ---
-title: "Yumi"
+title: "Yumii"
 description: "Open-source AI companion with a Live2D avatar, real-time voice conversation, and switchable personalities. Runs on CPU. Alpha — v0.1.0."
 hideHero: true
 ---
 
 <MascotHero
-  title="Yumi"
+  title="Yumii"
   subtitle="Open-source AI companion with voice and a Live2D avatar. Runs on CPU. v0.1.0 — alpha."
 />
 
@@ -15,7 +15,7 @@ hideHero: true
     icon="rocket"
     href="/quickstart"
   >
-    Install Yumi locally and launch your companion.
+    Install Yumii locally and launch your companion.
   </DocsCard>
   <DocsCard
     title="Core Senses"
@@ -29,7 +29,7 @@ hideHero: true
     icon="face-smile"
     href="/customization/personality-prompts"
   >
-    Explore Yumi's personas and emotional tones.
+    Explore Yumii's personas and emotional tones.
   </DocsCard>
   <DocsCard
     title="Capabilities"
@@ -40,9 +40,9 @@ hideHero: true
   </DocsCard>
 </FeatureList>
 
-## What is Yumi?
+## What is Yumii?
 
-Yumi is an open-source, locally-runnable AI companion. She listens
+Yumii is an open-source, locally-runnable AI companion. She listens
 through your microphone, thinks using a hosted LLM (Groq, OpenAI, or
 Anthropic), speaks using a hosted TTS provider (ElevenLabs or
 CAMB.ai), and reacts in real time through a Live2D avatar in your
@@ -58,12 +58,12 @@ for v1.1 (see `ROADMAP.md`).
 * **Real-time voice conversation** — Silero VAD for speech detection,
   `faster-whisper` (local CPU) or Groq Whisper (cloud) for transcription.
 * **Animated Live2D avatar** — open the browser, allow the microphone,
-  and Yumi reacts with expressions and body motions driven by the
+  and Yumii reacts with expressions and body motions driven by the
   LLM's structured output.
 * **Six personalities** — `caring`, `tsundere`, `genki`, `kuudere`,
   `yandere`, `dandere`. Each is a plain text file in
-  `src/yumi/assets/prompts/`. Add your own.
-* **Barge-in** — speak while Yumi is talking and she stops. This is
+  `src/yumii/assets/prompts/`. Add your own.
+* **Barge-in** — speak while Yumii is talking and she stops. This is
   the Gemini Live–style feel.
 * **OS-keychain credentials** — API keys are stored in Windows
   Credential Manager, macOS Keychain, or libsecret. Never in `.env`.
@@ -80,14 +80,14 @@ These are on the roadmap and will land in subsequent releases:
 * **Multimodal vision input** — post v2.0.
 * **A bundled Live2D model** — you bring your own
   (`.model3.json` from any Cubism 4 compatible model). Drop it in
-  `~/.yumi/avatar/` and update the `modelUrl` in
-  `src/yumi/assets/webui/index.html`.
+  `~/.yumii/avatar/` and update the `modelUrl` in
+  `src/yumii/assets/webui/index.html`.
 
-## Why Yumi?
+## Why Yumii?
 
 Because the existing closed-source companions (Replika, Character.AI,
 Ava, etc.) require cloud accounts, lock you out of the personality
-prompts, and ship voice + avatar as an opaque binary. Yumi is the
+prompts, and ship voice + avatar as an opaque binary. Yumii is the
 opposite: every line of her brain is a text file you can edit, every
 key lives in your OS keychain, every STT / TTS / LLM provider is a
 pluggable factory, and the avatar runs in your browser using standard

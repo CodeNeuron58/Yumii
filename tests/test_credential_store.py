@@ -4,7 +4,7 @@ These tests do not actually call the OS keychain. They exercise the
 in-memory logic, key-validation lists, and credential-name conventions.
 """
 
-from yumi.core.credential_store import (
+from yumii.core.credential_store import (
     CREDENTIAL_KEYS,
     PREFERENCE_KEYS,
     SERVICE_NAME,
@@ -12,9 +12,9 @@ from yumi.core.credential_store import (
 )
 
 
-def test_service_name_is_yumi():
-    """The keychain service identifier must be exactly 'Yumi'."""
-    assert SERVICE_NAME == "Yumi"
+def test_service_name_is_yumii():
+    """The keychain service identifier must be exactly 'Yumii'."""
+    assert SERVICE_NAME == "Yumii"
 
 
 def test_credential_keys_are_secrets_only():

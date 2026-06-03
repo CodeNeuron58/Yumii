@@ -1,6 +1,6 @@
 ---
 title: "Windows WSL2 Setup"
-description: "How to configure microphone audio routing and run Yumi inside Windows Subsystem for Linux (WSL2)."
+description: "How to configure microphone audio routing and run Yumii inside Windows Subsystem for Linux (WSL2)."
 layout: "cards"
 icon: "box"
 ---
@@ -8,7 +8,7 @@ icon: "box"
 <ContentCard>
 Running voice agents inside Windows Subsystem for Linux (WSL2) is a popular choice for developers, but routing microphone audio from your Windows host to the WSL2 container requires extra setup.
 
-Follow this guide to get Yumi's ears working under WSL2.
+Follow this guide to get Yumii's ears working under WSL2.
 
 ---
 </ContentCard>
@@ -56,9 +56,9 @@ You will now see your USB microphone listed as a local USB device inside your Li
 </ContentCard>
 
 <ContentCard>
-## ⚡ Step 3: Run Yumi in WSL2
+## ⚡ Step 3: Run Yumii in WSL2
 
-Follow the standard [Developer Manual](/installation/developer-manual) guide inside your WSL2 prompt to clone and sync Yumi. When you boot the wake-up server, Uvicorn will listen on port `8000` inside the WSL2 instance and Windows will automatically route port forwarding so you can open `http://localhost:8000/` in your Windows host browser!
+Follow the standard [Developer Manual](/installation/developer-manual) guide inside your WSL2 prompt to clone and sync Yumii. When you boot the wake-up server, Uvicorn will listen on port `8000` inside the WSL2 instance and Windows will automatically route port forwarding so you can open `http://localhost:8000/` in your Windows host browser!
 
 Proceed to [Core Senses](/senses/vad) to learn how the audio pipeline processes this signal.
 </ContentCard>

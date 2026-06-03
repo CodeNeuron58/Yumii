@@ -1,12 +1,12 @@
 ---
 title: "FastAPI REST API Reference"
-description: "A complete mapping of Yumi's FastAPI routes, static mount configurations, and local servers."
+description: "A complete mapping of Yumii's FastAPI routes, static mount configurations, and local servers."
 layout: "cards"
 icon: "webhook"
 ---
 
 <ContentCard>
-Yumi is driven by a lightweight **FastAPI** backend (`src/yumi/api/server.py`). Alongside the real-time WebSocket connection, Yumi serves REST endpoints to mount folders and serve assets.
+Yumii is driven by a lightweight **FastAPI** backend (`src/yumii/api/server.py`). Alongside the real-time WebSocket connection, Yumii serves REST endpoints to mount folders and serve assets.
 
 ---
 </ContentCard>
@@ -14,17 +14,17 @@ Yumi is driven by a lightweight **FastAPI** backend (`src/yumi/api/server.py`). 
 <ContentCard>
 ## 1. Asset Mounting & Serving
 
-Yumi bundles her frontend interface and exposes custom folders securely.
+Yumii bundles her frontend interface and exposes custom folders securely.
 
 ### A. Serving the WebUI
 *   **Path**: `/` (root)
 *   **Method**: `app.mount("/", StaticFiles(directory=webui_dir, html=True))`
-*   **Description**: Serves Yumi's standard single-file client page (`index.html`) directly inside your browser.
+*   **Description**: Serves Yumii's standard single-file client page (`index.html`) directly inside your browser.
 
 ### B. Mounting Custom Avatars
-*   **Path**: `/Yumi_Avatar`
-*   **Method**: `app.mount("/Yumi_Avatar", StaticFiles(directory=avatar_dir))`
-*   **Description**: Exposes your custom Live2D model directories located in `~/.yumi/avatar/` to the PixiJS loading runtime.
+*   **Path**: `/Yumii_Avatar`
+*   **Method**: `app.mount("/Yumii_Avatar", StaticFiles(directory=avatar_dir))`
+*   **Description**: Exposes your custom Live2D model directories located in `~/.yumii/avatar/` to the PixiJS loading runtime.
 
 ---
 </ContentCard>
@@ -32,7 +32,7 @@ Yumi bundles her frontend interface and exposes custom folders securely.
 <ContentCard>
 ## 2. CORS Configurations
 
-Yumi's FastAPI server permits cross-origin browser connections so that
+Yumii's FastAPI server permits cross-origin browser connections so that
 local development overlays, OBS browser sources, and other tools on
 the same machine can reach the WebSocket without browser CORS errors:
 
@@ -53,12 +53,12 @@ app.add_middleware(
 > LAN machines cannot reach it, and your API keys are never exposed
 > to the browser, but the LLM token cost is. The v0.1.1 release will
 > tighten `allow_origins` to the specific localhost / app origins
-> that Yumi actually serves.
+> that Yumii actually serves.
 
 For WebSocket payload details, see the [WebSocket Protocol](/integration/websocket-protocol) page.
 
 <Callout type="info" title="Planned for v2">
-  Exposing Yumi's tool registry to external LLM clients via the
+  Exposing Yumii's tool registry to external LLM clients via the
   **Model Context Protocol (MCP)** is on the roadmap for v2.0. The
   v1.0 release has no MCP server transport — the current engine is a
   self-contained voice → LLM → TTS loop. See the

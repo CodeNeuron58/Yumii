@@ -9,7 +9,7 @@ normalization, which are deterministic.
 import numpy as np
 import pytest
 
-from yumi.audio.stt import float_to_pcm16, normalize_audio, rms_energy
+from yumii.audio.stt import float_to_pcm16, normalize_audio, rms_energy
 
 
 def test_rms_energy_silent_signal_is_zero() -> None:

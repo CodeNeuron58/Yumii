@@ -49,8 +49,8 @@ export default function TopNav() {
       <div className="top-nav-shell">
         <div className="top-nav-row top-nav-row--primary">
           <a href="/" className="logo">
-            <img src="/docs/images/yumi-nav.png" alt="Yumi" width={30} height={30} />
-            <span>Yumi</span>
+            <img src="/docs/images/yumii-nav.png" alt="Yumii" width={30} height={30} />
+            <span>Yumii</span>
           </a>
 
           <div className="search-bar">
@@ -66,7 +66,7 @@ export default function TopNav() {
 
           <div className="nav-links">
             <a
-              href="https://github.com/CodeNeuron58/Yumi"
+              href="https://github.com/CodeNeuron58/Yumii"
               target="_blank"
               rel="noopener noreferrer"
               className="nav-utility"

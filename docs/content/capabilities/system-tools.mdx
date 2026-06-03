@@ -1,12 +1,12 @@
 ---
 title: "Built-in System Tools"
-description: "How Yumi utilizes LangChain tools to interact with your system."
+description: "How Yumii utilizes LangChain tools to interact with your system."
 layout: "cards"
 icon: "settings"
 ---
 
 <ContentCard>
-Yumi is equipped with tool-calling capabilities. When she needs to fetch external data or run a task, she can execute functional tools in the background before formulating her final spoken response.
+Yumii is equipped with tool-calling capabilities. When she needs to fetch external data or run a task, she can execute functional tools in the background before formulating her final spoken response.
 
 ---
 </ContentCard>
@@ -14,13 +14,13 @@ Yumi is equipped with tool-calling capabilities. When she needs to fetch externa
 <ContentCard>
 ## 🛠️ The Time Tool Example
 
-Yumi's default system tool is `get_current_time`, which is loaded inside `src/yumi/tools/` and exposed to the LLM agent registry inside `llm.py`.
+Yumii's default system tool is `get_current_time`, which is loaded inside `src/yumii/tools/` and exposed to the LLM agent registry inside `llm.py`.
 
 ### How it operates under the hood:
-1.  **User Input**: *"Hey Yumi, what time is it?"*
+1.  **User Input**: *"Hey Yumii, what time is it?"*
 2.  **LLM Decision**: The model realizes it does not know the current time. It halts text generation and requests a function call: `get_current_time()`.
-3.  **Local Execution**: Yumi's backend catches this request, runs the local Python utility (`datetime.now()`), and returns the raw string time: `15:15:32`.
-4.  **Final Response**: The LLM consumes the time value, packages it inside the Pydantic `YumiResponse` container, and outputs:
+3.  **Local Execution**: Yumii's backend catches this request, runs the local Python utility (`datetime.now()`), and returns the raw string time: `15:15:32`.
+4.  **Final Response**: The LLM consumes the time value, packages it inside the Pydantic `YumiiResponse` container, and outputs:
     *   `response_text`: *"It's exactly 3:15 PM! Hope your afternoon is going well."*
     *   `expression`: `"smile"`
     *   `motion`: `"nod"`
@@ -31,7 +31,7 @@ Yumi's default system tool is `get_current_time`, which is loaded inside `src/yu
 <ContentCard>
 ## Modifying Existing Tools
 
-Tools are declared inside `src/yumi/tools/` as standard LangChain structured tools. You can adjust parameters or update prompts easily.
+Tools are declared inside `src/yumii/tools/` as standard LangChain structured tools. You can adjust parameters or update prompts easily.
 
 To see how to write completely new custom tools (like weather checkers or computer controls), proceed to the [Writing Custom Tools](/capabilities/custom-tools) page!
 </ContentCard>

@@ -1,12 +1,12 @@
 ---
 title: "CLI Command Registry"
-description: "A complete reference table of all Yumi shell terminal commands and command shortcuts."
+description: "A complete reference table of all Yumii shell terminal commands and command shortcuts."
 layout: "cards"
 icon: "terminal"
 ---
 
 <ContentCard>
-Yumi features a highly stylized, interactive **Typer CLI** that lets you configure her parameters, read roadmaps, switch personas, and wake her up instantly.
+Yumii features a highly stylized, interactive **Typer CLI** that lets you configure her parameters, read roadmaps, switch personas, and wake her up instantly.
 
 ---
 </ContentCard>
@@ -14,16 +14,16 @@ Yumi features a highly stylized, interactive **Typer CLI** that lets you configu
 <ContentCard>
 ## 🎛️ Interactive Shell Commands
 
-When you launch the console using `yumi` or `uv run yumi`, you enter a rich REPL command-line interface. 
+When you launch the console using `yumii` or `uv run yumii`, you enter a rich REPL command-line interface. 
 
 The following command shortcuts are registered:
 
 | Shell Command | Alias Command | Description |
 | :--- | :--- | :--- |
-| **`/wake`** | `wake`, `wake-up` | **Wake Yumi up** — starts the FastAPI backend on port `8000`, routes audio, and automatically opens your web browser. |
+| **`/wake`** | `wake`, `wake-up` | **Wake Yumii up** — starts the FastAPI backend on port `8000`, routes audio, and automatically opens your web browser. |
 | **`/config`** | `configure`, `settings` | **Configure Senses** — launches the step-by-step Attunement wizard to set up Groq, OpenAI, ElevenLabs, and Whisper configurations. |
-| **`/personality`** | `personality` | **Select Personality** — dynamically switches Yumi's active personality prompt and loaded visual emotion state. |
-| **`/vision`** | `story`, `roadmap` | **Vision & Story** — loads Yumi's project origin, development roadmap, and feature visions inside the terminal viewport. |
+| **`/personality`** | `personality` | **Select Personality** — dynamically switches Yumii's active personality prompt and loaded visual emotion state. |
+| **`/vision`** | `story`, `roadmap` | **Vision & Story** — loads Yumii's project origin, development roadmap, and feature visions inside the terminal viewport. |
 | **`/help`** | `h`, `?` | Displays the stylized Command help matrix inline. |
 | **`/exit`** | `quit`, `q` | Exits the dashboard gracefully, shutting down background tasks and returning to the system terminal. |
 
@@ -36,14 +36,14 @@ The following command shortcuts are registered:
 You can bypass the interactive console REPL and execute commands directly from your standard terminal prompt:
 
 ```bash
-# Wake Yumi up immediately
-uv run yumi wake-up
+# Wake Yumii up immediately
+uv run yumii wake-up
 
 # Configure settings directly
-uv run yumi attune
+uv run yumii attune
 
 # Check the package version
-uv run yumi --version
+uv run yumii --version
 ```
 
 Proceed to the [Configuration Schema Reference](/ops/configuration-schemas) page to see config JSON layouts!

@@ -8,7 +8,7 @@ icon: "venetian-mask"
 <ContentCard>
 Want to add a custom character like a sassy helper, a futuristic hacker, or a fantasy wizard companion? 
 
-Creating a custom persona in Yumi is simple. Follow this step-by-step tutorial.
+Creating a custom persona in Yumii is simple. Follow this step-by-step tutorial.
 
 ---
 </ContentCard>
@@ -16,8 +16,8 @@ Creating a custom persona in Yumi is simple. Follow this step-by-step tutorial.
 <ContentCard>
 ## Step 1: Write Your Prompt File
 
-Create a new text file inside Yumi's asset prompts directory:
-`src/yumi/assets/prompts/hacker.txt`
+Create a new text file inside Yumii's asset prompts directory:
+`src/yumii/assets/prompts/hacker.txt`
 
 Write a detailed roleplay prompt defining the character. Here is a starting template:
 
@@ -46,9 +46,9 @@ You have access to the following body motions:
 <ContentCard>
 ## Step 2: Register the Description
 
-To make your new personality visible in Yumi's CLI configuration tool, register it inside `src/yumi/agent/personality_manager.py`:
+To make your new personality visible in Yumii's CLI configuration tool, register it inside `src/yumii/agent/personality_manager.py`:
 
-1.  Open `src/yumi/agent/personality_manager.py`.
+1.  Open `src/yumii/agent/personality_manager.py`.
 2.  Locate `PERSONALITY_DESCRIPTIONS` (around line 13).
 3.  Add your new persona name and a brief description:
     ```python
@@ -66,15 +66,15 @@ PERSONALITY_DESCRIPTIONS: Dict[PERSONALITY_TYPE, str] = {
 <ContentCard>
 ## Step 3: Clear Cache & Run
 
-Yumi caches LLM agents to optimize performance. When you add a new personality, clear the cache and run:
+Yumii caches LLM agents to optimize performance. When you add a new personality, clear the cache and run:
 
 1.  Start the CLI:
     ```bash
-yumi
+yumii
 ```
 2.  Go to **Configure Senses > Select Personality**.
 3.  Choose your new **Hacker** personality.
-4.  Wake Yumi up and talk to Hex!
+4.  Wake Yumii up and talk to Hex!
 
-Proceed to the [Capabilities section](/capabilities/system-tools) to expand Yumi's brain with tools!
+Proceed to the [Capabilities section](/capabilities/system-tools) to expand Yumii's brain with tools!
 </ContentCard>

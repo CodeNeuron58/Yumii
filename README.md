@@ -1,4 +1,4 @@
-# Yumi 🌸 — Real-Time AI Companion
+# Yumii 🌸 — Real-Time AI Companion
 
 [![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
@@ -6,9 +6,9 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Live2D](https://img.shields.io/badge/Live2D-Cubism-pink.svg)](https://www.live2d.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumi?style=social)](https://github.com/CodeNeuron58/Yumi)
+[![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumii?style=social)](https://github.com/CodeNeuron58/Yumii)
 
-Yumi is an open-source, locally-runnable AI companion with a Live2D avatar,
+Yumii is an open-source, locally-runnable AI companion with a Live2D avatar,
 real-time voice conversation, and expressive personality. She runs on a standard
 CPU — no expensive GPU required.
 
@@ -24,38 +24,38 @@ CPU — no expensive GPU required.
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.ps1 | iex
+irm https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.ps1 | iex
 ```
 
 **macOS / Linux:**
 ```bash
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.sh | sh
 ```
 
 **From source (developers):**
 ```bash
-git clone https://github.com/CodeNeuron58/Yumi.git
-cd Yumi
+git clone https://github.com/CodeNeuron58/Yumii.git
+cd Yumii
 uv sync
 ```
 Then either activate the virtual environment:
 ```bash
 # Windows
 .venv\Scripts\activate
-yumi
+yumii
 
 # macOS / Linux
 source .venv/bin/activate
-yumi
+yumii
 ```
 Or skip activation and use:
 ```bash
-uv run yumi
+uv run yumii
 ```
 
 ---
 
-## ✨ What Yumi Does
+## ✨ What Yumii Does
 
 - 🎙 **Listens** — picks up your voice using Silero VAD + Whisper (local or Groq cloud)
 - 🧠 **Thinks** — responds via Groq, OpenAI, or Anthropic LLMs with a persistent personality
@@ -84,8 +84,8 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ### 2. Clone & Install
 
 ```bash
-git clone https://github.com/CodeNeuron58/Yumi.git
-cd Yumi
+git clone https://github.com/CodeNeuron58/Yumii.git
+cd Yumii
 uv sync
 ```
 
@@ -95,7 +95,7 @@ uv sync
 
 ### 3. Live2D Model
 
-Yumi does **not** bundle a Live2D model. We used to ship a sample
+Yumii does **not** bundle a Live2D model. We used to ship a sample
 model adapted from a third-party Live2D artist's work for the zero-config
 demo, but the underlying character IP is owned by a large game company
 and the artist's distribution terms explicitly prohibit redistribution.
@@ -113,32 +113,32 @@ To add an avatar:
    granted redistribution rights (rare — read the license).
 2. Place the entire model folder into:
    ```
-   ~/.yumi/avatar/
+   ~/.yumii/avatar/
    ```
-   *(On Windows: `C:\Users\YourName\.yumi\avatar\`)*
+   *(On Windows: `C:\Users\YourName\.yumii\avatar\`)*
 3. Update `modelUrl` in
-   [`src/yumi/assets/webui/index.html`](src/yumi/assets/webui/index.html)
+   [`src/yumii/assets/webui/index.html`](src/yumii/assets/webui/index.html)
    to point at your model's `.model3.json` filename.
-4. Map your model's `.exp3.json` files and motion groups to Yumi's
+4. Map your model's `.exp3.json` files and motion groups to Yumii's
    emotion labels in the `EXPRESSION_MAP` and `MOTION_MAP` JavaScript
    objects in the same file. The full guide is in
    [`docs/content/customization/adding-avatars.mdx`](docs/content/customization/adding-avatars.mdx).
 
-If you don't add a model, Yumi will still work end-to-end — she will
+If you don't add a model, Yumii will still work end-to-end — she will
 speak through your speakers, your mic will be heard, the LLM will
 respond, but the avatar canvas will show a clear "no avatar loaded"
 message instead of a character.
 
-### 4. Configure Yumi
+### 4. Configure Yumii
 
 ```bash
 # Option A — activate venv (then use bare commands for the rest of the session)
 .venv\Scripts\activate    # Windows
 source .venv/bin/activate  # macOS / Linux
-yumi
+yumii
 
 # Option B — no activation needed
-uv run yumi
+uv run yumii
 ```
 
 On first launch, an interactive wizard walks you through:
@@ -158,13 +158,13 @@ dashboard.
 
 ```bash
 # If venv is activated
-yumi
+yumii
 
 # Without activation
-uv run yumi
+uv run yumii
 ```
 
-Select **🌸 Wake Yumi Up** from the dashboard. Your browser opens automatically.
+Select **🌸 Wake Yumii Up** from the dashboard. Your browser opens automatically.
 Click **Connect & Start Audio Context**, allow microphone access, and start talking.
 
 ---
@@ -179,7 +179,7 @@ Click **Connect & Start Audio Context**, allow microphone access, and start talk
 Switch backends anytime via ⚙️ Configure Senses → Listening Settings.
 
 For **Groq Whisper**: if you've already configured Groq as your LLM provider,
-Yumi will reuse the same API key — no duplicate entry needed.
+Yumii will reuse the same API key — no duplicate entry needed.
 
 ---
 
@@ -207,7 +207,7 @@ Yumi will reuse the same API key — no duplicate entry needed.
        ├── SystemMessage (personality prompt, injected every turn)
        ├── HumanMessage  (user speech)
        ├── LLM invoke    (Groq / OpenAI / Anthropic)
-       └── YumiResponse  { response_text, expression, motion }
+       └── YumiiResponse  { response_text, expression, motion }
                │
           [ ElevenLabs TTS ]
                │
@@ -224,7 +224,7 @@ Yumi will reuse the same API key — no duplicate entry needed.
 ## 📁 Project Structure
 
 ```
-src/yumi/
+src/yumii/
   agent/          # LangGraph state machine, LLM agent, personality manager
   api/            # FastAPI server, WebSocket broadcast
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
@@ -234,24 +234,24 @@ src/yumi/
   assets/
     prompts/      # Personality prompt files (.txt)
     webui/        # Frontend HTML (Live2D + PixiJS)
-  cli.py          # Typer CLI entry point (yumi command)
+  cli.py          # Typer CLI entry point (yumii command)
 ```
 
-> **Avatar files** go in `~/.yumi/avatar/` (user-provided, not bundled).
+> **Avatar files** go in `~/.yumii/avatar/` (user-provided, not bundled).
 
 ---
 
 ## 🔐 Security
 
-Yumi never stores API keys on disk in plaintext.
-All secrets go through the [`credential_store.py`](src/yumi/core/credential_store.py)
+Yumii never stores API keys on disk in plaintext.
+All secrets go through the [`credential_store.py`](src/yumii/core/credential_store.py)
 module which delegates to your OS's native keychain:
 
 - **Windows** → Windows Credential Manager
 - **macOS** → macOS Keychain
 - **Linux** → GNOME Keyring / KWallet (via libsecret)
 
-Non-sensitive preferences (personality, provider choice) are saved to `~/.yumi/config.json`.
+Non-sensitive preferences (personality, provider choice) are saved to `~/.yumii/config.json`.
 
 ---
 

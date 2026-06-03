@@ -1,12 +1,12 @@
 ---
 title: "Developer Manual (Manual Install)"
-description: "How to set up, build, and run Yumi manually from the source repository."
+description: "How to set up, build, and run Yumii manually from the source repository."
 layout: "cards"
 icon: "book-open"
 ---
 
 <ContentCard>
-If you are a developer looking to contribute to Yumi, write custom tools, or tweak her LangGraph architecture, you should install her manually from source.
+If you are a developer looking to contribute to Yumii, write custom tools, or tweak her LangGraph architecture, you should install her manually from source.
 </ContentCard>
 
 <ContentCard>
@@ -35,13 +35,13 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Clone the repository and sync the virtual environment. `uv` handles virtualenv creation automatically under the hood:
 
 ```bash
-git clone https://github.com/CodeNeuron58/Yumi.git
-cd Yumi
+git clone https://github.com/CodeNeuron58/Yumii.git
+cd Yumii
 uv sync
 ```
 
 <Info>
-  **CRITICAL RULE**: Never use `pip install`! Yumi pins PyTorch and TorchAudio to a dedicated **CPU-only index** inside `pyproject.toml` (which reduces package size from 2 GB to ~220 MB). Using raw `pip` will bypass this config, attempting to download the full CUDA build, and will likely fail on Standard CPUs.
+  **CRITICAL RULE**: Never use `pip install`! Yumii pins PyTorch and TorchAudio to a dedicated **CPU-only index** inside `pyproject.toml` (which reduces package size from 2 GB to ~220 MB). Using raw `pip` will bypass this config, attempting to download the full CUDA build, and will likely fail on Standard CPUs.
 </Info>
 
 ---
@@ -50,7 +50,7 @@ uv sync
 <ContentCard>
 ## 3. Activate the Environment
 
-To make the global `yumi` command available in your current terminal session:
+To make the global `yumii` command available in your current terminal session:
 
 ### Windows (PowerShell)
 ```powershell
@@ -62,15 +62,15 @@ To make the global `yumi` command available in your current terminal session:
 source .venv/bin/activate
 ```
 
-Once activated, you can execute `yumi` commands directly:
+Once activated, you can execute `yumii` commands directly:
 ```bash
-yumi --help
-yumi wake-up
+yumii --help
+yumii wake-up
 ```
 
 Alternatively, you can run commands without activation by prefixing with `uv run`:
 ```bash
-uv run yumi
+uv run yumii
 ```
 
 Proceed to [WSL2 Installation](/installation/wsl2) or [Core Senses](/senses/vad) to learn more!

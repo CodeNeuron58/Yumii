@@ -4,7 +4,7 @@ import TopNav from "./TopNav";
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
-  title: "Yumi Documentation",
+  title: "Yumii Documentation",
   description: "Real-time AI companion for terminal-native interaction.",
 };
 

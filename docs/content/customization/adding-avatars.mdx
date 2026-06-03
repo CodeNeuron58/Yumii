@@ -1,14 +1,14 @@
 ---
 title: "Adding Custom Live2D Avatars"
-description: "How to download, structure, and mount custom Live2D Cubism models for Yumi."
+description: "How to download, structure, and mount custom Live2D Cubism models for Yumii."
 layout: "cards"
 icon: "image"
 ---
 
 <ContentCard>
-Yumi is designed to support custom Live2D avatars. You are not locked into the default visual look! You can download any Cubism 4 compatible model (from creators on platforms like **Booth.pm** or **Nizima**) and load it directly.
+Yumii is designed to support custom Live2D avatars. You are not locked into the default visual look! You can download any Cubism 4 compatible model (from creators on platforms like **Booth.pm** or **Nizima**) and load it directly.
 
-Follow this guide to swap Yumi's visual appearance.
+Follow this guide to swap Yumii's visual appearance.
 
 ---
 </ContentCard>
@@ -16,7 +16,7 @@ Follow this guide to swap Yumi's visual appearance.
 <ContentCard>
 ## 1. Structure Your Model Folder
 
-Live2D Cubism models are exported as a bundle of assets. Yumi requires the model to follow the standard Cubism 4 layout. 
+Live2D Cubism models are exported as a bundle of assets. Yumii requires the model to follow the standard Cubism 4 layout. 
 
 Ensure your downloaded model folder contains:
 *   An authoritative `.model3.json` file (this coordinates all other assets).
@@ -28,16 +28,16 @@ Ensure your downloaded model folder contains:
 </ContentCard>
 
 <ContentCard>
-## 2. Place in Yumi's Avatar Directory
+## 2. Place in Yumii's Avatar Directory
 
-For security and modularity, Yumi loads custom avatars from a specific system-level directory:
+For security and modularity, Yumii loads custom avatars from a specific system-level directory:
 
-*   **Windows**: `C:\Users\YourName\.yumi\avatar\`
-*   **macOS / Linux**: `~/.yumi/avatar/`
+*   **Windows**: `C:\Users\YourName\.yumii\avatar\`
+*   **macOS / Linux**: `~/.yumii/avatar/`
 
 Create a subdirectory matching your character's name and paste all files inside it:
 ```
-~/.yumi/avatar/my_custom_waifu/
+~/.yumii/avatar/my_custom_waifu/
    ├── my_custom_waifu.model3.json
    ├── my_custom_waifu.moc3
    ├── my_custom_waifu.physics3.json
@@ -53,21 +53,21 @@ Create a subdirectory matching your character's name and paste all files inside 
 Once your custom model is placed in the folder, you must instruct the HTML5 frontend to compile and load it.
 
 1.  Open the web UI index file:
-    `src/yumi/assets/webui/index.html`
+    `src/yumii/assets/webui/index.html`
 2.  Locate the line defining `modelUrl` (around line 121). The shipped
     placeholder is:
     ```javascript
-    const modelUrl = "/Yumi_Avatar/your-model.model3.json";
+    const modelUrl = "/Yumii_Avatar/your-model.model3.json";
     ```
 3.  Replace `your-model.model3.json` with the exact filename of your
     new custom model's `.model3.json` file:
     ```javascript
-    const modelUrl = "/Yumi_Avatar/my_custom_waifu.model3.json";
+    const modelUrl = "/Yumii_Avatar/my_custom_waifu.model3.json";
     ```
-4.  Save the file and refresh your browser! Yumi's backend automatically mounts `~/.yumi/avatar/` to the web server under `/Yumi_Avatar`, so your new model will compile and load instantly!
+4.  Save the file and refresh your browser! Yumii's backend automatically mounts `~/.yumii/avatar/` to the web server under `/Yumii_Avatar`, so your new model will compile and load instantly!
 
     You can also remap the `EXPRESSION_MAP` and `MOTION_MAP` JavaScript
-    objects in the same file to map Yumi's abstract emotion labels
+    objects in the same file to map Yumii's abstract emotion labels
     (`smile`, `angry`, `sad`, `surprise`, `scared`, `shy`, `normal` and
     `nod`, `shakehead`, `tilthead`, `fidget`, `forward`, `lookaway`,
     `greeting`, `idle`) onto your model's specific `.exp3.json`
