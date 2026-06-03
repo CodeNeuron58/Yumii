@@ -20,23 +20,29 @@ Open `src/yumi/assets/webui/index.html` and locate the `EXPRESSION_MAP` configur
 
 ```javascript
 const EXPRESSION_MAP = {
-    "smile": "baozhen",
+    "smile": "smile",
     "angry": "angry",
-    "sad": "cry",
-    "surprise": "baozhen",
-    "scared": "cry",
-    "shy": "qizi1",
+    "sad": "sad",
+    "surprise": "surprise",
+    "scared": "scared",
+    "shy": "shy",
     "normal": null
 };
 ```
 
+> **The shipped defaults above assume your model ships `.exp3.json`
+> files whose basenames match Yumi's abstract emotion labels.** Most
+> third-party Live2D models do not — they use whatever the model
+> author chose. The map below this block is what you change to make
+> the shipped defaults work for your model.
+
 ### How to adjust it:
 *   The **Keys** (`smile`, `angry`, `sad`, etc.) represent the static categories that Yumi's LLM outputs.
-*   The **Values** (`baozhen`, `angry`, `cry`, etc.) represent the exact **filenames** of the `.exp3.json` expression files located inside your custom model folder (without the `.exp3.json` file extension).
+*   The **Values** (`smile`, `angry`, `sad`, etc. in the shipped default) represent the exact **filenames** of the `.exp3.json` expression files located inside your custom model folder (without the `.exp3.json` file extension).
 *   If your model has a custom blush expression named `blush.exp3.json` that you want to trigger when she is `shy`, update the map:
     ```javascript
-"shy": "blush",
-```
+    "shy": "blush",
+    ```
 
 ---
 </ContentCard>

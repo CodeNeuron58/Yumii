@@ -67,5 +67,5 @@ def test_normalize_audio_peak_clamped_to_safe_level() -> None:
 # ---------------------------------------------------------------------------
 # Note: Silero VAD and faster-whisper are exercised in integration tests
 # under tests/integration/ which require a working network connection
-# for the first-run model download. v1.0 ships without those.
+# for the first-run model download. v0.1.0 ships without those.
 # ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 # Yumi 🌸 — Real-Time AI Companion
 
+[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![uv](https://img.shields.io/badge/package%20manager-uv-green.svg)](https://docs.astral.sh/uv/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -11,18 +12,24 @@ Yumi is an open-source, locally-runnable AI companion with a Live2D avatar,
 real-time voice conversation, and expressive personality. She runs on a standard
 CPU — no expensive GPU required.
 
+> ⚠️ **This is v0.1.0 — an alpha release.** The voice loop, avatar, and
+> six personalities all work end-to-end, but the engine will be rewritten
+> in v1.0.0 (Triage / Planner / Synthesizer agent loop with persistent
+> memory and tool support). **No API stability promise yet.** See
+> [`CHANGELOG.md`](CHANGELOG.md) and [`ROADMAP.md`](ROADMAP.md).
+
 ---
 
 ## ⚡ Install (One Line)
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.ps1 | iex
 ```
 
 **macOS / Linux:**
 ```bash
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
 ```
 
 **From source (developers):**

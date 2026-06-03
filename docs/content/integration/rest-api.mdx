@@ -32,7 +32,9 @@ Yumi bundles her frontend interface and exposes custom folders securely.
 <ContentCard>
 ## 2. CORS Configurations
 
-To allow developers to build secondary WebUI interfaces (e.g. mobile overlays or OBS widget overlays), Yumi implements permissive **CORS** configurations:
+Yumi's FastAPI server permits cross-origin browser connections so that
+local development overlays, OBS browser sources, and other tools on
+the same machine can reach the WebSocket without browser CORS errors:
 
 ```python
 app.add_middleware(
@@ -44,7 +46,14 @@ app.add_middleware(
 )
 ```
 
-This guarantees you can connect to `ws://localhost:8000/ws` from any local development host or OBS browser source cleanly without safety crashes!
+> **Security note.** This is a permissive configuration suitable for a
+> local-only single-user tool. A page in **any** browser tab you have
+> open can theoretically open a WebSocket to `ws://localhost:8000/ws`
+> and interact with the LLM. The server is bound to `127.0.0.1` so
+> LAN machines cannot reach it, and your API keys are never exposed
+> to the browser, but the LLM token cost is. The v0.1.1 release will
+> tighten `allow_origins` to the specific localhost / app origins
+> that Yumi actually serves.
 
 For WebSocket payload details, see the [WebSocket Protocol](/integration/websocket-protocol) page.
 

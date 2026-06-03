@@ -17,7 +17,7 @@ The easiest way to install Yumi on Windows is via the automated PowerShell scrip
 Open a PowerShell terminal (no Administrator privileges required) and paste:
 
 ```powershell
-irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.ps1 | iex
 ```
 </ContentCard>
 
@@ -25,11 +25,10 @@ irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.ps1 | iex
 ### What this script does
 
 <StepsList>
-  <Step icon="code" title="Checks if Python 3.12+ is installed (prompts if missing)." />
-  <Step icon="package" title="Installs the `uv` package manager securely." />
-  <Step icon="folder" title="Clones the Yumi repository to `C:\Users\YourName\Yumi`." />
-  <Step icon="terminal" title="Creates a virtual environment and runs `uv sync` to set up all packages (pinning CPU-only Torch)." />
-  <Step icon="star" title="Creates a global `yumi` alias so you can launch the app from any directory." />
+  <Step icon="code" title="Checks if Python 3.12+ is installed (prompts to install from python.org if missing)." />
+  <Step icon="package" title="Installs the `uv` package manager securely via the official Astral installer." />
+  <Step icon="terminal" title="Runs `uv tool install git+https://github.com/CodeNeuron58/Yumi.git` — installs Yumi as a uv-managed tool (no manual clone, no separate venv)." />
+  <Step icon="star" title="The `yumi` command becomes globally available — `uv tool install` puts it on PATH for you, no alias needed." />
 </StepsList>
 </ContentCard>
 

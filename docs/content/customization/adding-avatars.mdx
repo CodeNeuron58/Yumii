@@ -54,15 +54,24 @@ Once your custom model is placed in the folder, you must instruct the HTML5 fron
 
 1.  Open the web UI index file:
     `src/yumi/assets/webui/index.html`
-2.  Locate the line defining `modelUrl` (around line 111):
+2.  Locate the line defining `modelUrl` (around line 121). The shipped
+    placeholder is:
     ```javascript
-const modelUrl = "/Yumi_Avatar/huohuo.model3.json";
-```
-3.  Replace `huohuo.model3.json` with the exact filename of your new custom model's `.model3.json` file:
+    const modelUrl = "/Yumi_Avatar/your-model.model3.json";
+    ```
+3.  Replace `your-model.model3.json` with the exact filename of your
+    new custom model's `.model3.json` file:
     ```javascript
-const modelUrl = "/Yumi_Avatar/my_custom_waifu.model3.json";
-```
+    const modelUrl = "/Yumi_Avatar/my_custom_waifu.model3.json";
+    ```
 4.  Save the file and refresh your browser! Yumi's backend automatically mounts `~/.yumi/avatar/` to the web server under `/Yumi_Avatar`, so your new model will compile and load instantly!
+
+    You can also remap the `EXPRESSION_MAP` and `MOTION_MAP` JavaScript
+    objects in the same file to map Yumi's abstract emotion labels
+    (`smile`, `angry`, `sad`, `surprise`, `scared`, `shy`, `normal` and
+    `nod`, `shakehead`, `tilthead`, `fidget`, `forward`, `lookaway`,
+    `greeting`, `idle`) onto your model's specific `.exp3.json`
+    basenames and motion group names.
 
 Proceed to the [Parameter Mapping](/customization/parameter-mapping) page to customize how she emotes!
 </ContentCard>

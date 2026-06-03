@@ -83,7 +83,11 @@ Since this is your first time, Yumi will automatically guide you through her **A
 </FeatureList>
 
 <Callout type="success" title="Local First Security">
-  Keys are stored securely in your local environment file (`.env`). They are never transmitted anywhere except directly to the providers you chose.
+  Keys are stored in your **OS keychain** — Windows Credential Manager,
+  macOS Keychain, or libsecret on Linux. They are **never** written to
+  disk as plaintext, and **never** stored in a `.env` file. They are
+  only transmitted directly to the LLM / TTS / STT provider you
+  configured.
 </Callout>
 </ContentCard>
 

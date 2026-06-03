@@ -37,7 +37,7 @@ Yumi bridges a concurrent Python 3.12+ backend with an HTML5 / WebSockets / Pixi
 1.  **The Ears**: A local high-speed VAD pipeline captures audio slices from the web client, processing voice boundaries instantly.
 2.  **The Brain**: The transcribed query passes into a **LangGraph** conversational workflow, querying selected models (Groq/Llama-3, OpenAI/GPT-4, Anthropic/Claude-3.5) with rich persona prompts.
 3.  **The Voice**: The generated response text is synthesized through streaming TTS models (ElevenLabs or CAMB.ai).
-4.  **The Body**: The frontend plays the streaming audio, computes the real-time RMS wave amplitude, maps it to lip movements on a **Live2D model** (Huohuo), and applies the LLM's requested body gestures and expressions.
+4.  **The Body**: The frontend plays the streaming audio, computes the real-time RMS wave amplitude, maps it to lip movements on a **user-supplied Live2D model** (drop a Cubism 4 `.model3.json` into `~/.yumi/avatar/` and point `modelUrl` at it in `src/yumi/assets/webui/index.html`), and applies the LLM's requested body gestures and expressions.
 
 To get started, follow the [Quickstart Guide](/quickstart) to wake her up!
 </ContentCard>

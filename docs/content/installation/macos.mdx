@@ -15,16 +15,17 @@ Yumi is fully compatible with macOS, operating natively on both Intel (x86_64) a
 Open a standard Terminal window and run the automated bash installation script:
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
 ```
 
 ### What this script does:
-1.  Ensures Homebrew is installed.
-2.  Installs Python 3.12 (if missing).
-3.  Installs the `uv` package manager securely.
-4.  Clones the Yumi repository to your home folder.
-5.  Sets up the virtual environment with CPU-specific PyTorch wheels.
-6.  Pins a global shell alias so typing `yumi` works everywhere.
+1.  Installs the `uv` package manager securely via the official Astral installer.
+2.  Runs `uv tool install git+https://github.com/CodeNeuron58/Yumi.git` — installs Yumi as a uv-managed tool (no manual clone, no separate venv). The CPU-only PyTorch wheel pin in `pyproject.toml` is honored automatically.
+3.  The `yumi` command becomes globally available — `uv tool install` puts it on `~/.local/bin` for you, no shell alias needed.
+
+### Prerequisites
+
+`install.sh` assumes a standard `curl` + POSIX shell environment and a working network connection. It does not install Homebrew, Python, or system audio libraries — see the audio section below for those.
 
 ---
 </ContentCard>

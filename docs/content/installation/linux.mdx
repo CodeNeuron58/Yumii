@@ -15,7 +15,7 @@ Yumi is fully compatible with standard Linux distributions. Since she leverages 
 Open your terminal and execute:
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
 ```
 
 ---
@@ -29,18 +29,23 @@ Before Yumi can capture mic streams on Linux, you must install development heade
 ### Ubuntu / Debian
 ```bash
 sudo apt-get update
-sudo apt-get install -y portaudio19-dev libasound2-dev git python3-pip
+sudo apt-get install -y portaudio19-dev libasound2-dev git
 ```
 
 ### Fedora / RedHat
 ```bash
-sudo dnf install -y portaudio-devel alsa-lib-devel git python3-pip
+sudo dnf install -y portaudio-devel alsa-lib-devel git
 ```
 
 ### Arch Linux
 ```bash
-sudo pacman -Sy portaudio alsa-lib git python-pip
+sudo pacman -Sy portaudio alsa-lib git
 ```
+
+> **Do not install `python3-pip`.** Yumi is managed exclusively by `uv`.
+> The installer script installs `uv` for you, and `uv tool install` then
+> handles the rest. Mixing `pip` and `uv` will try to download the full
+> 2 GB CUDA build of `torch` and likely fail.
 
 ---
 </ContentCard>

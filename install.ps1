@@ -1,5 +1,5 @@
 # Yumi Installer for Windows (PowerShell)
-# Usage: irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -59,6 +59,17 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Host "    Found $uvVer" -ForegroundColor Green
 }
 
+# Step 2.5: Ensure git is on PATH — the next step does `uv tool install git+https://...`
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Host ""
+    Write-Host "  ERROR: 'git' is required but not found on PATH." -ForegroundColor Red
+    Write-Host "  Install Git for Windows: https://git-scm.com/download/win" -ForegroundColor Yellow
+    Write-Host "  Then re-run this installer." -ForegroundColor Yellow
+    exit 1
+} else {
+    $gitVer = git --version 2>&1
+    Write-Host "    Found $gitVer" -ForegroundColor Green
+}
 # Step 3: Install Yumi
 Write-Host "[3/3] Installing Yumi..." -ForegroundColor Cyan
 Write-Host "    (Downloading dependencies, this may take a few minutes)" -ForegroundColor DarkGray

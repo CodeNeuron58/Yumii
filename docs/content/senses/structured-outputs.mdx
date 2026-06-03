@@ -40,18 +40,18 @@ When the structured response is returned by the LangGraph workflow:
 3.  The frontend client translates these generic states using `EXPRESSION_MAP` and `MOTION_MAP`:
     ```javascript
 const EXPRESSION_MAP = {
-        "smile": "baozhen",
+        "smile": "smile",
         "angry": "angry",
-        "sad": "cry",
-        "surprise": "baozhen",
-        "scared": "cry",
-        "shy": "qizi1",
+        "sad": "sad",
+        "surprise": "surprise",
+        "scared": "scared",
+        "shy": "shy",
         "normal": null
     };
 ```
 4.  It immediately feeds these parameter identifiers to the PixiJS Live2D model renderer:
     ```javascript
-live2dModel.expression("baozhen"); // Plays the smile expression
+live2dModel.expression("smile"); // Plays the smile expression
     live2dModel.motion("nod");         // Triggers a nodding motion
 ```
 

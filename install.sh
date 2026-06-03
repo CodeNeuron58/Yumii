@@ -1,6 +1,6 @@
 #!/bin/sh
 # Yumi Installer for macOS / Linux
-# Usage: curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/main/install.sh | sh
+# Usage: curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumi/master/install.sh | sh
 
 set -e
 
@@ -65,6 +65,19 @@ if ! command -v uv >/dev/null 2>&1; then
 else
     UV_VER=$(uv --version 2>&1)
     printf "    ${GREEN}Found $UV_VER${NC}\n"
+fi
+
+# ── Step 2.5: Ensure git is on PATH (needed by `uv tool install git+...`) ───
+if ! command -v git >/dev/null 2>&1; then
+    echo ""
+    printf "  ${RED}ERROR: 'git' is required but not found on PATH.${NC}\n"
+    printf "  ${YELLOW}Install Git, then re-run this installer:${NC}\n"
+    printf "  ${YELLOW}  macOS:  brew install git${NC}\n"
+    printf "  ${YELLOW}  Linux:  sudo apt-get install -y git  (or your distro's equivalent)${NC}\n"
+    exit 1
+else
+    GIT_VER=$(git --version 2>&1)
+    printf "    ${GREEN}Found $GIT_VER${NC}\n"
 fi
 
 # ── Step 3: Install Yumi ─────────────────────────────────────────────────────

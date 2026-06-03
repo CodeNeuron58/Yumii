@@ -3,13 +3,16 @@
 This document tracks what is **shipped**, what is **in progress**, and
 what is **planned**. Anything not listed under "Shipped" is not in the
 binary you downloaded. The "What's not in v1" section of
-[`CHANGELOG.md`](CHANGELOG.md) is the authoritative list for v1.0.0.
+[`CHANGELOG.md`](CHANGELOG.md) is the authoritative list for v0.1.0.
 
 ---
 
-## ✅ Shipped — v1.0.0 (June 2026)
+## ✅ Shipped — 0.1.0 (June 2026)
 
-The first public release. See `CHANGELOG.md` for the full list.
+The first public release. **Alpha — no API stability promise.** See
+`CHANGELOG.md` for the full list. The next release is v1.0.0, which
+will be tagged once the Triage / Planner / Synthesizer agent loop,
+persistent memory, and tool registry are all in place.
 
 - Real-time voice loop (Silero VAD → STT → LangGraph → TTS)
 - Live2D avatar with LLM-driven expressions and motions

@@ -5,9 +5,12 @@ All notable changes to Yumi will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] — 2026-06-03
+## [0.1.0] — 2026-06-03
 
-First public release of Yumi.
+First public release. **Alpha — no API stability promise.** Everything
+that works today may need to change in v1.0.0 once the Triage / Planner
+/ Synthesizer agent loop lands. Don't build third-party plugins
+against the current engine yet.
 
 ### Added
 - Real-time voice conversation loop: Silero VAD → STT → LangGraph agent → TTS.
@@ -31,8 +34,9 @@ First public release of Yumi.
   gradient vision reader, and a guided first-run Attunement wizard.
 - One-line installers for Windows (`install.ps1`) and macOS / Linux
   (`install.sh`) that pin `torch` to the CPU-only wheel index.
-- 24 unit tests covering the audio pipeline, credential store, global
-  config, personality manager, and conversation state contract.
+- 31 unit tests covering the audio pipeline, credential store, global
+  config, personality manager, conversation state contract, and a
+  smoke-test pass for every top-level module.
 
 ### Changed
 - `uv` is the only supported package manager. `pip` will try to
@@ -53,7 +57,7 @@ First public release of Yumi.
   spam from the engine or from third-party libraries (uvicorn, httpx,
   LangChain).
 
-### Known limitations (post-1.0)
+### Known limitations (post-0.1.0)
 - **No persistent memory across restarts.** Conversation history
   lives in LangGraph's `InMemorySaver` and is lost when the server
   exits. Planned for v1.1.
@@ -66,9 +70,9 @@ First public release of Yumi.
   Planned for a post-v2.0 milestone.
 - **Single shared conversation.** All WebSocket clients share one
   `thread_id` (`yumi_session_1`). Multi-user support is not in scope
-  for v1.
+  for the v0.1.x line.
 
 ## [0.x] — pre-release history
 
-Prior to v1.0.0, Yumi was developed in a non-public form. Earlier
+Prior to v0.1.0, Yumi was developed in a non-public form. Earlier
 versions existed only as personal builds and were not tagged.
