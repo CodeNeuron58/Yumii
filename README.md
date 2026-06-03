@@ -88,18 +88,39 @@ uv sync
 
 ### 3. Live2D Model
 
-Yumi's avatar uses the Live2D Cubism SDK. Due to licensing, the model file is not
-bundled in this repo.
+Yumi does **not** bundle a Live2D model. We used to ship a sample
+model adapted from a third-party Live2D artist's work for the zero-config
+demo, but the underlying character IP is owned by a large game company
+and the artist's distribution terms explicitly prohibit redistribution.
+Shipping the model in a public GitHub repo created a copyright risk for
+every user who forked the project, so we removed it.
 
-1. Browse [Booth.pm](https://booth.pm/) for a Cubism 4 compatible Live2D model.
-2. Download and extract it.
-3. Place the entire model folder into:
+**Voice + LLM + personality all work without an avatar.** The avatar is
+purely visual.
+
+To add an avatar:
+
+1. Download a Cubism 4 compatible Live2D model from a legal source.
+   Common options: [Booth.pm](https://booth.pm/) (most original
+   Live2D artists sell here), or a model whose creator has explicitly
+   granted redistribution rights (rare — read the license).
+2. Place the entire model folder into:
    ```
    ~/.yumi/avatar/
    ```
    *(On Windows: `C:\Users\YourName\.yumi\avatar\`)*
-4. Update `modelUrl` in [`src/yumi/assets/webui/index.html`](src/yumi/assets/webui/index.html)
-   to point to your model's `.model3.json` filename.
+3. Update `modelUrl` in
+   [`src/yumi/assets/webui/index.html`](src/yumi/assets/webui/index.html)
+   to point at your model's `.model3.json` filename.
+4. Map your model's `.exp3.json` files and motion groups to Yumi's
+   emotion labels in the `EXPRESSION_MAP` and `MOTION_MAP` JavaScript
+   objects in the same file. The full guide is in
+   [`docs/content/customization/adding-avatars.mdx`](docs/content/customization/adding-avatars.mdx).
+
+If you don't add a model, Yumi will still work end-to-end — she will
+speak through your speakers, your mic will be heard, the LLM will
+respond, but the avatar canvas will show a clear "no avatar loaded"
+message instead of a character.
 
 ### 4. Configure Yumi
 

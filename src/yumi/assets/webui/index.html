@@ -108,7 +108,16 @@
     </div>
 
     <script>
-        const modelUrl = "/Yumi_Avatar/huohuo.model3.json";
+        // --- LIVE2D MODEL CONFIGURATION ---
+        // Yumi does NOT bundle a Live2D model. You must supply your own
+        // Cubism 4 compatible .model3.json file in ~/.yumi/avatar/ and
+        // point the path below at its filename. See
+        // docs/content/customization/adding-avatars.mdx for the full
+        // guide, including which sites host legal models.
+        //
+        // If this URL 404s, the page will fall back to a "no avatar
+        // loaded" message rather than crashing the rest of the UI.
+        const modelUrl = "/Yumi_Avatar/your-model.model3.json";
         let live2dModel = null;
         let audioContext = null;
         let analyser = null;
@@ -119,26 +128,33 @@
         let audioByteRemainder = new Uint8Array(0); // Buffer for odd-sized chunks
 
         // --- EMOTION/MOTION HANDLING ---
-        // Map LLM expressions to available huohuo expressions
+        // Map LLM expression labels to your model's expression file basenames.
+        // Keys are the abstract labels the LLM can emit; values are the
+        // exact basenames of the .exp3.json files in your model folder
+        // (without the extension), or null for the neutral face.
         const EXPRESSION_MAP = {
-            "smile": "baozhen",
+            "smile": "smile",
             "angry": "angry",
-            "sad": "cry",
-            "surprise": "baozhen",
-            "scared": "cry",
-            "shy": "qizi1",
+            "sad": "sad",
+            "surprise": "surprise",
+            "scared": "scared",
+            "shy": "shy",
             "normal": null
         };
-        
-        // Map LLM motions to available huohuo motions
+
+        // Map LLM motion labels to your model's motion group names.
+        // Keys are the abstract labels the LLM can emit; values are the
+        // motion group names declared in your .model3.json file under
+        // "Motions". If your model has no matching group, Yumi falls
+        // back to "idle".
         const MOTION_MAP = {
             "nod": "nod",
             "shakehead": "shakehead",
             "tilthead": "nod",
             "fidget": "idle",
             "forward": "idle",
-            "lookaway": "shakehead",
-            "greeting": "happy",
+            "lookaway": "lookaway",
+            "greeting": "greeting",
             "idle": "idle"
         };
 
@@ -193,8 +209,16 @@
 
             } catch (err) {
                 console.error("Error loading Live2D model:", err);
-                document.getElementById('subtitle').innerText = "Error loading Live2D model! Check console.";
+                const sub = document.getElementById('subtitle');
+                sub.innerHTML =
+                    "⚠️ No avatar loaded.<br>" +
+                    "Drop a Cubism 4 <code>.model3.json</code> into <code>~/.yumi/avatar/</code> " +
+                    "and update <code>modelUrl</code> in <code>index.html</code>.<br>" +
+                    "See the <strong>Adding Avatars</strong> guide in the docs. " +
+                    "Voice + LLM still work without an avatar.";
                 document.getElementById('ui-layer').style.opacity = 1;
+                document.getElementById('debug-info').innerText =
+                    "Live2D model not found. Yumi will speak through your speakers; only the animated avatar is missing.";
             }
         }
 
