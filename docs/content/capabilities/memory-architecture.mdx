@@ -1,51 +1,86 @@
 ---
 title: "State & Memory Architecture"
-description: "How Yumi maintains conversational memory and state across active WebSocket sessions."
+description: "How Yumi maintains conversational memory in v1 — and what is planned for v1.1."
 layout: "cards"
 icon: "network"
 ---
 
 <ContentCard>
-A key aspect of a virtual companion is conversational recall. If you mention your name or your favorite food in one turn, Yumi must remember it dynamically in the next.
+## What v1.0 actually does
 
-Here is a breakdown of Yumi's memory architecture.
-
----
-</ContentCard>
-
-<ContentCard>
-## 🧠 LangGraph State & Memory Saver
-
-Yumi is orchestrating conversations using **LangGraph**. The workflow utilizes a persistent checkpointer to load and store chat history.
-
-In `src/yumi/agent/graph.py`, the memory checkpointer is initialized:
+Yumi v1.0.0 uses **LangGraph's `InMemorySaver`** checkpointer
+(`src/yumi/agent/graph.py`):
 
 ```python
 from langgraph.checkpoint.memory import InMemorySaver
 
-# ...
 saver = InMemorySaver()
 return workflow.compile(checkpointer=saver)
 ```
 
-*   **Session IDs**: Every WebSocket connection is assigned a persistent session identifier (e.g. `yumi_session_1`).
-*   **Message Buffering**: When the LLM generates a response in `nodes.py`, both your human message and Yumi's AI response are appended to the LangGraph history:
-    ```python
-messages_to_append = [
-        new_human_message,
-        AIMessage(content=structured_response.response_text),
-    ]
-```
+This means:
+
+* Conversation history is preserved **for the lifetime of one running
+  server process**.
+* The checkpointer is keyed by `thread_id`. The current engine uses a
+  single hardcoded thread (`yumi_session_1`), so all WebSocket clients
+  share the same history.
+* **Restarting the server clears all memory.** There is no disk-backed
+  storage in v1.
+
+This is sufficient for a single-session demo and matches the
+prototyping posture of the project. The v1 README, `VISION.md`, and
+this page are explicit about it.
 
 ---
+
 </ContentCard>
 
 <ContentCard>
-## Technical Details: Prototype vs. Production Memory
+## What is planned for v1.1
 
-*   **Prototype (`InMemorySaver`)**: The current architecture holds message history inside active RAM memory. This is optimized for ultra-fast, zero-overhead access. However, restarting the python server clears the memory.
-*   **Production Migration (SQLite / PostgreSQL)**:
-    For permanent memory that survives server reboots, the checkpointer can be swapped from `InMemorySaver` to standard **`SqliteSaver`** or **`PostgresSaver`** with just a few lines of code inside `graph.py`.
+The v1.1 release (target: shortly after v1.0) introduces two new
+storage layers:
 
-Proceed to the [Writing Custom Tools](/capabilities/custom-tools) page to extend her functional capabilities!
+1. **Conversation log** — every `(turn_id, role, content, timestamp)`
+   tuple appended to a SQLite database at
+   `~/.yumi/memory/conversations.db`. Append-only.
+2. **User facts** — a `UserFacts` table
+   `(user_id, key, value, source_turn_id, last_seen)` populated by a
+   lightweight extraction step (probably an LLM pass at the end of each
+   session, or a daily cron).
+
+The LLM Planner (in v2.0) will read from this store. v1.1 only writes
+to it.
+
+The intent is to avoid building a vector store on day one. SQLite +
+keyword matching covers the v1.1 use case. If retrieval quality becomes
+the bottleneck, embeddings come later.
+
+---
+
+</ContentCard>
+
+<ContentCard>
+## Why not SQLite / Postgres today?
+
+It would be ~150 lines of code. The reason to defer is not effort, it
+is **observability**. Memory bugs only show up under real use. v1.0
+shipped without memory is a clean baseline. v1.1 ships with memory and
+is debugged against real conversation logs from v1.0 users.
+
+If you want to enable persistent memory on a v1.0 build today, the
+cleanest path is to fork `graph.py` and swap the checkpointer:
+
+```python
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+async with AsyncSqliteSaver.from_conn_string(
+    "~/.yumi/memory/checkpoints.db"
+) as saver:
+    app = workflow.compile(checkpointer=saver)
+```
+
+This is not officially supported in v1, but the seam is small enough
+that a contributor PR is welcome.
 </ContentCard>

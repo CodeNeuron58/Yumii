@@ -1,12 +1,12 @@
 ---
 title: "Yumi"
-description: "Real-time AI companion for terminal-native interaction."
+description: "Open-source AI companion with a Live2D avatar, real-time voice conversation, and switchable personalities. Runs on CPU."
 hideHero: true
 ---
 
-<MascotHero 
-  title="Yumi" 
-  subtitle="Real-time AI companion for terminal-native interaction." 
+<MascotHero
+  title="Yumi"
+  subtitle="Open-source AI companion with voice and a Live2D avatar. Runs on CPU."
 />
 
 <FeatureList cols={4}>
@@ -36,40 +36,62 @@ hideHero: true
     icon="cube"
     href="/capabilities/system-tools"
   >
-    Extend Yumi with system tools and persistent memory.
+    Built-in tools and the current (in-process) memory model.
   </DocsCard>
 </FeatureList>
 
 ## What is Yumi?
 
-Yumi is an interactive, real-time AI waifu designed to act as your virtual companion. 
-With dynamic, expressive visuals and an intelligent conversational backend, Yumi provides 
-a highly engaging and responsive experience.
+Yumi is an open-source, locally-runnable AI companion. She listens
+through your microphone, thinks using a hosted LLM (Groq, OpenAI, or
+Anthropic), speaks using a hosted TTS provider (ElevenLabs or
+CAMB.ai), and reacts in real time through a Live2D avatar in your
+browser.
 
-Unlike sterile utility tools, Yumi is built with a focus on **presence**. She listens, reacts 
-dynamically, and synchronizes her facial expressions to the emotional tone of her thoughts.
+She is not a chatbot you query. She is a presence that listens,
+reacts, and remembers you within a session. Across sessions, the
+current v1.0 release does not yet persist memory — that is scheduled
+for v1.1 (see `ROADMAP.md`).
 
-## Key Features
+## What v1.0 ships with
 
-<FeatureList cols={2}>
-  <DocsCard title="Real-time Voice Recognition" icon="waveform-lines">
-    Captures and processes your voice seamlessly using local, low-latency Whisper models.
-  </DocsCard>
-  <DocsCard title="Lifelike Voice Synthesis" icon="face-smile">
-    Utilizes ElevenLabs TTS for incredibly realistic, high-quality, and expressive voice generation.
-  </DocsCard>
-  <DocsCard title="Dynamic Visuals" icon="cube">
-    Brought to life using HTML5, WebSockets, and Live2D, Yumi reacts to your conversations with fluid body movements.
-  </DocsCard>
-  <DocsCard title="Emotional Intelligence" icon="rocket">
-    Powered by LLMs (Groq, OpenAI, Anthropic), Yumi's expressions dynamically change based on the emotional context of the dialogue.
-  </DocsCard>
-  <DocsCard title="Interactive Terminal Dashboard" icon="layout-dashboard">
-    A beautiful, fully interactive CLI to configure and launch her easily.
-  </DocsCard>
-</FeatureList>
+* **Real-time voice conversation** — Silero VAD for speech detection,
+  `faster-whisper` (local CPU) or Groq Whisper (cloud) for transcription.
+* **Animated Live2D avatar** — open the browser, allow the microphone,
+  and Yumi reacts with expressions and body motions driven by the
+  LLM's structured output.
+* **Six personalities** — `caring`, `tsundere`, `genki`, `kuudere`,
+  `yandere`, `dandere`. Each is a plain text file in
+  `src/yumi/assets/prompts/`. Add your own.
+* **Barge-in** — speak while Yumi is talking and she stops. This is
+  the Gemini Live–style feel.
+* **OS-keychain credentials** — API keys are stored in Windows
+  Credential Manager, macOS Keychain, or libsecret. Never in `.env`.
+* **Polished CLI** — a Typer + Rich terminal dashboard with a
+  pixel-art banner, gradient vision reader, and a guided setup wizard.
 
-## The Architecture
+## What v1.0 does **not** ship with
 
-Yumi's architecture bridges a powerful Python backend with a reactive frontend.
-To learn more about the engineering details behind Yumi, proceed to the [Core Senses](/senses/vad) or [Integration](/integration/websocket-protocol) sections.
+These are on the roadmap and will land in subsequent releases:
+
+* **Persistent memory across restarts** — v1.1.
+* **A planning / tool-execution agent loop** — v2.0.
+* **MCP (Model Context Protocol) server** — v2.0.
+* **Multimodal vision input** — post v2.0.
+* **A bundled Live2D model** — you bring your own
+  (`.model3.json` from any Cubism 4 compatible model). Drop it in
+  `~/.yumi/avatar/` and update the `modelUrl` in
+  `src/yumi/assets/webui/index.html`.
+
+## Why Yumi?
+
+Because the existing closed-source companions (Replika, Character.AI,
+Ava, etc.) require cloud accounts, lock you out of the personality
+prompts, and ship voice + avatar as an opaque binary. Yumi is the
+opposite: every line of her brain is a text file you can edit, every
+key lives in your OS keychain, every STT / TTS / LLM provider is a
+pluggable factory, and the avatar runs in your browser using standard
+Web tech.
+
+She is not the smartest assistant. She is the one you can actually
+read, modify, and own.

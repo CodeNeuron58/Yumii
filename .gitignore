@@ -24,5 +24,11 @@ docs/thought_process.md
 Experiments/
 *.wav
 
-# Assets
+# Assets — user-provided Live2D models live in ~/.yumi/avatar/, not here
 assets/avatar/
+
+# IDE / OS clutter
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

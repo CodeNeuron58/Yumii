@@ -82,7 +82,15 @@ class YumiEngine:
 
         def on_speech_start() -> None:
             # We allow interrupts even while speaking to achieve a "Gemini Live" feel.
-            # The browser's echoCancellation and Silero VAD handle the filtering of Yumi's own voice.
+            # The browser's `echoCancellation` and Silero VAD handle the filtering
+            # of Yumi's own voice, but we *also* suppress the interrupt event
+            # while audio is actively playing on the TTS speaker. This is a
+            # belt-and-suspenders defense against the feedback loop that would
+            # otherwise occur when the user's mic picks up Yumi's spoken output
+            # on speakers without headphones.
+            if self.is_speaking:
+                log.debug("interrupt_suppressed_yumi_speaking")
+                return
             self.interrupt_event.set()
             payload = {"type": "interrupt"}
             asyncio.create_task(self.broadcast_payload(payload))

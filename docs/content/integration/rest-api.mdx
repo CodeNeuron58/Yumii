@@ -46,5 +46,13 @@ app.add_middleware(
 
 This guarantees you can connect to `ws://localhost:8000/ws` from any local development host or OBS browser source cleanly without safety crashes!
 
-Proceed to the [Model Context Protocol (MCP)](/integration/mcp-server) page to expose her brain tools globally!
+For WebSocket payload details, see the [WebSocket Protocol](/integration/websocket-protocol) page.
+
+<Callout type="info" title="Planned for v2">
+  Exposing Yumi's tool registry to external LLM clients via the
+  **Model Context Protocol (MCP)** is on the roadmap for v2.0. The
+  v1.0 release has no MCP server transport — the current engine is a
+  self-contained voice → LLM → TTS loop. See the
+  [MCP page](/integration/mcp-server) for details.
+</Callout>
 </ContentCard>
