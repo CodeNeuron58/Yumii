@@ -222,8 +222,9 @@ def _toolbar() -> HTML:
 _COMMANDS: list[tuple[str, str, str]] = [
     # (command,         aliases hint,            description)
     ("/wake",         "",                       "Wake Yumii up — launch her avatar server and open the browser"),
-    ("/chat",         "new",                    "Start a brand-new chat session in the browser"),
+    ("/chat",         "new",                    "Browse sessions: resume old or start new"),
     ("/resume",       "resume-chat",            "Resume your most recent chat session"),
+    ("/memory",       "",                       "Browse and edit long-term memory (facts)"),
     ("/sessions",     "",                       "List your saved chat sessions"),
     ("/config",       "configure · settings",   "Configure mind (LLM), voice (TTS), and ears (STT)"),
     ("/personality",  "",                       "Switch Yumii's personality mode"),
@@ -777,6 +778,176 @@ def _cmd_forget() -> None:
         )
 
 
+# ── /chat — Session picker with delete ───────────────────────────────────────
+
+def _cmd_chat() -> None:
+    """Open a TUI session picker: resume, new, or delete."""
+    import asyncio
+    from prompt_toolkit.shortcuts import button_dialog
+
+    sessions = asyncio.run(session_manager.list_sessions(limit=50))
+
+    # Build radiolist values: (session_id, display_text)
+    values: list[tuple[str | None, str]] = [(None, "✨  New Chat")]
+    for s in sessions:
+        date_str = s.created_at.split("T")[0] if "T" in s.created_at else s.created_at[:10]
+        label = f"{s.name}    {date_str}  ·  {s.message_count} msg"
+        values.append((s.id, label))
+
+    if not sessions:
+        console.print(f"\n  [{_C_DIM}]No saved sessions yet. Starting a new chat.[/]\n")
+        _cmd_new()
+        return
+
+    choice = radiolist_dialog(
+        title="💬  Chat Sessions",
+        text="Select a session, then choose what to do:\n",
+        values=values,
+        ok_text="Select  ❯",
+        cancel_text="Cancel",
+        style=_DIALOG_STYLE,
+    ).run()
+
+    if choice is None:
+        return  # User cancelled
+
+    if choice is None or choice == "":
+        _cmd_new()
+        return
+
+    # Find the selected session name
+    selected_name = "New Chat"
+    for s in sessions:
+        if s.id == choice:
+            selected_name = s.name
+            break
+
+    action = button_dialog(
+        title=f"💬  {selected_name}",
+        text="What would you like to do?\n",
+        buttons=[
+            ("Resume", "resume"),
+            ("Delete", "delete"),
+            ("Cancel", "cancel"),
+        ],
+        style=_DIALOG_STYLE,
+    ).run()
+
+    if action == "resume":
+        _cmd_resume_with_id(choice)
+    elif action == "delete":
+        confirm = yes_no_dialog(
+            title="🗑️  Delete Session",
+            text=(
+                f"Delete '{selected_name}'?\n\n"
+                "This removes the conversation history permanently."
+            ),
+            yes_text="Delete",
+            no_text="Cancel",
+            style=_DIALOG_STYLE,
+        ).run()
+        if confirm:
+            asyncio.run(session_manager.delete_session(choice))
+            console.print(
+                f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Session deleted.[/]\n"
+            )
+
+
+def _cmd_resume_with_id(session_id: str) -> None:
+    """Resume a specific session ID and open the browser."""
+    import asyncio
+    session = asyncio.run(session_manager.get_session(session_id))
+    if session:
+        console.print(
+            f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Resuming [bold]{session.name}[/bold] "
+            f"({session.id[:8]}…)[/]\n"
+        )
+    _cmd_wake()
+
+
+# ── /memory — Fact manager ───────────────────────────────────────────────────
+
+def _cmd_memory() -> None:
+    """Open a TUI fact manager: browse, edit, or delete long-term memory."""
+    import asyncio
+    from prompt_toolkit.shortcuts import button_dialog
+
+    facts = asyncio.run(memory_manager.get_facts(limit=200))
+    if not facts:
+        console.print(
+            f"\n  [{_C_DIM}]No long-term memory stored yet."
+            f" Chat with Yumii and she'll start remembering.[/]\n"
+        )
+        return
+
+    # Build radiolist values
+    values: list[tuple[str, str]] = []
+    for f in facts:
+        preview = f.fact[:50] + "…" if len(f.fact) > 50 else f.fact
+        date_str = f.created_at.split("T")[0] if "T" in f.created_at else f.created_at[:10]
+        label = f"[{f.category}]  {preview}    (conf: {f.confidence:.0%})  {date_str}"
+        values.append((f.id, label))
+
+    choice = radiolist_dialog(
+        title="🧠  Long-Term Memory",
+        text="Select a fact to edit or delete:\n",
+        values=values,
+        ok_text="Select  ❯",
+        cancel_text="Close",
+        style=_DIALOG_STYLE,
+    ).run()
+
+    if choice is None:
+        return
+
+    # Find the selected fact
+    selected_fact = next((f for f in facts if f.id == choice), None)
+    if selected_fact is None:
+        return
+
+    action = button_dialog(
+        title="🧠  Memory Action",
+        text=f"Fact:\n  {selected_fact.fact}\n",
+        buttons=[
+            ("Edit", "edit"),
+            ("Delete", "delete"),
+            ("Cancel", "cancel"),
+        ],
+        style=_DIALOG_STYLE,
+    ).run()
+
+    if action == "edit":
+        new_text = input_dialog(
+            title="✏️  Edit Memory",
+            text="Update this fact:",
+            default=selected_fact.fact,
+            style=_DIALOG_STYLE,
+        ).run()
+        if new_text and new_text.strip():
+            asyncio.run(memory_manager.update_fact(selected_fact.id, new_text.strip()))
+            console.print(
+                f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Memory updated.[/]\n"
+            )
+
+    elif action == "delete":
+        confirm = yes_no_dialog(
+            title="🗑️  Delete Memory",
+            text=(
+                f"Remove this fact?\n\n"
+                f"  {selected_fact.fact}\n\n"
+                "Yumii will no longer know this about you."
+            ),
+            yes_text="Delete",
+            no_text="Cancel",
+            style=_DIALOG_STYLE,
+        ).run()
+        if confirm:
+            asyncio.run(memory_manager.delete_fact(selected_fact.id))
+            console.print(
+                f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Memory deleted.[/]\n"
+            )
+
+
 # ── Vision content ────────────────────────────────────────────────────────────
 _VISION_SECTIONS = [
     (
@@ -1048,11 +1219,17 @@ def run_interactive_shell() -> None:
         if cmd in {"/wake", "wake"}:
             _cmd_wake()
 
-        elif cmd in {"/chat", "chat", "/new", "new"}:
+        elif cmd in {"/chat", "chat"}:
+            _cmd_chat()
+
+        elif cmd in {"/new", "new"}:
             _cmd_new()
 
         elif cmd in {"/resume", "resume", "/resume-chat", "resume-chat"}:
             _cmd_resume()
+
+        elif cmd in {"/memory", "memory"}:
+            _cmd_memory()
 
         elif cmd in {"/sessions", "sessions"}:
             _cmd_sessions()

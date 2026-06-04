@@ -19,6 +19,7 @@ from starlette.websockets import WebSocketState
 
 from yumii.core.engine import YumiiEngine
 from yumii.core.global_config import load_global_config
+from yumii.core.memory_manager import UserFact, memory_manager
 from yumii.core.session_manager import SessionRow, session_manager
 
 # The Engine handles all the heavy lifting: STT, LLM, TTS, and state
@@ -97,6 +98,44 @@ async def delete_session_endpoint(session_id: str) -> dict[str, Any]:
     """Hard-delete a session and its summary."""
     await session_manager.delete_session(session_id)
     return {"deleted": True, "session_id": session_id}
+
+
+# ---------------------------------------------------------------------------
+# REST API: Facts (Long-term Memory)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/facts")
+async def list_facts() -> list[dict[str, Any]]:
+    """Return all stored user facts."""
+    facts: list[UserFact] = await memory_manager.get_facts(limit=500)
+    return [
+        {
+            "id": f.id,
+            "fact": f.fact,
+            "category": f.category,
+            "confidence": f.confidence,
+            "created_at": f.created_at,
+        }
+        for f in facts
+    ]
+
+
+@app.put("/api/facts/{fact_id}")
+async def update_fact_endpoint(fact_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Update the text of an existing fact."""
+    new_text = body.get("fact", "").strip()
+    if not new_text:
+        return {"error": "Missing 'fact' field"}, 400
+    await memory_manager.update_fact(fact_id, new_text)
+    return {"updated": True, "fact_id": fact_id}
+
+
+@app.delete("/api/facts/{fact_id}")
+async def delete_fact_endpoint(fact_id: str) -> dict[str, Any]:
+    """Delete a single fact."""
+    await memory_manager.delete_fact(fact_id)
+    return {"deleted": True, "fact_id": fact_id}
 
 
 # ---------------------------------------------------------------------------

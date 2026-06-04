@@ -234,6 +234,209 @@
             color: #00d4aa;
             border-color: #00d4aa;
         }
+
+        /* ─── Memory Manager ─────────────────────────────────────────── */
+        #memory-manager {
+            position: absolute;
+            z-index: 35;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(13, 17, 23, 0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 40px;
+            overflow-y: auto;
+        }
+
+        #memory-manager.visible {
+            display: flex;
+        }
+
+        #memory-manager h2 {
+            color: #00d4aa;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .memory-close {
+            position: absolute;
+            top: 20px; right: 30px;
+            background: none;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .memory-close:hover {
+            color: #f85149;
+            border-color: #f85149;
+        }
+
+        .fact-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin: 6px 0;
+            width: 420px;
+            max-width: 90vw;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .fact-card .fact-text {
+            font-size: 15px;
+            color: #c9d1d9;
+            line-height: 1.4;
+        }
+
+        .fact-card .fact-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #8b949e;
+        }
+
+        .fact-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-preference { background: #238636; color: #fff; }
+        .badge-identity   { background: #1f6feb; color: #fff; }
+        .badge-habit      { background: #8957e5; color: #fff; }
+        .badge-relationship{ background: #da3633; color: #fff; }
+        .badge-goal       { background: #d29922; color: #fff; }
+        .badge-general    { background: #6e7681; color: #fff; }
+
+        .fact-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .fact-actions button {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .fact-actions button:hover {
+            background: #30363d;
+        }
+
+        .fact-actions .btn-delete:hover {
+            background: #da3633;
+            color: #fff;
+            border-color: #da3633;
+        }
+
+        /* ─── Session Delete Button ──────────────────────────────────── */
+        .session-card .delete-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: #8b949e;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .session-card:hover .delete-btn {
+            display: block;
+        }
+
+        .session-card .delete-btn:hover {
+            color: #f85149;
+        }
+
+        /* ─── Confirmation Modal ─────────────────────────────────────── */
+        .confirm-modal {
+            position: fixed;
+            z-index: 50;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .confirm-modal.visible {
+            display: flex;
+        }
+
+        .confirm-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px 28px;
+            max-width: 360px;
+            text-align: center;
+        }
+
+        .confirm-box h3 {
+            color: #f85149;
+            margin: 0 0 12px;
+            font-size: 18px;
+        }
+
+        .confirm-box p {
+            color: #c9d1d9;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .confirm-actions button {
+            padding: 8px 20px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .btn-confirm-delete {
+            background: #da3633;
+            color: #fff;
+        }
+
+        .btn-confirm-delete:hover {
+            background: #f85149;
+        }
+
+        .btn-confirm-cancel {
+            background: #21262d;
+            color: #8b949e;
+            border: 1px solid #30363d;
+        }
+
+        .btn-confirm-cancel:hover {
+            background: #30363d;
+            color: #c9d1d9;
+        }
     </style>
 </head>
 
@@ -253,6 +456,25 @@
         <h2>Welcome to Yumii</h2>
         <button class="btn-new-session" id="btn-new-session">✨ New Chat</button>
         <div id="session-list"></div>
+    </div>
+
+    <!-- Memory Manager Overlay -->
+    <div id="memory-manager">
+        <button class="memory-close" id="btn-memory-close">Close ✕</button>
+        <h2>🧠  Long-Term Memory</h2>
+        <div id="fact-list"></div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="confirm-modal" id="confirm-modal">
+        <div class="confirm-box">
+            <h3 id="confirm-title">🗑️ Delete?</h3>
+            <p id="confirm-text">This cannot be undone.</p>
+            <div class="confirm-actions">
+                <button class="btn-confirm-delete" id="btn-confirm-yes">Delete</button>
+                <button class="btn-confirm-cancel" id="btn-confirm-no">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <!-- Command Bar -->
@@ -450,6 +672,176 @@
             if (e.key === 'Escape') cmdBar.classList.remove('visible');
         });
 
+        // ─── Confirmation Modal ───
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmTitle = document.getElementById('confirm-title');
+        const confirmText = document.getElementById('confirm-text');
+        let confirmCallback = null;
+
+        function showConfirm(title, text, onYes) {
+            confirmTitle.innerText = title;
+            confirmText.innerText = text;
+            confirmCallback = onYes;
+            confirmModal.classList.add('visible');
+        }
+
+        function hideConfirm() {
+            confirmModal.classList.remove('visible');
+            confirmCallback = null;
+        }
+
+        document.getElementById('btn-confirm-yes').addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            hideConfirm();
+        });
+        document.getElementById('btn-confirm-no').addEventListener('click', hideConfirm);
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) hideConfirm();
+        });
+
+        // ─── Enhanced Session Picker (with delete) ───
+        async function loadSessionList() {
+            try {
+                const resp = await fetch('/api/sessions');
+                const sessions = await resp.json();
+                const list = document.getElementById('session-list');
+                list.innerHTML = '';
+
+                if (sessions.length === 0) {
+                    list.innerHTML = '<div style="color:#8b949e;font-size:14px;">No previous chats yet.</div>';
+                    return;
+                }
+
+                sessions.forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'session-card';
+                    card.innerHTML =
+                        `<div>` +
+                        `<div class="title">${escapeHtml(s.name)}</div>` +
+                        `<div class="meta">${s.created_at.split('T')[0]} · ${s.message_count} messages</div>` +
+                        `</div>` +
+                        `<button class="delete-btn" title="Delete session">🗑️</button>`;
+
+                    // Click on card body resumes
+                    card.onclick = (e) => {
+                        if (e.target.closest('.delete-btn')) return;
+                        selectSession(s.id);
+                    };
+
+                    // Delete button
+                    const delBtn = card.querySelector('.delete-btn');
+                    delBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        showConfirm(
+                            '🗑️ Delete Session',
+                            `Delete "${escapeHtml(s.name)}"?\n\nThis removes the conversation history permanently.`,
+                            () => deleteSession(s.id)
+                        );
+                    };
+
+                    list.appendChild(card);
+                });
+            } catch (e) {
+                console.error("Failed to load sessions:", e);
+            }
+        }
+
+        async function deleteSession(sessionId) {
+            try {
+                const resp = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+                if (resp.ok) {
+                    loadSessionList();  // refresh
+                } else {
+                    console.error("Failed to delete session");
+                }
+            } catch (e) {
+                console.error("Error deleting session:", e);
+            }
+        }
+
+        // ─── Memory Manager ───
+        const memoryManager = document.getElementById('memory-manager');
+        const factList = document.getElementById('fact-list');
+
+        function showMemoryManager() {
+            memoryManager.classList.add('visible');
+            loadFactList();
+        }
+
+        function hideMemoryManager() {
+            memoryManager.classList.remove('visible');
+        }
+
+        document.getElementById('btn-memory-close').addEventListener('click', hideMemoryManager);
+
+        async function loadFactList() {
+            try {
+                const resp = await fetch('/api/facts');
+                const facts = await resp.json();
+                factList.innerHTML = '';
+
+                if (facts.length === 0) {
+                    factList.innerHTML = '<div style="color:#8b949e;font-size:14px;padding:20px;">No memories stored yet. Chat with Yumii and she will start remembering.</div>';
+                    return;
+                }
+
+                facts.forEach(f => {
+                    const card = document.createElement('div');
+                    card.className = 'fact-card';
+                    const badgeClass = `badge-${f.category}`;
+                    card.innerHTML =
+                        `<div class="fact-text">${escapeHtml(f.fact)}</div>` +
+                        `<div class="fact-meta">` +
+                        `<span class="fact-badge ${badgeClass}">${f.category}</span>` +
+                        `<span>conf: ${Math.round(f.confidence * 100)}% · ${f.created_at.split('T')[0]}</span>` +
+                        `</div>` +
+                        `<div class="fact-actions">` +
+                        `<button onclick="editFact('${f.id}', this)">✏️ Edit</button>` +
+                        `<button class="btn-delete" onclick="deleteFact('${f.id}', this)">🗑️ Delete</button>` +
+                        `</div>`;
+                    factList.appendChild(card);
+                });
+            } catch (e) {
+                console.error("Failed to load facts:", e);
+            }
+        }
+
+        window.editFact = async function(factId, btn) {
+            const card = btn.closest('.fact-card');
+            const textDiv = card.querySelector('.fact-text');
+            const currentText = textDiv.innerText;
+            const newText = prompt("Edit memory:", currentText);
+            if (newText && newText.trim() && newText.trim() !== currentText) {
+                try {
+                    const resp = await fetch(`/api/facts/${factId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fact: newText.trim() })
+                    });
+                    if (resp.ok) loadFactList();
+                } catch (e) {
+                    console.error("Error updating fact:", e);
+                }
+            }
+        };
+
+        window.deleteFact = async function(factId, btn) {
+            const card = btn.closest('.fact-card');
+            const text = card.querySelector('.fact-text').innerText;
+            showConfirm(
+                '🗑️ Delete Memory',
+                `Remove this fact?\n\n${escapeHtml(text)}`,
+                async () => {
+                    try {
+                        const resp = await fetch(`/api/facts/${factId}`, { method: 'DELETE' });
+                        if (resp.ok) loadFactList();
+                    } catch (e) {
+                        console.error("Error deleting fact:", e);
+                    }
+                }
+            );
+        };
+
         // ─── Microphone ───
         async function initMicrophone() {
             try {
@@ -575,6 +967,11 @@
 
                 if (data.type === 'memory_cleared') {
                     console.log("Long-term memory cleared.");
+                    return;
+                }
+
+                if (data.type === 'show_memory_manager') {
+                    showMemoryManager();
                     return;
                 }
 
