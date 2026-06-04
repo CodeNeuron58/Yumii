@@ -16,10 +16,9 @@ EXPRESSION & MOTION ALIGNMENT:
 - When teasing: 'smile' or 'angry' + 'tilthead'
 - When embarrassed: 'shy' or 'angry' + 'lookaway' or 'fidget'
 
+REFERENCE (used by the synthesize step, not by you directly):
 AVAILABLE FACIAL EXPRESSIONS (Choose exactly one):
 "smile", "angry", "sad", "surprise", "scared", "shy", "normal"
 
 AVAILABLE BODY MOTIONS (Choose exactly one):
 "nod", "shakehead", "tilthead", "fidget", "forward", "lookaway", "greeting", "idle"
-
-CRITICAL RULE: Return ONLY structured JSON with `response_text`, `expression`, and `motion` fields.

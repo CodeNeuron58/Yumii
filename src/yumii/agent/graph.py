@@ -1,26 +1,34 @@
 """Reasoning graph definition for Yumii.
 
 Defines the LangGraph workflow that orchestrates the LLM interaction loop
-and maintains the conversational state.
+and maintains the conversational state using **persistent** SQLite checkpoints.
 """
 
+from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, StateGraph
 
 from yumii.agent.nodes import chat_node
 from yumii.core.types import MainState
 
 from yumii.core.logging import get_logger
+
 log = get_logger(__name__)
 
+# LangGraph checkpoints live in their own SQLite file.
+_CHECKPOINT_DB = Path.home() / ".yumii" / "memory" / "checkpoints.db"
 
-def build_graph() -> Any:
+
+async def build_graph() -> Any:
     """Build and return the compiled LangGraph for Yumii's reasoning engine.
 
-    This graph handles the LLM ReAct loop and state memory.
+    Uses :class:`AsyncSqliteSaver` so conversation history survives
+    server restarts.  Each session gets its own ``thread_id`` checkpoint
+    namespace automatically.
     """
 
     def think_node(state: MainState) -> dict:
@@ -31,6 +39,8 @@ def build_graph() -> Any:
                 "input": state["input"],
                 "messages": state.get("messages", []),
                 "session_id": state["session_id"],
+                "session_name": state.get("session_name", ""),
+                "user_facts": state.get("user_facts", []),
             }
         )
         return {
@@ -47,5 +57,6 @@ def build_graph() -> Any:
     workflow.set_entry_point("think")
     workflow.add_edge("think", END)
 
-    saver = InMemorySaver()
+    _CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
+    saver = AsyncSqliteSaver.from_conn_string(str(_CHECKPOINT_DB))
     return workflow.compile(checkpointer=saver)

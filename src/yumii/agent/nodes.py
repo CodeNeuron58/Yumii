@@ -13,6 +13,7 @@ from yumii.agent.personality_manager import personality_manager
 from yumii.core.types import MainState
 
 from yumii.core.logging import get_logger
+
 log = get_logger(__name__)
 
 
@@ -54,7 +55,14 @@ def chat_node(state: MainState) -> dict:
         )
 
     current_personality = personality_manager.get_current_personality()
-    agent = get_agent(current_personality)
+
+    # Load long-term memory facts for prompt injection.
+    # memory_manager.get_facts_formatted is async, but chat_node is sync.
+    # For now we use the synchronous bridge; engine.py pre-loads facts into state.
+    facts = state.get("user_facts", [])
+    facts_text = "\n".join(f"  • {f}" for f in facts) if facts else ""
+
+    agent = get_agent(current_personality, user_facts=facts_text or None)
 
     new_human_message = HumanMessage(content=user_input)
     input_messages = history + [new_human_message]

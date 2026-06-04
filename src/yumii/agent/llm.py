@@ -65,35 +65,39 @@ _TOOL_HINT = (
     "\nIf you need to use other tools (like getting the time), use them first before calling YumiiResponse."
 )
 
-# Lazy cache: personality name → compiled create_agent instance
-_agent_cache: dict[str, object] = {}
+# Lazy cache: (personality_name, facts_hash) → compiled create_agent instance
+_agent_cache: dict[tuple[str, int], object] = {}
 
 
-def _build_system_prompt(personality_name: str) -> str:
-    """Return the full system prompt for a personality (prompt file + tool hint)."""
+def _build_system_prompt(personality_name: str, user_facts: str | None = None) -> str:
+    """Return the full system prompt for a personality (prompt file + tool hint + facts)."""
     # Import here to avoid a circular import at module load time
     from yumii.agent.personality_manager import personality_manager
 
     base = personality_manager.load_personality(personality_name)
-    return base + _TOOL_HINT
+    prompt = base + _TOOL_HINT
+    if user_facts:
+        prompt += f"\n\n{user_facts}"
+    return prompt
 
 
-def get_agent(personality: str) -> object:
+def get_agent(personality: str, user_facts: str | None = None) -> object:
     """Return the create_agent instance for *personality*, building it on first use.
 
-    The agent is cached so subsequent calls with the same personality are free.
-    Personality switching (nodes.py) simply calls get_agent with the new name,
-    which either hits the cache or builds a new instance once.
+    The agent is cached so subsequent calls with the same personality and
+    fact set are free.  Personality switching simply calls get_agent with
+    the new name; long-term memory updates call it with new facts.
     """
-    if personality not in _agent_cache:
-        system_prompt = _build_system_prompt(personality)
-        _agent_cache[personality] = create_agent(
+    cache_key = (personality, hash(user_facts or ""))
+    if cache_key not in _agent_cache:
+        system_prompt = _build_system_prompt(personality, user_facts)
+        _agent_cache[cache_key] = create_agent(
             model=base_llm,
             tools=tools,
             response_format=YumiiResponse,
             system_prompt=system_prompt,
         )
-    return _agent_cache[personality]
+    return _agent_cache[cache_key]
 
 
 def clear_agent_cache() -> None:

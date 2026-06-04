@@ -41,6 +41,8 @@ from yumii.core.credential_store import (
     save_credential,
 )
 from yumii.core.global_config import load_global_config, update_global_config
+from yumii.core.memory_manager import memory_manager
+from yumii.core.session_manager import session_manager
 
 from yumii.core.logging import configure_logging, get_logger
 configure_logging()
@@ -220,9 +222,13 @@ def _toolbar() -> HTML:
 _COMMANDS: list[tuple[str, str, str]] = [
     # (command,         aliases hint,            description)
     ("/wake",         "",                       "Wake Yumii up — launch her avatar server and open the browser"),
+    ("/chat",         "new",                    "Start a brand-new chat session in the browser"),
+    ("/resume",       "resume-chat",            "Resume your most recent chat session"),
+    ("/sessions",     "",                       "List your saved chat sessions"),
     ("/config",       "configure · settings",   "Configure mind (LLM), voice (TTS), and ears (STT)"),
     ("/personality",  "",                       "Switch Yumii's personality mode"),
     ("/vision",       "story",                  "Read the story and roadmap behind Yumii"),
+    ("/forget",       "",                       "Wipe all long-term memory (facts)"),
     ("/help",         "h · ?",                  "Show this help screen"),
     ("/exit",         "quit · q",               "Let Yumii sleep — exit gracefully"),
 ]
@@ -672,6 +678,105 @@ def _cmd_personality() -> None:
         )
 
 
+# ─── Session helpers ──────────────────────────────────────────────────────────
+
+def _render_sessions_table(sessions: list) -> None:
+    """Print a Rich table of sessions."""
+    table = Table(
+        show_header=True,
+        header_style=f"bold {_C_PRIMARY}",
+        border_style=_C_PANEL,
+        box=box.SIMPLE_HEAVY,
+        padding=(0, 2),
+        show_lines=False,
+        min_width=70,
+    )
+    table.add_column("Name",     style=_C_TEXT, min_width=20)
+    table.add_column("Created",  style=_C_DIM,  min_width=12)
+    table.add_column("Messages", style=_C_DIM,  min_width=10, justify="right")
+    table.add_column("ID",       style=_C_DIM,  min_width=26)
+
+    for s in sessions:
+        table.add_row(
+            s.name,
+            s.created_at.split("T")[0] if "T" in s.created_at else s.created_at[:10],
+            str(s.message_count),
+            s.id,
+        )
+
+    console.print()
+    console.print(
+        Panel(table, border_style=_C_PRIMARY, expand=False, padding=(1, 2))
+    )
+    console.print()
+
+
+def _cmd_sessions() -> None:
+    """List all saved chat sessions in the terminal."""
+    import asyncio
+    sessions = asyncio.run(session_manager.list_sessions())
+    if not sessions:
+        console.print(f"\n  [{_C_DIM}]No saved sessions yet.[/]\n")
+        return
+    _render_sessions_table(sessions)
+
+
+def _cmd_new() -> None:
+    """Start a new chat session in the browser."""
+    _cmd_wake()
+
+
+def _cmd_resume() -> None:
+    """Resume the most recent session, or start new if none exist."""
+    import asyncio
+    last = asyncio.run(session_manager.get_last_active_session())
+    if last:
+        console.print(
+            f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Resuming [bold]{last.name}[/bold] "
+            f"({last.id[:8]}…)[/]\n"
+        )
+    _cmd_wake()
+
+
+def _cmd_rename(raw: str) -> None:
+    """Rename the current session from the REPL."""
+    parts = raw.strip().split(maxsplit=1)
+    name = parts[1] if len(parts) > 1 else ""
+    if not name:
+        console.print(
+            f"\n  [{_C_DIM}]Usage: [bold {_C_PRIMARY}]/name <new-name>[/][/]\n"
+        )
+        return
+    # We don't know the active session_id in the REPL, so this is a no-op
+    # until we add a way to query the running engine.  For now we just guide.
+    console.print(
+        f"\n  [{_C_DIM}]Session renaming works in the browser. "
+        f"Type [bold {_C_PRIMARY}]/name {name}[/] there.[/]\n"
+    )
+
+
+def _cmd_forget() -> None:
+    """Wipe all long-term user facts."""
+    import asyncio
+    result = yes_no_dialog(
+        title="🗑️  Forget Everything",
+        text=(
+            "This will erase all long-term memory:\n"
+            "preferences, habits, and facts Yumii has learned about you.\n\n"
+            "Conversation history (sessions) will remain.\n\n"
+            "Are you sure?"
+        ),
+        yes_text="Forget",
+        no_text="Cancel",
+        style=_DIALOG_STYLE,
+    ).run()
+    if result:
+        asyncio.run(memory_manager.clear_all_facts())
+        console.print(
+            f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Long-term memory cleared.[/]\n"
+        )
+
+
 # ── Vision content ────────────────────────────────────────────────────────────
 _VISION_SECTIONS = [
     (
@@ -943,6 +1048,15 @@ def run_interactive_shell() -> None:
         if cmd in {"/wake", "wake"}:
             _cmd_wake()
 
+        elif cmd in {"/chat", "chat", "/new", "new"}:
+            _cmd_new()
+
+        elif cmd in {"/resume", "resume", "/resume-chat", "resume-chat"}:
+            _cmd_resume()
+
+        elif cmd in {"/sessions", "sessions"}:
+            _cmd_sessions()
+
         elif cmd in {"/config", "config", "/configure", "configure",
                      "/settings", "settings"}:
             run_models_wizard()
@@ -952,6 +1066,12 @@ def run_interactive_shell() -> None:
 
         elif cmd in {"/vision", "vision", "/story", "story"}:
             _cmd_vision()
+
+        elif cmd.startswith("/name") or cmd.startswith("/rename"):
+            _cmd_rename(raw)
+
+        elif cmd in {"/forget", "forget"}:
+            _cmd_forget()
 
         elif cmd in {"/help", "help", "h", "?"}:
             _show_help()
@@ -1043,6 +1163,40 @@ def server() -> None:
 
     console.print(f"[bold {_C_PRIMARY}]Starting Yumii API server...[/]")
     uvicorn.run(fastapi_app, host="127.0.0.1", port=8000, log_config=None)
+
+
+@app.command()
+def chat() -> None:
+    """Start a brand-new chat session in the browser."""
+    _cmd_new()
+
+
+@app.command(name="resume-chat")
+def resume_chat() -> None:
+    """Resume your most recent chat session in the browser."""
+    _cmd_resume()
+
+
+@app.command()
+def sessions() -> None:
+    """List all saved chat sessions."""
+    _cmd_sessions()
+
+
+@app.command(name="delete-session")
+def delete_session(session_id: str) -> None:
+    """Delete a chat session and its conversation history."""
+    import asyncio
+    asyncio.run(session_manager.delete_session(session_id))
+    console.print(
+        f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Session {session_id[:8]}… deleted.[/]\n"
+    )
+
+
+@app.command()
+def forget() -> None:
+    """Wipe all long-term memory (user facts) without deleting sessions."""
+    _cmd_forget()
 
 
 if __name__ == "__main__":

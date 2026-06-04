@@ -16,6 +16,8 @@ class MainState(TypedDict):
     expression: str
     motion: str
     session_id: str
+    session_name: str  # Human-readable session label
+    user_facts: list[str]  # Injected long-term memory facts
 
 
 # --- Personality Types ---

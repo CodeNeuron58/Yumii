@@ -14,7 +14,10 @@ def test_main_state_has_required_fields() -> None:
     contract and the WebSocket payload contract.
     """
     annotations = MainState.__annotations__
-    for required in ("messages", "input", "response", "expression", "motion", "session_id"):
+    for required in (
+        "messages", "input", "response", "expression", "motion",
+        "session_id", "session_name", "user_facts",
+    ):
         assert required in annotations, f"MainState missing field: {required}"
 
 
