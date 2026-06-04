@@ -16,6 +16,7 @@ from typing import Any
 import aiosqlite
 from langgraph.store.sqlite import AsyncSqliteStore
 
+from yumii.agent.fact_extractor import extract_facts
 from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -211,7 +212,7 @@ class MemoryManager:
         return [f.fact for f in facts]
 
     # ------------------------------------------------------------------
-    # Extraction (stub — filled in v1.1)
+    # Extraction
     # ------------------------------------------------------------------
 
     async def extract_facts_from_messages(
@@ -221,15 +222,49 @@ class MemoryManager:
     ) -> list[str]:
         """Analyse a list of messages and extract new facts about the user.
 
-        This is a **stub** for v0.2.0.  In v1.1 it will call a cheap LLM
-        (e.g. llama-3.1-8b via Groq) to extract facts and then call
-        :meth:`store_fact` for each one.
+        Uses a cheap LLM to extract atomic facts, deduplicates them against
+        existing memory, and stores each new fact.  Runs as a fire-and-forget
+        background task so it never blocks the conversation.
 
-        Returns an empty list so that nothing happens until the feature
-        is fully wired.
+        Returns the list of newly stored fact texts.
         """
-        log.debug("fact_extraction_stub", message_count=len(messages))
-        return []
+        if not messages:
+            return []
+
+        try:
+            extracted = await extract_facts(messages)
+        except Exception as exc:
+            log.warning("fact_extraction_failed", error=str(exc))
+            return []
+
+        if not extracted:
+            return []
+
+        # Deduplicate against existing facts (simple substring match)
+        existing = await self.get_facts_raw(limit=500)
+        existing_lower = [e.lower() for e in existing]
+
+        stored: list[str] = []
+        for item in extracted:
+            fact_text: str = item["fact"]
+            fact_lower = fact_text.lower()
+
+            # Skip if this fact (or a very similar one) already exists
+            if any(fact_lower in existing or existing in fact_lower for existing in existing_lower):
+                log.debug("fact_deduplicated", fact_preview=fact_text[:60])
+                continue
+
+            await self.store_fact(
+                fact=fact_text,
+                category=item["category"],
+                confidence=item["confidence"],
+                session_id=session_id,
+            )
+            stored.append(fact_text)
+            existing_lower.append(fact_lower)
+
+        log.info("facts_stored_after_extraction", count=len(stored), session_id=session_id)
+        return stored
 
 
 # Global singleton — safe because all methods are async and the store is

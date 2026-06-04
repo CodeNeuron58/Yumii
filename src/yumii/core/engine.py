@@ -364,6 +364,17 @@ class YumiiEngine:
                     self.active_session_id
                 )
 
+                # Fire-and-forget fact extraction from this turn.
+                asyncio.create_task(
+                    memory_manager.extract_facts_from_messages(
+                        [
+                            {"role": "user", "content": user_text},
+                            {"role": "assistant", "content": reasoning_result["response"]},
+                        ],
+                        self.active_session_id,
+                    )
+                )
+
                 await self.tts_queue.put(reasoning_result)
             except Exception as e:
                 log.error("reasoning_engine_crash", error=str(e), exc_info=True)

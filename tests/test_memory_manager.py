@@ -85,7 +85,56 @@ async def test_get_facts_raw(isolated_memory: MemoryManager) -> None:
 
 
 @pytest.mark.asyncio
-async def test_extract_facts_stub(isolated_memory: MemoryManager) -> None:
-    """extract_facts_from_messages() is a stub and should return []."""
+async def test_extract_facts_with_deduplication(isolated_memory: MemoryManager, monkeypatch: pytest.MonkeyPatch) -> None:
+    """extract_facts_from_messages should store new facts and skip duplicates."""
+    # Pre-seed an existing fact
+    await isolated_memory.store_fact("User likes jazz music", category="preference")
+
+    # Mock the extractor to return one duplicate and one new fact
+    async def fake_extract_facts(_messages: list[dict[str, str]]) -> list[dict]:
+        return [
+            {"fact": "User likes jazz music", "category": "preference", "confidence": 0.9},
+            {"fact": "User has a cat", "category": "identity", "confidence": 0.8},
+        ]
+
+    monkeypatch.setattr(
+        "yumii.core.memory_manager.extract_facts",
+        fake_extract_facts,
+    )
+
+    result = await isolated_memory.extract_facts_from_messages(
+        [{"role": "user", "content": "I like jazz and have a cat."}],
+        "sess-1",
+    )
+
+    # Only the new fact should be stored
+    assert len(result) == 1
+    assert "cat" in result[0]
+
+    all_facts = await isolated_memory.get_facts_raw()
+    assert len(all_facts) == 2  # original + new
+
+
+@pytest.mark.asyncio
+async def test_extract_facts_empty_messages(isolated_memory: MemoryManager) -> None:
+    """Empty messages should short-circuit to empty list."""
     result = await isolated_memory.extract_facts_from_messages([], "sess-1")
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_extract_facts_extractor_failure(isolated_memory: MemoryManager, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the extractor LLM fails, the method should return [] gracefully."""
+    async def fake_extract_facts(_messages: list[dict[str, str]]) -> None:
+        raise RuntimeError("LLM down")
+
+    monkeypatch.setattr(
+        "yumii.core.memory_manager.extract_facts",
+        fake_extract_facts,
+    )
+
+    result = await isolated_memory.extract_facts_from_messages(
+        [{"role": "user", "content": "Hello"}],
+        "sess-1",
+    )
     assert result == []
