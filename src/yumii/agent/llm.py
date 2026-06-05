@@ -7,7 +7,6 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from yumii.core.config import settings
-from yumii.tools import tools
 
 
 class YumiiResponse(BaseModel):

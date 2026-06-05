@@ -188,7 +188,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     # --- Phase 1: Session negotiation ---
     # Try to read the client's first message.  If it's a session_select
     # JSON payload we honour it; otherwise default to a new session.
-    session_id: str | None = None
     try:
         first_msg = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
         data = json.loads(first_msg)
@@ -198,15 +197,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     if data.get("type") == "session_select":
         action = data.get("action", "new")
         if action == "new":
-            session_id = await engine.create_new_session()
+            await engine.create_new_session()
         elif action == "resume":
             sid = data.get("session_id", "")
-            session_id = await engine.resume_session(sid)
+            await engine.resume_session(sid)
         else:
-            session_id = await engine.create_new_session()
+            await engine.create_new_session()
     else:
         # Default: brand new session
-        session_id = await engine.create_new_session()
+        await engine.create_new_session()
 
     # Take-over: if another connection is active, politely evict it.
     for conn in engine.active_connections:
