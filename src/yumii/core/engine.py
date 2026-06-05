@@ -26,15 +26,6 @@ from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
 
-# ---------------------------------------------------------------------------
-# In-conversation commands that affect session state
-# ---------------------------------------------------------------------------
-_SESSION_COMMANDS = frozenset({
-    "/new", "/chat", "/resume", "/sessions",
-    "/name", "/rename", "/forget",
-})
-
-
 class YumiiEngine:
     """The central orchestration engine for Yumii.
 
@@ -136,118 +127,6 @@ class YumiiEngine:
                     break
         log.debug("queues_cleared")
 
-    def _handle_text_command(self, text: str) -> bool:
-        """Intercept in-conversation commands.  Return True if handled."""
-        lowered = text.strip().lower()
-        parts = lowered.split(maxsplit=1)
-        cmd = parts[0] if parts else ""
-        arg = parts[1] if len(parts) > 1 else ""
-
-        if cmd not in _SESSION_COMMANDS:
-            return False
-
-        # Schedule the async side-effect via create_task so we don't block
-        # the reasoning loop synchronously.
-        if cmd in ("/new", "/chat"):
-            asyncio.create_task(self._cmd_new_session())
-        elif cmd == "/resume":
-            asyncio.create_task(self._cmd_resume(arg))
-        elif cmd == "/sessions":
-            asyncio.create_task(self._cmd_list_sessions())
-        elif cmd in ("/name", "/rename"):
-            asyncio.create_task(self._cmd_rename(arg))
-        elif cmd == "/forget":
-            asyncio.create_task(self._cmd_forget())
-        else:
-            return False
-
-        return True
-
-    async def _cmd_new_session(self) -> None:
-        """Handle /new — create a fresh session and speak a welcome line."""
-        session_id = await self.create_new_session()
-        await self.tts_queue.put({
-            "response": "Starting a brand new chat. What's on your mind?",
-            "expression": "smile",
-            "motion": "greeting",
-            "session_id": session_id,
-        })
-        await self.broadcast_payload({
-            "type": "session_switched",
-            "session_id": session_id,
-            "session_name": self.active_session_name,
-        })
-
-    async def _cmd_resume(self, arg: str) -> None:
-        """Handle /resume [id] — resume last or specific session."""
-        if arg:
-            session_id = await self.resume_session(arg)
-        else:
-            last = await session_manager.get_last_active_session()
-            if last:
-                session_id = await self.resume_session(last.id)
-            else:
-                session_id = await self.create_new_session()
-
-        await self.tts_queue.put({
-            "response": f"Resuming your chat: {self.active_session_name}.",
-            "expression": "normal",
-            "motion": "nod",
-            "session_id": session_id,
-        })
-        await self.broadcast_payload({
-            "type": "session_switched",
-            "session_id": session_id,
-            "session_name": self.active_session_name,
-        })
-
-    async def _cmd_list_sessions(self) -> None:
-        """Handle /sessions — speak the list of recent sessions."""
-        sessions = await session_manager.list_sessions(limit=5)
-        if not sessions:
-            text = "You don't have any saved sessions yet."
-        else:
-            lines = ["Here are your recent chats:"]
-            for s in sessions:
-                lines.append(f"  {s.name} — {s.created_at[:10]}")
-            text = "\n".join(lines)
-
-        await self.tts_queue.put({
-            "response": text,
-            "expression": "normal",
-            "motion": "idle",
-            "session_id": self.active_session_id or "",
-        })
-
-    async def _cmd_rename(self, name: str) -> None:
-        """Handle /name <name> — rename the active session."""
-        if not self.active_session_id:
-            return
-        name = name.strip() or "New Chat"
-        await session_manager.rename_session(self.active_session_id, name)
-        self.active_session_name = name
-        await self.broadcast_payload({
-            "type": "session_renamed",
-            "session_id": self.active_session_id,
-            "session_name": name,
-        })
-        await self.tts_queue.put({
-            "response": f"Got it. This chat is now called {name}.",
-            "expression": "smile",
-            "motion": "nod",
-            "session_id": self.active_session_id,
-        })
-
-    async def _cmd_forget(self) -> None:
-        """Handle /forget — wipe all long-term memory."""
-        await memory_manager.clear_all_facts()
-        await self.tts_queue.put({
-            "response": "All right, I've forgotten everything I knew about you.",
-            "expression": "sad",
-            "motion": "idle",
-            "session_id": self.active_session_id or "",
-        })
-
     # ------------------------------------------------------------------
     # Broadcast
     # ------------------------------------------------------------------
@@ -326,11 +205,6 @@ class YumiiEngine:
                         self.tts_queue.get_nowait()
                     except asyncio.QueueEmpty:
                         break
-
-                # --- Command interception ---
-                if self._handle_text_command(user_text):
-                    log.info("command_handled", command=user_text)
-                    continue
 
                 if not self.active_session_id or not self.graph_app:
                     log.warning("reasoning_skipped_no_session")

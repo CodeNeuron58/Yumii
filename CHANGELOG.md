@@ -5,6 +5,54 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-06-05
+
+Memory & Sessions release.
+
+### Added
+- **Persistent SQLite memory.** Two local databases at `~/.yumii/memory/`:
+  `yumii.db` (session metadata + user facts) and `checkpoints.db`
+  (LangGraph `AsyncSqliteSaver` conversation history). Survives server
+  restarts.
+- **Session management.** Each browser tab gets its own session ID.
+  No more shared `yumii_session_1`. Sessions can be created, resumed,
+  renamed, listed, and deleted.
+- **Automatic fact extraction.** After every conversation turn, a cheap
+  LLM pass extracts user facts ("user is vegetarian", "user likes jazz")
+  and deduplicates them against existing memory. Facts are injected into
+  the system prompt on every new / resumed session.
+- **CLI session & memory commands:**
+  - `/chat` — TUI session picker (resume, new, delete)
+  - `/resume` — resume most recent session
+  - `/sessions` — list all saved sessions
+  - `/memory` — TUI fact browser / editor / deleter
+  - `/forget` — wipe all long-term memory (facts, not sessions)
+  - `/name <name>` — rename the active session
+- **REST API endpoints** (`server.py`):
+  - `GET/POST /api/sessions`, `POST /api/sessions/{id}/resume`,
+    `DELETE /api/sessions/{id}`
+  - `GET /api/facts`, `PUT /api/facts/{id}`, `DELETE /api/facts/{id}`
+  - `GET /api/config` — runtime config + avatar URL
+- **4 new test files** (`test_fact_extractor.py`, `test_memory_db.py`,
+  `test_memory_manager.py`, `test_session_manager.py`).
+- **New dependencies:** `aiosqlite`, `langgraph-checkpoint-sqlite`.
+
+### Changed
+- `graph.py` now uses `AsyncSqliteSaver` instead of `InMemorySaver`.
+- `llm.py` agent cache key includes a hash of injected user facts, so
+  personality updates correctly when memory changes.
+- `engine.py` initializes lazily (async `initialize()`) because
+  `AsyncSqliteSaver` needs an async context.
+
+### Removed
+- Dead frontend-only WebSocket broadcasts (`session_switched`,
+  `session_renamed`, `session_taken_over`, `session_ready`,
+  `memory_cleared`). The frontend never displayed these; they were
+  scaffolding for a UI overlay that was reverted.
+
+### Security
+- Facts database is local SQLite only — no cloud storage.
+
 ## [0.1.0] — 2026-06-03
 
 First public release. **Alpha — no API stability promise.** Everything

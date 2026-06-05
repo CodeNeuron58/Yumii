@@ -210,24 +210,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     for conn in engine.active_connections:
         if conn != websocket and conn.client_state == WebSocketState.CONNECTED:
             try:
-                await conn.send_text(
-                    json.dumps({"type": "session_taken_over"})
-                )
                 await conn.close()
             except Exception:
                 pass
     engine.active_connections = [websocket]
-
-    # Notify client that session is ready
-    await websocket.send_text(
-        json.dumps(
-            {
-                "type": "session_ready",
-                "session_id": session_id,
-                "session_name": engine.active_session_name,
-            }
-        )
-    )
 
     # --- Phase 2: Normal audio / command loop ---
     try:
@@ -245,30 +231,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         # Inject the command into the transcription queue
                         # so the engine's command handler can process it.
                         await engine.transcription_queue.put(cmd)
-
-                    elif msg_type == "rename_session":
-                        name = payload.get("name", "").strip()
-                        if engine.active_session_id and name:
-                            await session_manager.rename_session(
-                                engine.active_session_id, name
-                            )
-                            engine.active_session_name = name
-                            await engine.broadcast_payload(
-                                {
-                                    "type": "session_renamed",
-                                    "session_id": engine.active_session_id,
-                                    "session_name": name,
-                                }
-                            )
-
-                    elif msg_type == "forget_me":
-                        from yumii.core.memory_manager import memory_manager
-
-                        await memory_manager.clear_all_facts()
-                        # Also wipe checkpoints?  No — just facts for now.
-                        await engine.broadcast_payload(
-                            {"type": "memory_cleared"}
-                        )
 
                 except Exception:
                     pass

@@ -7,12 +7,22 @@ binary you downloaded. The "What's not in v1" section of
 
 ---
 
+## ✅ Shipped — 0.2.0 (June 2026)
+
+Memory & Sessions release. **Alpha — no API stability promise.** See
+`CHANGELOG.md` for the full list.
+
+- Persistent SQLite memory (sessions + user facts + LangGraph checkpoints)
+- Automatic fact extraction from conversation turns
+- Session management (create, resume, rename, list, delete)
+- CLI commands: `/chat`, `/resume`, `/sessions`, `/memory`, `/forget`, `/name`
+- In-conversation voice commands (`/new`, `/resume`, `/sessions`, etc.)
+- REST API for sessions and facts
+- 4 new test modules (48 total tests)
+
 ## ✅ Shipped — 0.1.0 (June 2026)
 
-The first public release. **Alpha — no API stability promise.** See
-`CHANGELOG.md` for the full list. The next release is v1.0.0, which
-will be tagged once the Triage / Planner / Synthesizer agent loop,
-persistent memory, and tool registry are all in place.
+The first public release.
 
 - Real-time voice loop (Silero VAD → STT → LangGraph → TTS)
 - Live2D avatar with LLM-driven expressions and motions
@@ -28,55 +38,32 @@ persistent memory, and tool registry are all in place.
 
 ---
 
-## 🚧 In progress — v1.1 (target: Q3 2026)
+## 🚧 In progress — v1.0 (target: Q3 2026)
 
-The next release. Focus: **memory**.
+The next release. Focus: **agentic loop**.
 
-- **Persistent conversation log.** Append every turn to a SQLite
-  database at `~/.yumii/memory/conversations.db`. The log survives
-  server restarts. No vector store yet — keyword matching.
-- **User-facts table.** A `UserFacts` table stores small extracted
-  facts ("user is vegetarian", "user's timezone is IST"). Populated
-  by a periodic extraction step (likely an LLM pass at the end of
-  each session).
-- **Per-WebSocket session IDs.** The current `yumii_session_1`
-  hardcoded thread becomes per-connection, so multiple browser tabs
-  no longer share conversation history.
-- **A `/forget-me` CLI command** that wipes the local memory store,
-  for users who want a clean slate.
+- **Triage / Planner / Synthesizer agent loop.** A cheap classifier
+  (Triage) produces an immediate spoken acknowledgement, the Planner
+  builds a `Plan` of tool calls, the Tool Dispatcher runs them with
+  cancellation support, and the Synthesizer produces the final
+  spoken answer.
+- **`ToolContract` protocol.** A new tool is added in <30 lines:
+  Pydantic input schema, an `async run()` method, a
+  `requires_confirmation` flag, and an idempotency key.
+- **Confirmation gates.** Side-effecting tools pause the engine and
+  emit a `{"type": "confirmation_request"}` WebSocket event.
+- **MCP server transport.** Expose the tool registry over the Model
+  Context Protocol so Claude Desktop, Cursor, etc. can call Yumii's
+  tools.
+- **A first real integration.** Likely Google Calendar (read-only)
+  or Google Tasks.
 - **More tests.** Aim for 60% coverage of `core/` and `agent/`.
-  The v1.0 tests are sanity checks, not a full suite.
 
 ---
 
 ## 🧠 Planned — v2.0 (target: Q4 2026)
 
 The flagship release. Focus: **agentic capabilities**.
-
-- **Triage / Planner / Synthesizer agent loop.** A cheap classifier
-  (Triage) produces an immediate spoken acknowledgement, the Planner
-  builds a `Plan` of tool calls, the Tool Dispatcher runs them with
-  cancellation support, and the Synthesizer produces the final
-  spoken answer. This is the architecture described in the project
-  wiki and the v2 design notes.
-- **`ToolContract` protocol.** A new tool is added in <30 lines:
-  Pydantic input schema, an `async run()` method, a
-  `requires_confirmation` flag, and an idempotency key.
-- **Confirmation gates.** Side-effecting tools (anything that
-  changes the world — sends email, books, orders) pause the engine
-  and emit a `{"type": "confirmation_request"}` WebSocket event.
-  The frontend shows a "Yumii wants to do X. Approve?" overlay.
-  Voice + button both work.
-- **MCP server transport.** Once the tool registry exists, expose it
-  over the Model Context Protocol so Claude Desktop, Cursor, and
-  other clients can call Yumii's tools.
-- **A first real integration.** Likely Google Calendar (read-only)
-  or Google Tasks — both have clean OAuth flows, real value, and no
-  legal grey area.
-
----
-
-## 🎨 Planned — post v2.0
 
 - **Multimodal vision input.** Webcam or screen-share as visual
   context. Uses a multimodal LLM (Llama-3.2-Vision, GPT-4o, or

@@ -1,6 +1,6 @@
 # Yumii 🌸 — Real-Time AI Companion
 
-[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![uv](https://img.shields.io/badge/package%20manager-uv-green.svg)](https://docs.astral.sh/uv/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -12,11 +12,11 @@ Yumii is an open-source, locally-runnable AI companion with a Live2D avatar,
 real-time voice conversation, and expressive personality. She runs on a standard
 CPU — no expensive GPU required.
 
-> ⚠️ **This is v0.1.0 — an alpha release.** The voice loop, avatar, and
-> six personalities all work end-to-end, but the engine will be rewritten
-> in v1.0.0 (Triage / Planner / Synthesizer agent loop with persistent
-> memory and tool support). **No API stability promise yet.** See
-> [`CHANGELOG.md`](CHANGELOG.md) and [`ROADMAP.md`](ROADMAP.md).
+> ⚠️ **This is v0.2.0 — an alpha release.** The voice loop, avatar,
+> six personalities, persistent memory, and multi-session support all work
+> end-to-end. The engine will be rewritten in v1.0.0 (Triage / Planner /
+> Synthesizer agent loop with tool support). **No API stability promise yet.**
+> See [`CHANGELOG.md`](CHANGELOG.md) and [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -61,6 +61,8 @@ uv run yumii
 - 🧠 **Thinks** — responds via Groq, OpenAI, or Anthropic LLMs with a persistent personality
 - 🗣 **Speaks** — synthesizes voice through ElevenLabs with real-time lip sync
 - 💃 **Feels** — drives Live2D avatar expressions and motions based on emotional context
+- 🧠 **Remembers** — extracts and stores user facts in local SQLite, injects them into every session
+- 💬 **Sessions** — multiple independent conversations with resume, rename, and delete
 - 🔐 **Private** — API keys stored in your OS keychain (Windows Credential Manager / macOS Keychain), never on disk
 
 ---
@@ -167,6 +169,17 @@ uv run yumii
 Select **🌸 Wake Yumii Up** from the dashboard. Your browser opens automatically.
 Click **Connect & Start Audio Context**, allow microphone access, and start talking.
 
+You can also manage sessions and memory directly from the CLI **before** waking Yumii up:
+
+| Command | What it does |
+|---------|-------------|
+| `/chat` | Browse, resume, or delete past sessions |
+| `/resume` | Resume your most recent session |
+| `/sessions` | List all saved sessions |
+| `/memory` | Browse and edit what Yumii remembers about you |
+| `/forget` | Wipe all long-term memory (keeps sessions) |
+| `/name <name>` | Rename the active session |
+
 ---
 
 ## 🎛 STT Backends
@@ -202,9 +215,9 @@ Yumii will reuse the same API key — no duplicate entry needed.
        │
   [ Whisper STT ]  ←── Local (CPU) or Groq Cloud
        │
-  [ LangGraph Agent ]
+  [ LangGraph Agent ] ←── AsyncSqliteSaver (persistent checkpoints)
        │
-       ├── SystemMessage (personality prompt, injected every turn)
+       ├── SystemMessage (personality prompt + user facts, injected every turn)
        ├── HumanMessage  (user speech)
        ├── LLM invoke    (Groq / OpenAI / Anthropic)
        └── YumiiResponse  { response_text, expression, motion }
@@ -217,6 +230,11 @@ Yumii will reuse the same API key — no duplicate entry needed.
                                    ├── Lip sync (real-time RMS)
                                    ├── Facial expressions
                                    └── Body motions
+
+  [ SQLite Memory ]  ←── ~/.yumii/memory/
+       ├── sessions      (metadata: name, created_at, last_active)
+       ├── facts         (extracted user facts, deduplicated)
+       └── checkpoints   (LangGraph conversation history per session)
 ```
 
 ---
@@ -226,9 +244,18 @@ Yumii will reuse the same API key — no duplicate entry needed.
 ```
 src/yumii/
   agent/          # LangGraph state machine, LLM agent, personality manager
-  api/            # FastAPI server, WebSocket broadcast
+                  #   graph.py      → AsyncSqliteSaver checkpoints
+                  #   llm.py        → Agent builder with fact injection
+                  #   nodes.py      → chat_node with memory-aware prompts
+                  #   fact_extractor.py → Automatic user-fact extraction
+  api/            # FastAPI server, WebSocket, REST endpoints
+                  #   server.py     → /api/sessions, /api/facts, /ws
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
-  core/           # Pydantic settings, OS keychain credential store
+  core/           # Pydantic settings, OS keychain, engine orchestrator
+                  #   engine.py     → Session lifecycle + command interception
+                  #   memory_db.py  → Low-level SQLite schema
+                  #   memory_manager.py → Fact CRUD + extraction trigger
+                  #   session_manager.py  → Session CRUD
   tts/            # ElevenLabs TTS + CAMB.ai streaming TTS
   tools/          # LangChain tools (time, etc.)
   assets/
@@ -238,6 +265,7 @@ src/yumii/
 ```
 
 > **Avatar files** go in `~/.yumii/avatar/` (user-provided, not bundled).
+> **Memory database** lives at `~/.yumii/memory/yumii.db` (auto-created).
 
 ---
 
