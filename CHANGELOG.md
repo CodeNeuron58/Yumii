@@ -34,15 +34,24 @@ Memory & Sessions release.
   - `GET /api/facts`, `PUT /api/facts/{id}`, `DELETE /api/facts/{id}`
   - `GET /api/config` — runtime config + avatar URL
 - **4 new test files** (`test_fact_extractor.py`, `test_memory_db.py`,
-  `test_memory_manager.py`, `test_session_manager.py`).
+  `test_memory_manager.py`, `test_session_manager.py`). Test suite is
+  now **57 tests** total.
 - **New dependencies:** `aiosqlite`, `langgraph-checkpoint-sqlite`.
 
 ### Changed
-- `graph.py` now uses `AsyncSqliteSaver` instead of `InMemorySaver`.
+- `graph.py` now uses `AsyncSqliteSaver` (held open by the engine for
+  the lifetime of the process) instead of `InMemorySaver`.
 - `llm.py` agent cache key includes a hash of injected user facts, so
   personality updates correctly when memory changes.
+- `llm.py` no longer registers external tools — it relies on a
+  structured `YumiiResponse` (`create_agent` with `response_format=`)
+  to avoid a Groq Llama 400 error on malformed tool calls. Current
+  time is injected as a `SystemMessage` per turn instead of via a
+  `get_current_time` tool.
 - `engine.py` initializes lazily (async `initialize()`) because
-  `AsyncSqliteSaver` needs an async context.
+  `AsyncSqliteSaver` needs an async context, and tracks an
+  `active_session_id` / `active_session_name` for the current
+  conversation.
 
 ### Removed
 - Dead frontend-only WebSocket broadcasts (`session_switched`,

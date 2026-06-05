@@ -12,13 +12,25 @@ binary you downloaded. The "What's not in v1" section of
 Memory & Sessions release. **Alpha — no API stability promise.** See
 `CHANGELOG.md` for the full list.
 
-- Persistent SQLite memory (sessions + user facts + LangGraph checkpoints)
-- Automatic fact extraction from conversation turns
-- Session management (create, resume, rename, list, delete)
-- CLI commands: `/chat`, `/resume`, `/sessions`, `/memory`, `/forget`, `/name`
-- In-conversation voice commands (`/new`, `/resume`, `/sessions`, etc.)
-- REST API for sessions and facts
-- 4 new test modules (48 total tests)
+- Persistent SQLite memory: `yumii.db` (sessions), `store.db` (user
+  facts via LangGraph `AsyncSqliteStore`), `checkpoints.db` (LangGraph
+  `AsyncSqliteSaver` conversation history, per-session `thread_id`)
+- Automatic fact extraction from every conversation turn
+  (Groq 8b / OpenAI mini / Anthropic Sonnet), substring-deduplicated
+- Session lifecycle: create, resume, rename, list, archive, delete
+- CLI commands: `/chat`, `/resume`, `/sessions`, `/memory`,
+  `/forget`, `/name`, plus `yumii resume-chat` / `delete-session` /
+  `forget` direct subcommands
+- In-conversation voice commands (`/new`, `/resume`, `/name`, etc.)
+  routed via WebSocket JSON `command` frames
+- REST API: `GET/POST /api/sessions`, `POST /api/sessions/{id}/resume`,
+  `DELETE /api/sessions/{id}`, `GET/PUT/DELETE /api/facts[/{id}]`,
+  `GET /api/config`
+- Engine refactor: lazy async `initialize()`, `active_session_id`
+  + `active_session_name`, queue drain on session switch
+- Removed dead frontend session/memory UI scaffolding
+- 4 new test modules (`test_fact_extractor`, `test_memory_db`,
+  `test_memory_manager`, `test_session_manager`) — **57 tests** total
 
 ## ✅ Shipped — 0.1.0 (June 2026)
 
