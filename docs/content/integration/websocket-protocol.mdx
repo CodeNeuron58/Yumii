@@ -10,25 +10,60 @@ Yumii leverages a real-time WebSocket connection to transmit raw user microphone
 
 *   **Default Endpoint**: `ws://localhost:8000/ws`
 *   **Data Types**:
-    *   **Client to Server**: Transmits **binary PCM arrays** (recording chunks) and status metadata.
+    *   **Client to Server**: Transmits **binary PCM arrays** (recording chunks) and JSON command payloads (e.g. session negotiation, `/name`, `/new`).
     *   **Server to Client**: Transmits **JSON event payloads** and **base64-encoded audio frames**.
 
 ---
+
 </ContentCard>
 
 <ContentCard>
-## 1. Client to Server (Input)
+## 1. Session Negotiation (handshake)
+
+The server expects the client's first message to be either a `session_select`
+JSON command or empty. If nothing arrives within 5 s, a fresh session is
+auto-created. After this, the active session is locked — a second
+client trying to connect will politely evict the first.
+
+```json
+// Start a brand new session
+{"type": "session_select", "action": "new"}
+
+// Resume an existing session by id
+{"type": "session_select", "action": "resume", "session_id": "<uuid>"}
+```
+
+After the handshake, the normal audio flow begins.
+
+---
+
+</ContentCard>
+
+<ContentCard>
+## 2. Client to Server (Input)
 
 ### Raw Microphone Chunks
 *   **Format**: Raw Binary buffers.
 *   **Audio Coding**: `Int16` (PCM 16-bit) single-channel mono, sampled at 16,000Hz.
 *   **Interval**: Sent every 250 - 300 milliseconds.
 
+### In-Conversation Commands
+JSON text frames can also be sent at any time to trigger slash-style
+commands. The server forwards them to the engine's transcription
+queue so the LLM handles them as if you had spoken the command:
+
+```json
+{"type": "command", "command": "/new"}
+{"type": "command", "command": "/name My Trip"}
+{"type": "command", "command": "/resume"}
+```
+
 ---
+
 </ContentCard>
 
 <ContentCard>
-## 2. Server to Client (Output)
+## 3. Server to Client (Output)
 
 The backend streams structured JSON events to all active WebSocket connections.
 
@@ -53,7 +88,22 @@ Sent recursively as raw TTS voice chunks are synthesized by the voice provider (
 
 ---
 
-### C. Streaming Audio End (`audio_end`)
+### C. Streaming Audio Start (`audio_start`)
+Carries the sample rate, the spoken text, and the chosen expression/motion
+so the avatar can begin lip-syncing before the first audio chunk arrives:
+```json
+{
+  "type": "audio_start",
+  "sampleRate": 22050,
+  "text": "Hello! How are you?",
+  "expression": "smile",
+  "motion": "greeting"
+}
+```
+
+---
+
+### D. Streaming Audio End (`audio_end`)
 Fired once the complete TTS vocal track has finished streaming, signaling the client to gracefully hide subtitles:
 ```json
 {
@@ -63,7 +113,7 @@ Fired once the complete TTS vocal track has finished streaming, signaling the cl
 
 ---
 
-### D. Legacy Static Audio Package
+### E. Legacy Static Audio Package
 If using static TTS providers like ElevenLabs (non-streaming), Yumii transmits the full package in a single transaction:
 ```json
 {
@@ -76,7 +126,7 @@ If using static TTS providers like ElevenLabs (non-streaming), Yumii transmits t
 
 ---
 
-### E. Error Events
+### F. Error Events
 Fired when a cloud provider fails or credentials are invalid, displaying the issue on the client UI:
 ```json
 {

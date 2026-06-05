@@ -6,9 +6,10 @@ icon: "webhook"
 ---
 
 <ContentCard>
-Yumii is driven by a lightweight **FastAPI** backend (`src/yumii/api/server.py`). Alongside the real-time WebSocket connection, Yumii serves REST endpoints to mount folders and serve assets.
+Yumii is driven by a lightweight **FastAPI** backend (`src/yumii/api/server.py`). Alongside the real-time WebSocket connection, Yumii serves REST endpoints for session and fact management, runtime config introspection, and mounts the static frontend.
 
 ---
+
 </ContentCard>
 
 <ContentCard>
@@ -27,14 +28,59 @@ Yumii bundles her frontend interface and exposes custom folders securely.
 *   **Description**: Exposes your custom Live2D model directories located in `~/.yumii/avatar/` to the PixiJS loading runtime.
 
 ---
+
 </ContentCard>
 
 <ContentCard>
-## 2. CORS Configurations
+## 2. Sessions API
+
+Conversation session management. All session metadata is persisted in
+`~/.yumii/memory/yumii.db` (`sessions` table).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`    | `/api/sessions` | List non-archived sessions, most recently active first. Returns `[{"id","name","created_at","last_active_at","message_count"}]`. |
+| `POST`   | `/api/sessions?name=…` | Create a brand-new session. Returns `{"session_id","name"}`. |
+| `POST`   | `/api/sessions/{id}/resume` | Resume an existing session by id; clears queues and resets the interrupt flag. |
+| `DELETE` | `/api/sessions/{id}` | Hard-delete a session and its summary. |
+
+---
+
+</ContentCard>
+
+<ContentCard>
+## 3. Long-term Memory API
+
+User facts (preferences, identity, habits, goals) stored under the
+LangGraph `("facts",)` namespace in `~/.yumii/memory/store.db`.
+
+| Method | Path | Body | Description |
+|--------|------|------|-------------|
+| `GET`    | `/api/facts`           | — | List all stored facts with metadata. |
+| `PUT`    | `/api/facts/{id}`      | `{"fact":"new text"}` | Update the text of an existing fact. |
+| `DELETE` | `/api/facts/{id}`      | — | Remove a single fact. |
+
+---
+
+</ContentCard>
+
+<ContentCard>
+## 4. Runtime Config
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/config` | Returns `{"personality","avatar_url"}` — useful for the frontend to render the correct character without a separate config fetch. |
+
+---
+
+</ContentCard>
+
+<ContentCard>
+## 5. CORS Configurations
 
 Yumii's FastAPI server permits cross-origin browser connections so that
-local development overlays, OBS browser sources, and other tools on
-the same machine can reach the WebSocket without browser CORS errors:
+local development overlays, OBS browser sources, and other tools on the
+same machine can reach the WebSocket without browser CORS errors:
 
 ```python
 app.add_middleware(
@@ -51,7 +97,7 @@ app.add_middleware(
 > open can theoretically open a WebSocket to `ws://localhost:8000/ws`
 > and interact with the LLM. The server is bound to `127.0.0.1` so
 > LAN machines cannot reach it, and your API keys are never exposed
-> to the browser, but the LLM token cost is. The v0.1.1 release will
+> to the browser, but the LLM token cost is. The v0.3.0 release will
 > tighten `allow_origins` to the specific localhost / app origins
 > that Yumii actually serves.
 
@@ -60,8 +106,7 @@ For WebSocket payload details, see the [WebSocket Protocol](/integration/websock
 <Callout type="info" title="Planned for v2">
   Exposing Yumii's tool registry to external LLM clients via the
   **Model Context Protocol (MCP)** is on the roadmap for v2.0. The
-  v1.0 release has no MCP server transport — the current engine is a
-  self-contained voice → LLM → TTS loop. See the
+  current engine is a self-contained voice → LLM → TTS loop. See the
   [MCP page](/integration/mcp-server) for details.
 </Callout>
 </ContentCard>
