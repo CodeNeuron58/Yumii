@@ -8,11 +8,29 @@ icon: "stethoscope"
 <ContentCard>
 If you run into issues launching the dashboard, connecting your microphone, or getting Yumii's voice outputs, follow this comprehensive troubleshooting registry.
 
+Yumii v0.2.0 keeps all persistent state in `~/.yumii/memory/`:
+
+```
+~/.yumii/
+  config.json          # non-sensitive preferences
+  memory/
+    yumii.db           # session metadata (sessions, session_summaries)
+    checkpoints.db     # LangGraph conversation history (AsyncSqliteSaver)
+    store.db           # user facts (AsyncSqliteStore namespace ("facts",))
+```
+
+If Yumii "forgets" a fact you remember teaching her, check that
+`store.db` exists and is writable. If she loses the conversation
+context on restart, check `checkpoints.db` is not on a read-only
+filesystem. To start completely fresh, stop the server and delete
+the entire `memory/` directory.
+
 ---
+
 </ContentCard>
 
 <ContentCard>
-## 🛠️ Windows Issues
+## Windows Issues
 
 ### Error: `KMP_DUPLICATE_LIB_OK`
 *   **Symptom**: The backend terminal crashes instantly on start, complaining about multiple OpenMP runtimes being loaded.
@@ -34,10 +52,11 @@ set KMP_DUPLICATE_LIB_OK=TRUE
 *   **The Fix**: Right-click your terminal emulator (e.g. PowerShell) and run it as a standard user (not Administrator). Windows Credential Manager sometimes locks access to administrative terminals for security.
 
 ---
+
 </ContentCard>
 
 <ContentCard>
-## 🎙️ Microphone & Audio Issues
+## Microphone & Audio Issues
 
 ### Speech Not Detected (`[Voice Activity Detected]` is missing)
 *   **Symptom**: You talk to Yumii but nothing happens, and your terminal console does not register speech.
@@ -47,10 +66,11 @@ set KMP_DUPLICATE_LIB_OK=TRUE
     3.  Click the WebUI pink button **"Connect & Start Audio Context"** to ensure the WebSocket pipeline wakes up.
 
 ---
+
 </ContentCard>
 
 <ContentCard>
-## 🔑 API & Secret Keys Issues
+## API & Secret Keys Issues
 
 ### Authentication Failures (ElevenLabs or Groq)
 *   **Symptom**: Subtitles show error messages or Yumii responds with fallback dialogue.

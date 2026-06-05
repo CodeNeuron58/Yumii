@@ -1,12 +1,12 @@
 ---
 title: "Yumii"
-description: "Open-source AI companion with a Live2D avatar, real-time voice conversation, and switchable personalities. Runs on CPU. Alpha — v0.1.0."
+description: "Open-source AI companion with a Live2D avatar, real-time voice conversation, and switchable personalities. Runs on CPU. Alpha — v0.2.0."
 hideHero: true
 ---
 
 <MascotHero
   title="Yumii"
-  subtitle="Open-source AI companion with voice and a Live2D avatar. Runs on CPU. v0.1.0 — alpha."
+  subtitle="Open-source AI companion with voice and a Live2D avatar. Runs on CPU. v0.2.0 — alpha."
 />
 
 <FeatureList cols={4}>
@@ -34,9 +34,9 @@ hideHero: true
   <DocsCard
     title="Capabilities"
     icon="cube"
-    href="/capabilities/system-tools"
+    href="/capabilities/memory-architecture"
   >
-    Built-in tools and the current (in-process) memory model.
+    Built-in tools, persistent memory, and session management.
   </DocsCard>
 </FeatureList>
 
@@ -49,11 +49,12 @@ CAMB.ai), and reacts in real time through a Live2D avatar in your
 browser.
 
 She is not a chatbot you query. She is a presence that listens,
-reacts, and remembers you within a session. Across sessions, the
-current v0.1.0 release does not yet persist memory — that is scheduled
-for v1.1 (see `ROADMAP.md`).
+reacts, and remembers you across sessions — every conversation turn
+runs a cheap LLM pass that extracts facts about you and stores them
+in local SQLite, and those facts are injected into the system prompt
+on every new or resumed session.
 
-## What v0.1.0 ships with
+## What v0.2.0 ships with
 
 * **Real-time voice conversation** — Silero VAD for speech detection,
   `faster-whisper` (local CPU) or Groq Whisper (cloud) for transcription.
@@ -65,18 +66,21 @@ for v1.1 (see `ROADMAP.md`).
   `src/yumii/assets/prompts/`. Add your own.
 * **Barge-in** — speak while Yumii is talking and she stops. This is
   the Gemini Live–style feel.
+* **Persistent memory** — `~/.yumii/memory/yumii.db` (sessions),
+  `store.db` (user facts), and `checkpoints.db` (LangGraph conversation
+  history). Survives restarts. CLI: `/chat`, `/resume`, `/sessions`,
+  `/memory`, `/forget`, `/name`. See [Memory Architecture](/capabilities/memory-architecture).
 * **OS-keychain credentials** — API keys are stored in Windows
   Credential Manager, macOS Keychain, or libsecret. Never in `.env`.
 * **Polished CLI** — a Typer + Rich terminal dashboard with a
   pixel-art banner, gradient vision reader, and a guided setup wizard.
 
-## What v0.1.0 does **not** ship with
+## What v0.2.0 does **not** ship with
 
 These are on the roadmap and will land in subsequent releases:
 
-* **Persistent memory across restarts** — v1.1.
-* **A planning / tool-execution agent loop** — v2.0.
-* **MCP (Model Context Protocol) server** — v2.0.
+* **A planning / tool-execution agent loop** — v1.0.
+* **MCP (Model Context Protocol) server** — v1.0 or v2.0.
 * **Multimodal vision input** — post v2.0.
 * **A bundled Live2D model** — you bring your own
   (`.model3.json` from any Cubism 4 compatible model). Drop it in
