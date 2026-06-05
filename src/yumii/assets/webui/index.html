@@ -93,350 +93,6 @@
             pointer-events: none;
             z-index: 100;
         }
-
-        /* ─── Session Picker ───────────────────────────────────────────── */
-        #session-picker {
-            position: absolute;
-            z-index: 30;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(13, 17, 23, 0.95);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease;
-        }
-
-        #session-picker.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        #session-picker h2 {
-            color: #00d4aa;
-            margin-bottom: 30px;
-            font-size: 28px;
-        }
-
-        .session-card {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 10px;
-            padding: 15px 20px;
-            margin: 8px 0;
-            width: 320px;
-            cursor: pointer;
-            transition: border-color 0.2s, transform 0.1s;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .session-card:hover {
-            border-color: #00d4aa;
-            transform: translateX(4px);
-        }
-
-        .session-card .title {
-            font-weight: 600;
-            font-size: 16px;
-        }
-
-        .session-card .meta {
-            font-size: 12px;
-            color: #8b949e;
-        }
-
-        .btn-new-session {
-            background: #00d4aa;
-            color: #0d1117;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
-        }
-
-        .btn-new-session:hover {
-            background: #00ff88;
-        }
-
-        /* ─── Command Bar ────────────────────────────────────────────── */
-        #command-bar {
-            position: absolute;
-            z-index: 25;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: none;
-            align-items: center;
-            gap: 8px;
-            background: rgba(13, 17, 23, 0.85);
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #30363d;
-        }
-
-        #command-bar.visible {
-            display: flex;
-        }
-
-        #command-input {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            width: 260px;
-            outline: none;
-        }
-
-        #command-input:focus {
-            border-color: #00d4aa;
-        }
-
-        .btn-command {
-            background: #30363d;
-            color: #c9d1d9;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .btn-command:hover {
-            background: #484f58;
-        }
-
-        #cmd-toggle {
-            position: absolute;
-            z-index: 25;
-            bottom: 30px;
-            right: 30px;
-            background: rgba(13, 17, 23, 0.6);
-            color: #8b949e;
-            border: 1px solid #30363d;
-            padding: 6px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        #cmd-toggle:hover {
-            color: #00d4aa;
-            border-color: #00d4aa;
-        }
-
-        /* ─── Memory Manager ─────────────────────────────────────────── */
-        #memory-manager {
-            position: absolute;
-            z-index: 35;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(13, 17, 23, 0.95);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            padding-top: 40px;
-            overflow-y: auto;
-        }
-
-        #memory-manager.visible {
-            display: flex;
-        }
-
-        #memory-manager h2 {
-            color: #00d4aa;
-            margin-bottom: 20px;
-            font-size: 24px;
-        }
-
-        .memory-close {
-            position: absolute;
-            top: 20px; right: 30px;
-            background: none;
-            border: 1px solid #30363d;
-            color: #8b949e;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .memory-close:hover {
-            color: #f85149;
-            border-color: #f85149;
-        }
-
-        .fact-card {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 10px;
-            padding: 14px 18px;
-            margin: 6px 0;
-            width: 420px;
-            max-width: 90vw;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .fact-card .fact-text {
-            font-size: 15px;
-            color: #c9d1d9;
-            line-height: 1.4;
-        }
-
-        .fact-card .fact-meta {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 12px;
-            color: #8b949e;
-        }
-
-        .fact-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .badge-preference { background: #238636; color: #fff; }
-        .badge-identity   { background: #1f6feb; color: #fff; }
-        .badge-habit      { background: #8957e5; color: #fff; }
-        .badge-relationship{ background: #da3633; color: #fff; }
-        .badge-goal       { background: #d29922; color: #fff; }
-        .badge-general    { background: #6e7681; color: #fff; }
-
-        .fact-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 4px;
-        }
-
-        .fact-actions button {
-            background: #21262d;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 4px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .fact-actions button:hover {
-            background: #30363d;
-        }
-
-        .fact-actions .btn-delete:hover {
-            background: #da3633;
-            color: #fff;
-            border-color: #da3633;
-        }
-
-        /* ─── Session Delete Button ──────────────────────────────────── */
-        .session-card .delete-btn {
-            display: none;
-            background: none;
-            border: none;
-            color: #8b949e;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 4px;
-        }
-
-        .session-card:hover .delete-btn {
-            display: block;
-        }
-
-        .session-card .delete-btn:hover {
-            color: #f85149;
-        }
-
-        /* ─── Confirmation Modal ─────────────────────────────────────── */
-        .confirm-modal {
-            position: fixed;
-            z-index: 50;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(0, 0, 0, 0.7);
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .confirm-modal.visible {
-            display: flex;
-        }
-
-        .confirm-box {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 12px;
-            padding: 24px 28px;
-            max-width: 360px;
-            text-align: center;
-        }
-
-        .confirm-box h3 {
-            color: #f85149;
-            margin: 0 0 12px;
-            font-size: 18px;
-        }
-
-        .confirm-box p {
-            color: #c9d1d9;
-            font-size: 14px;
-            margin-bottom: 20px;
-            line-height: 1.4;
-        }
-
-        .confirm-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .confirm-actions button {
-            padding: 8px 20px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .btn-confirm-delete {
-            background: #da3633;
-            color: #fff;
-        }
-
-        .btn-confirm-delete:hover {
-            background: #f85149;
-        }
-
-        .btn-confirm-cancel {
-            background: #21262d;
-            color: #8b949e;
-            border: 1px solid #30363d;
-        }
-
-        .btn-confirm-cancel:hover {
-            background: #30363d;
-            color: #c9d1d9;
-        }
     </style>
 </head>
 
@@ -451,43 +107,17 @@
         <div id="subtitle">Connecting to Yumii...</div>
     </div>
 
-    <!-- Session Picker Overlay -->
-    <div id="session-picker">
-        <h2>Welcome to Yumii</h2>
-        <button class="btn-new-session" id="btn-new-session">✨ New Chat</button>
-        <div id="session-list"></div>
-    </div>
-
-    <!-- Memory Manager Overlay -->
-    <div id="memory-manager">
-        <button class="memory-close" id="btn-memory-close">Close ✕</button>
-        <h2>🧠  Long-Term Memory</h2>
-        <div id="fact-list"></div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div class="confirm-modal" id="confirm-modal">
-        <div class="confirm-box">
-            <h3 id="confirm-title">🗑️ Delete?</h3>
-            <p id="confirm-text">This cannot be undone.</p>
-            <div class="confirm-actions">
-                <button class="btn-confirm-delete" id="btn-confirm-yes">Delete</button>
-                <button class="btn-confirm-cancel" id="btn-confirm-no">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Command Bar -->
-    <button id="cmd-toggle">⌨ Commands</button>
-    <div id="command-bar">
-        <input type="text" id="command-input" placeholder="/new, /resume, /name ..." autocomplete="off" />
-        <button class="btn-command" id="btn-cmd-send">Send</button>
-    </div>
-
     <script>
-        // ─── LIVE2D MODEL CONFIGURATION ───
-        // Resolved dynamically via /api/config now.
-        let modelUrl = "/Yumii_Avatar/your-model.model3.json";
+        // --- LIVE2D MODEL CONFIGURATION ---
+        // Yumii does NOT bundle a Live2D model. You must supply your own
+        // Cubism 4 compatible .model3.json file in ~/.yumii/avatar/ and
+        // point the path below at its filename. See
+        // docs/content/customization/adding-avatars.mdx for the full
+        // guide, including which sites host legal models.
+        //
+        // If this URL 404s, the page will fall back to a "no avatar
+        // loaded" message rather than crashing the rest of the UI.
+        const modelUrl = "/Yumii_Avatar/your-model.model3.json";
         let live2dModel = null;
         let audioContext = null;
         let analyser = null;
@@ -495,9 +125,13 @@
         let currentAudioSource = null;
         let micStream = null;
         let micProcessor = null;
-        let audioByteRemainder = new Uint8Array(0);
+        let audioByteRemainder = new Uint8Array(0); // Buffer for odd-sized chunks
 
-        // ─── EMOTION/MOTION HANDLING ───
+        // --- EMOTION/MOTION HANDLING ---
+        // Map LLM expression labels to your model's expression file basenames.
+        // Keys are the abstract labels the LLM can emit; values are the
+        // exact basenames of the .exp3.json files in your model folder
+        // (without the extension), or null for the neutral face.
         const EXPRESSION_MAP = {
             "smile": "smile",
             "angry": "angry",
@@ -508,6 +142,11 @@
             "normal": null
         };
 
+        // Map LLM motion labels to your model's motion group names.
+        // Keys are the abstract labels the LLM can emit; values are the
+        // motion group names declared in your .model3.json file under
+        // "Motions". If your model has no matching group, Yumii falls
+        // back to "idle".
         const MOTION_MAP = {
             "nod": "nod",
             "shakehead": "shakehead",
@@ -519,7 +158,7 @@
             "idle": "idle"
         };
 
-        // ─── PixiJS & Live2D Setup ───
+        // --- PixiJS & Live2D Setup ---
         const app = new PIXI.Application({
             view: document.createElement('canvas'),
             transparent: true,
@@ -527,11 +166,14 @@
             resizeTo: window
         });
 
+        // Prevent all global Pixi interactions from propagating to elements
         app.renderer.plugins.interaction.destroy();
+
         document.getElementById('canvas-container').appendChild(app.view);
 
         async function initLive2D() {
             try {
+                // Load the model
                 live2dModel = await PIXI.live2d.Live2DModel.from(modelUrl);
                 app.stage.addChild(live2dModel);
 
@@ -540,26 +182,39 @@
                 const scaleX = window.innerWidth / unscaledWidth;
                 const scaleY = window.innerHeight / unscaledHeight;
 
+                // Scale so that it strictly fits within the screen height
                 const scale = Math.min(scaleX, scaleY) * 0.95;
                 live2dModel.scale.set(scale);
 
+                // Center Horizontally, Align to Bottom Vertically
                 live2dModel.x = (window.innerWidth - (unscaledWidth * scale)) / 2;
                 live2dModel.y = (window.innerHeight - (unscaledHeight * scale));
 
+                // Properly disable mouse tracking in pixi-live2d-display
                 live2dModel.pointerTracking = false;
+
+                // If it STILL tracks, force the focus controller to center
                 if (live2dModel.internalModel.focusController) {
                     live2dModel.internalModel.focusController.focus(0, 0);
                 }
 
                 console.log("Model loaded successfully.");
-                try { live2dModel.motion("idle"); } catch (e) {}
+
+                // Play initial startup motion
+                try {
+                    live2dModel.motion("idle");
+                } catch (e) {
+                    console.error("Failed to play startup motion:", e);
+                }
 
             } catch (err) {
                 console.error("Error loading Live2D model:", err);
                 const sub = document.getElementById('subtitle');
                 sub.innerHTML =
                     "⚠️ No avatar loaded.<br>" +
-                    "Drop a Cubism 4 <code>.model3.json</code> into <code>~/.yumii/avatar/</code>.<br>" +
+                    "Drop a Cubism 4 <code>.model3.json</code> into <code>~/.yumii/avatar/</code> " +
+                    "and update <code>modelUrl</code> in <code>index.html</code>.<br>" +
+                    "See the <strong>Adding Avatars</strong> guide in the docs. " +
                     "Voice + LLM still work without an avatar.";
                 document.getElementById('ui-layer').style.opacity = 1;
                 document.getElementById('debug-info').innerText =
@@ -567,282 +222,7 @@
             }
         }
 
-        // ─── Config fetch ───
-        async function fetchConfig() {
-            try {
-                const resp = await fetch('/api/config');
-                const cfg = await resp.json();
-                if (cfg.avatar_url) {
-                    modelUrl = cfg.avatar_url;
-                    console.log("Avatar URL resolved:", modelUrl);
-                }
-            } catch (e) {
-                console.warn("Could not fetch /api/config, using fallback modelUrl");
-            }
-        }
-
-        // ─── Session Picker ───
-        async function loadSessionList() {
-            try {
-                const resp = await fetch('/api/sessions');
-                const sessions = await resp.json();
-                const list = document.getElementById('session-list');
-                list.innerHTML = '';
-
-                if (sessions.length === 0) {
-                    list.innerHTML = '<div style="color:#8b949e;font-size:14px;">No previous chats yet.</div>';
-                    return;
-                }
-
-                sessions.forEach(s => {
-                    const card = document.createElement('div');
-                    card.className = 'session-card';
-                    card.innerHTML =
-                        `<div>` +
-                        `<div class="title">${escapeHtml(s.name)}</div>` +
-                        `<div class="meta">${s.created_at.split('T')[0]} · ${s.message_count} messages</div>` +
-                        `</div>`;
-                    card.onclick = () => selectSession(s.id);
-                    list.appendChild(card);
-                });
-            } catch (e) {
-                console.error("Failed to load sessions:", e);
-            }
-        }
-
-        function showSessionPicker() {
-            document.getElementById('session-picker').classList.add('visible');
-            loadSessionList();
-        }
-
-        function hideSessionPicker() {
-            document.getElementById('session-picker').classList.remove('visible');
-        }
-
-        function selectSession(sessionId) {
-            hideSessionPicker();
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'session_select',
-                    action: 'resume',
-                    session_id: sessionId
-                }));
-            }
-        }
-
-        document.getElementById('btn-new-session').addEventListener('click', () => {
-            hideSessionPicker();
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'session_select',
-                    action: 'new'
-                }));
-            }
-        });
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // ─── Command Bar ───
-        const cmdToggle = document.getElementById('cmd-toggle');
-        const cmdBar = document.getElementById('command-bar');
-        const cmdInput = document.getElementById('command-input');
-        const btnCmdSend = document.getElementById('btn-cmd-send');
-
-        cmdToggle.addEventListener('click', () => {
-            cmdBar.classList.toggle('visible');
-            if (cmdBar.classList.contains('visible')) cmdInput.focus();
-        });
-
-        function sendCommand() {
-            const text = cmdInput.value.trim();
-            if (!text) return;
-            cmdInput.value = '';
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: 'command', command: text }));
-            }
-        }
-
-        btnCmdSend.addEventListener('click', sendCommand);
-        cmdInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') sendCommand();
-            if (e.key === 'Escape') cmdBar.classList.remove('visible');
-        });
-
-        // ─── Confirmation Modal ───
-        const confirmModal = document.getElementById('confirm-modal');
-        const confirmTitle = document.getElementById('confirm-title');
-        const confirmText = document.getElementById('confirm-text');
-        let confirmCallback = null;
-
-        function showConfirm(title, text, onYes) {
-            confirmTitle.innerText = title;
-            confirmText.innerText = text;
-            confirmCallback = onYes;
-            confirmModal.classList.add('visible');
-        }
-
-        function hideConfirm() {
-            confirmModal.classList.remove('visible');
-            confirmCallback = null;
-        }
-
-        document.getElementById('btn-confirm-yes').addEventListener('click', () => {
-            if (confirmCallback) confirmCallback();
-            hideConfirm();
-        });
-        document.getElementById('btn-confirm-no').addEventListener('click', hideConfirm);
-        confirmModal.addEventListener('click', (e) => {
-            if (e.target === confirmModal) hideConfirm();
-        });
-
-        // ─── Enhanced Session Picker (with delete) ───
-        async function loadSessionList() {
-            try {
-                const resp = await fetch('/api/sessions');
-                const sessions = await resp.json();
-                const list = document.getElementById('session-list');
-                list.innerHTML = '';
-
-                if (sessions.length === 0) {
-                    list.innerHTML = '<div style="color:#8b949e;font-size:14px;">No previous chats yet.</div>';
-                    return;
-                }
-
-                sessions.forEach(s => {
-                    const card = document.createElement('div');
-                    card.className = 'session-card';
-                    card.innerHTML =
-                        `<div>` +
-                        `<div class="title">${escapeHtml(s.name)}</div>` +
-                        `<div class="meta">${s.created_at.split('T')[0]} · ${s.message_count} messages</div>` +
-                        `</div>` +
-                        `<button class="delete-btn" title="Delete session">🗑️</button>`;
-
-                    // Click on card body resumes
-                    card.onclick = (e) => {
-                        if (e.target.closest('.delete-btn')) return;
-                        selectSession(s.id);
-                    };
-
-                    // Delete button
-                    const delBtn = card.querySelector('.delete-btn');
-                    delBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        showConfirm(
-                            '🗑️ Delete Session',
-                            `Delete "${escapeHtml(s.name)}"?\n\nThis removes the conversation history permanently.`,
-                            () => deleteSession(s.id)
-                        );
-                    };
-
-                    list.appendChild(card);
-                });
-            } catch (e) {
-                console.error("Failed to load sessions:", e);
-            }
-        }
-
-        async function deleteSession(sessionId) {
-            try {
-                const resp = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
-                if (resp.ok) {
-                    loadSessionList();  // refresh
-                } else {
-                    console.error("Failed to delete session");
-                }
-            } catch (e) {
-                console.error("Error deleting session:", e);
-            }
-        }
-
-        // ─── Memory Manager ───
-        const memoryManager = document.getElementById('memory-manager');
-        const factList = document.getElementById('fact-list');
-
-        function showMemoryManager() {
-            memoryManager.classList.add('visible');
-            loadFactList();
-        }
-
-        function hideMemoryManager() {
-            memoryManager.classList.remove('visible');
-        }
-
-        document.getElementById('btn-memory-close').addEventListener('click', hideMemoryManager);
-
-        async function loadFactList() {
-            try {
-                const resp = await fetch('/api/facts');
-                const facts = await resp.json();
-                factList.innerHTML = '';
-
-                if (facts.length === 0) {
-                    factList.innerHTML = '<div style="color:#8b949e;font-size:14px;padding:20px;">No memories stored yet. Chat with Yumii and she will start remembering.</div>';
-                    return;
-                }
-
-                facts.forEach(f => {
-                    const card = document.createElement('div');
-                    card.className = 'fact-card';
-                    const badgeClass = `badge-${f.category}`;
-                    card.innerHTML =
-                        `<div class="fact-text">${escapeHtml(f.fact)}</div>` +
-                        `<div class="fact-meta">` +
-                        `<span class="fact-badge ${badgeClass}">${f.category}</span>` +
-                        `<span>conf: ${Math.round(f.confidence * 100)}% · ${f.created_at.split('T')[0]}</span>` +
-                        `</div>` +
-                        `<div class="fact-actions">` +
-                        `<button onclick="editFact('${f.id}', this)">✏️ Edit</button>` +
-                        `<button class="btn-delete" onclick="deleteFact('${f.id}', this)">🗑️ Delete</button>` +
-                        `</div>`;
-                    factList.appendChild(card);
-                });
-            } catch (e) {
-                console.error("Failed to load facts:", e);
-            }
-        }
-
-        window.editFact = async function(factId, btn) {
-            const card = btn.closest('.fact-card');
-            const textDiv = card.querySelector('.fact-text');
-            const currentText = textDiv.innerText;
-            const newText = prompt("Edit memory:", currentText);
-            if (newText && newText.trim() && newText.trim() !== currentText) {
-                try {
-                    const resp = await fetch(`/api/facts/${factId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fact: newText.trim() })
-                    });
-                    if (resp.ok) loadFactList();
-                } catch (e) {
-                    console.error("Error updating fact:", e);
-                }
-            }
-        };
-
-        window.deleteFact = async function(factId, btn) {
-            const card = btn.closest('.fact-card');
-            const text = card.querySelector('.fact-text').innerText;
-            showConfirm(
-                '🗑️ Delete Memory',
-                `Remove this fact?\n\n${escapeHtml(text)}`,
-                async () => {
-                    try {
-                        const resp = await fetch(`/api/facts/${factId}`, { method: 'DELETE' });
-                        if (resp.ok) loadFactList();
-                    } catch (e) {
-                        console.error("Error deleting fact:", e);
-                    }
-                }
-            );
-        };
-
-        // ─── Microphone ───
+        // --- WebSocket & Lip Sync Setup ---
         async function initMicrophone() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -854,16 +234,22 @@
                 });
                 micStream = stream;
 
+                // Create a dedicated AudioContext for recording at 16kHz
                 const recContext = new (window.AudioContext || window.webkitAudioContext)({
                     sampleRate: 16000,
                 });
 
                 const source = recContext.createMediaStreamSource(stream);
+
+                // ScriptProcessorNode for raw PCM capture
+                // 4096 samples is about 256ms at 16kHz
                 micProcessor = recContext.createScriptProcessor(4096, 1, 1);
 
                 micProcessor.onaudioprocess = (e) => {
                     if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
                     const inputData = e.inputBuffer.getChannelData(0);
+                    // Convert Float32 (-1 to 1) to Int16 (PCM)
                     const pcm16 = new Int16Array(inputData.length);
                     for (let i = 0; i < inputData.length; i++) {
                         const s = Math.max(-1, Math.min(1, inputData[i]));
@@ -883,33 +269,19 @@
             }
         }
 
-        // ─── WebSocket ───
-        let sessionReady = false;
-
         function initWebSocket() {
+
+            // Use window.location.host so this works on any port or host,
+            // not just hardcoded localhost:8000.
             socket = new WebSocket(`ws://${window.location.host}/ws`);
             socket.binaryType = 'arraybuffer';
 
             socket.onopen = () => {
                 console.log("Connected to Python backend.");
-                // Wait for backend to ask for session selection, or send default
-                // The backend now expects the first message to be session_select.
-                // If the picker is visible, the user will click a button to send it.
-                // If we already have an active_session_id in localStorage, resume it.
-                const lastSession = localStorage.getItem('yumii_last_session');
-                if (lastSession) {
-                    socket.send(JSON.stringify({
-                        type: 'session_select',
-                        action: 'resume',
-                        session_id: lastSession
-                    }));
-                } else {
-                    socket.send(JSON.stringify({
-                        type: 'session_select',
-                        action: 'new'
-                    }));
-                }
+                document.getElementById('subtitle').innerText = "Listening...";
+                document.getElementById('ui-layer').style.opacity = 0; // Hide until spoken to
             };
+
 
             let nextPlayTime = 0;
             let isStreaming = false;
@@ -927,7 +299,7 @@
                 scheduledSources = [];
                 isStreaming = false;
                 nextPlayTime = 0;
-
+                
                 if (live2dModel) {
                     live2dModel.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', 0);
                 }
@@ -936,57 +308,21 @@
             socket.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
 
-                // ─── Session lifecycle events ───
-                if (data.type === 'session_ready') {
-                    sessionReady = true;
-                    localStorage.setItem('yumii_last_session', data.session_id);
-                    console.log("Session ready:", data.session_name, data.session_id);
-                    document.getElementById('subtitle').innerText = "Listening...";
-                    document.getElementById('ui-layer').style.opacity = 0;
-                    return;
-                }
-
-                if (data.type === 'session_taken_over') {
-                    document.getElementById('subtitle').innerText =
-                        "Another tab took over this session. Refresh to reconnect.";
-                    document.getElementById('ui-layer').style.opacity = 1;
-                    sessionReady = false;
-                    return;
-                }
-
-                if (data.type === 'session_switched') {
-                    localStorage.setItem('yumii_last_session', data.session_id);
-                    console.log("Switched to session:", data.session_name);
-                    return;
-                }
-
-                if (data.type === 'session_renamed') {
-                    console.log("Session renamed:", data.session_name);
-                    return;
-                }
-
-                if (data.type === 'memory_cleared') {
-                    console.log("Long-term memory cleared.");
-                    return;
-                }
-
-                if (data.type === 'show_memory_manager') {
-                    showMemoryManager();
-                    return;
-                }
-
-                // ─── Interrupt ───
-                if (data.type === 'interrupt') {
+                // Handle global interrupt (barge-in)
+                if (data.type === "interrupt") {
                     console.log("Interrupt received! Stopping audio.");
                     stopAllAudio();
+                    
                     document.getElementById('ui-layer').style.opacity = 0;
                     if (live2dModel) {
-                        try { live2dModel.motion("idle"); } catch (e) {}
+                        try {
+                            live2dModel.motion("idle");
+                        } catch (e) {}
                     }
                     return;
                 }
 
-                // ─── Error ───
+                // Handle TTS / backend errors — show visibly instead of silent failure
                 if (data.error) {
                     const subtitle = document.getElementById('subtitle');
                     subtitle.innerText = `⚠️ ${data.error}`;
@@ -998,79 +334,93 @@
                     }, 5000);
                     return;
                 }
-
-                // ─── Streaming audio (CAMB.ai) ───
-                if (data.type === 'audio_start') {
+                
+                // ─── STREAMING AUDIO HANDLERS (CAMB.ai) ──────────────────────────────────
+                if (data.type === "audio_start") {
                     console.log("Starting streaming session:", data);
                     stopAllAudio();
                     isStreaming = true;
                     currentSampleRate = data.sampleRate || 24000;
-                    nextPlayTime = audioContext.currentTime + 0.1;
-
+                    nextPlayTime = audioContext.currentTime + 0.1; // Small buffer delay
+                    
                     document.getElementById('subtitle').innerText = data.text;
                     document.getElementById('ui-layer').style.opacity = 1;
                     setExpressionAndMotion(data.expression, data.motion);
+                    
                     startStreamingLipSync();
                     return;
                 }
-
-                if (data.type === 'audio_chunk') {
-                    if (!isStreaming) return;
+                
+                if (data.type === "audio_chunk") {
+                    if (!isStreaming) return; // Discard if interrupted
+                    
                     const float32Data = pcm16Base64ToFloat32(data.data);
                     if (float32Data.length === 0) return;
-
+                    
                     const audioBuffer = audioContext.createBuffer(1, float32Data.length, currentSampleRate);
                     audioBuffer.getChannelData(0).set(float32Data);
-
+                    
                     const source = audioContext.createBufferSource();
                     source.buffer = audioBuffer;
-
+                    
+                    // Reduce volume slightly to prevent mic bleed (echo)
                     const gainNode = audioContext.createGain();
                     gainNode.gain.value = 0.7;
-
+                    
                     source.connect(gainNode);
                     gainNode.connect(analyser);
                     analyser.connect(audioContext.destination);
-
+                    
+                    // If we fell behind, catch up
                     if (nextPlayTime < audioContext.currentTime) {
                         nextPlayTime = audioContext.currentTime + 0.05;
                     }
-
+                    
                     source.start(nextPlayTime);
                     scheduledSources.push(source);
                     nextPlayTime += audioBuffer.duration;
-
+                    
+                    // Cleanup array when done playing
                     source.onended = () => {
                         const idx = scheduledSources.indexOf(source);
                         if (idx > -1) scheduledSources.splice(idx, 1);
                     };
                     return;
                 }
-
-                if (data.type === 'audio_end') {
+                
+                if (data.type === "audio_end") {
                     console.log("Stream ended.");
+                    // The lip-sync loop will self-terminate when currentTime > nextPlayTime
+                    
                     const remainingTime = Math.max(0, nextPlayTime - audioContext.currentTime);
                     setTimeout(() => {
-                        if (!isStreaming) return;
+                        if (!isStreaming) return; // Was interrupted
                         isStreaming = false;
                         document.getElementById('ui-layer').style.opacity = 0;
                     }, remainingTime * 1000 + 500);
+                    
                     return;
                 }
 
-                // ─── Legacy audio (ElevenLabs) ───
+                // ─── LEGACY AUDIO HANDLER (ElevenLabs) ───────────────────────────────────
                 if (data.text) {
                     console.log("Received AI payload (legacy block):", data);
+
+                    // 1. Show Subtitle
                     document.getElementById('subtitle').innerText = data.text;
                     document.getElementById('ui-layer').style.opacity = 1;
+
                     setExpressionAndMotion(data.expression, data.motion);
 
+                    // 3. Play Audio and Auto-Lip Sync
                     if (data.audio) {
                         await playAudioAndSyncLips(data.audio);
+
                         setTimeout(() => {
                             document.getElementById('ui-layer').style.opacity = 0;
                         }, 500);
                     } else {
+                        // Text received but no audio (TTS may have failed)
                         setTimeout(() => {
                             document.getElementById('ui-layer').style.opacity = 0;
                         }, 4000);
@@ -1080,22 +430,19 @@
 
             socket.onclose = () => {
                 console.log("Disconnected. Reconnecting in 3s...");
-                sessionReady = false;
                 setTimeout(initWebSocket, 3000);
             };
         }
 
-        // ─── Helpers ───
         function setExpressionAndMotion(rawExp, rawMot) {
             rawExp = rawExp?.toLowerCase() || "normal";
             rawMot = rawMot?.toLowerCase() || "idle";
-
+            
             const expression = EXPRESSION_MAP[rawExp];
             const motion = MOTION_MAP[rawMot] || "idle";
-
-            document.getElementById('debug-info').innerText =
-                `[LLM: ${rawExp} | ${rawMot}]\nExpression: ${expression || 'none'}\nMotion: ${motion}`;
-
+            
+            document.getElementById('debug-info').innerText = `[LLM: ${rawExp} | ${rawMot}]\nExpression: ${expression || 'none'}\nMotion: ${motion}`;
+            
             try {
                 if (expression && live2dModel?.internalModel?.expressionManager) {
                     live2dModel.expression(expression);
@@ -1103,7 +450,7 @@
                 if (motion && live2dModel) {
                     live2dModel.motion(motion);
                 }
-            } catch (e) {
+            } catch (e) { 
                 console.error("Motion/Expression error:", e);
                 document.getElementById('debug-info').innerText += `\nError: ${e.message}`;
             }
@@ -1117,12 +464,16 @@
                 bytes[i] = binary.charCodeAt(i);
             }
 
+            // Concatenate with any remainder from the previous chunk
             let totalBytes = new Uint8Array(audioByteRemainder.length + bytes.length);
             totalBytes.set(audioByteRemainder);
             totalBytes.set(bytes, audioByteRemainder.length);
 
+            // We need an even number of bytes for Int16Array (2 bytes per sample)
             const numFullSamples = Math.floor(totalBytes.length / 2);
             const validBytes = totalBytes.subarray(0, numFullSamples * 2);
+
+            // Store the remainder for the next chunk
             audioByteRemainder = totalBytes.subarray(numFullSamples * 2);
 
             const int16 = new Int16Array(validBytes.buffer, validBytes.byteOffset, numFullSamples);
@@ -1136,8 +487,9 @@
         let streamingLipSyncReqId = null;
         function startStreamingLipSync() {
             if (streamingLipSyncReqId) return;
+            
             const pcmData = new Float32Array(analyser.fftSize);
-
+            
             const loop = () => {
                 if (!live2dModel || !isStreaming) {
                     if (live2dModel) {
@@ -1153,11 +505,13 @@
                     sumSquares += amplitude * amplitude;
                 }
                 const rms = Math.sqrt(sumSquares / pcmData.length);
+
                 const mouthOpen = Math.min(1.0, rms * 15.0);
                 live2dModel.internalModel.coreModel.setParameterValueById("ParamMouthOpenY", mouthOpen);
+
                 streamingLipSyncReqId = requestAnimationFrame(loop);
             };
-
+            
             streamingLipSyncReqId = requestAnimationFrame(loop);
         }
 
@@ -1188,20 +542,25 @@
             source.start(0);
 
             const pcmData = new Float32Array(analyser.fftSize);
+
             const lipSyncLoop = () => {
                 if (!live2dModel) return;
+
                 analyser.getFloatTimeDomainData(pcmData);
                 let sumSquares = 0.0;
                 for (const amplitude of pcmData) {
                     sumSquares += amplitude * amplitude;
                 }
                 const rms = Math.sqrt(sumSquares / pcmData.length);
+
                 const mouthOpen = Math.min(1.0, rms * 15.0);
                 live2dModel.internalModel.coreModel.setParameterValueById("ParamMouthOpenY", mouthOpen);
+
                 if (source.playbackRate.value > 0) {
                     requestAnimationFrame(lipSyncLoop);
                 }
             };
+
             requestAnimationFrame(lipSyncLoop);
 
             return new Promise(resolve => {
@@ -1212,29 +571,28 @@
             });
         }
 
-        // ─── Startup ───
         document.getElementById('btn-start').addEventListener('click', async () => {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 512;
 
             document.getElementById('btn-start').style.display = 'none';
-            await fetchConfig();
             await initMicrophone();
-            await initLive2D();
+            initLive2D();
             initWebSocket();
-            showSessionPicker();
         });
 
-        // Window resize
+        // Window resize handler
         window.addEventListener('resize', () => {
             if (live2dModel) {
                 const unscaledWidth = live2dModel.internalModel.width;
                 const unscaledHeight = live2dModel.internalModel.height;
                 const scaleX = window.innerWidth / unscaledWidth;
                 const scaleY = window.innerHeight / unscaledHeight;
+
                 const scale = Math.min(scaleX, scaleY) * 0.95;
                 live2dModel.scale.set(scale);
+
                 live2dModel.x = (window.innerWidth - (unscaledWidth * scale)) / 2;
                 live2dModel.y = (window.innerHeight - (unscaledHeight * scale));
             }

@@ -31,7 +31,7 @@ log = get_logger(__name__)
 # ---------------------------------------------------------------------------
 _SESSION_COMMANDS = frozenset({
     "/new", "/chat", "/resume", "/sessions",
-    "/name", "/rename", "/forget", "/memory",
+    "/name", "/rename", "/forget",
 })
 
 
@@ -158,8 +158,6 @@ class YumiiEngine:
             asyncio.create_task(self._cmd_rename(arg))
         elif cmd == "/forget":
             asyncio.create_task(self._cmd_forget())
-        elif cmd == "/memory":
-            asyncio.create_task(self._cmd_memory())
         else:
             return False
 
@@ -247,13 +245,6 @@ class YumiiEngine:
             "response": "All right, I've forgotten everything I knew about you.",
             "expression": "sad",
             "motion": "idle",
-            "session_id": self.active_session_id or "",
-        })
-
-    async def _cmd_memory(self) -> None:
-        """Handle /memory — ask the frontend to open the memory manager."""
-        await self.broadcast_payload({
-            "type": "show_memory_manager",
             "session_id": self.active_session_id or "",
         })
 
