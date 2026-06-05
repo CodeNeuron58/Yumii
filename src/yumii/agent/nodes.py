@@ -6,7 +6,9 @@ and invoking the LLM agent.
 """
 
 
-from langchain_core.messages import AIMessage, HumanMessage
+import datetime
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from yumii.agent.llm import get_agent
 from yumii.agent.personality_manager import personality_manager
@@ -64,8 +66,16 @@ def chat_node(state: MainState) -> dict:
 
     agent = get_agent(current_personality, user_facts=facts_text or None)
 
+    # Inject current time as ephemeral context so the model always knows it
+    # without needing unreliable tool-calling on Groq Llama.
+    time_msg = SystemMessage(
+        content=(
+            f"The current time is {datetime.datetime.now().strftime('%I:%M %p on %A, %B %d, %Y')}. "
+            f"Use this information if the user asks about the time."
+        )
+    )
     new_human_message = HumanMessage(content=user_input)
-    input_messages = history + [new_human_message]
+    input_messages = [time_msg] + history + [new_human_message]
 
     result = agent.invoke({"messages": input_messages})
 

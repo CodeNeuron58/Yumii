@@ -61,8 +61,7 @@ else:
 _TOOL_HINT = (
     "\n\nIMPORTANT: To respond to the user, you MUST call the `YumiiResponse` tool. "
     "\nDo NOT wrap your response in <function> tags or use any other format. "
-    "\nKeep your spoken response text short and punchy: UNDER 3 sentences and strictly LESS THAN 400 characters. "
-    "\nIf you need to use other tools (like getting the time), use them first before calling YumiiResponse."
+    "\nKeep your spoken response text short and punchy: UNDER 3 sentences and strictly LESS THAN 400 characters."
 )
 
 # Lazy cache: (personality_name, facts_hash) → compiled create_agent instance
@@ -93,7 +92,7 @@ def get_agent(personality: str, user_facts: str | None = None) -> object:
         system_prompt = _build_system_prompt(personality, user_facts)
         _agent_cache[cache_key] = create_agent(
             model=base_llm,
-            tools=tools,
+            tools=[],
             response_format=YumiiResponse,
             system_prompt=system_prompt,
         )
