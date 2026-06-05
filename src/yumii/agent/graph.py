@@ -23,7 +23,7 @@ log = get_logger(__name__)
 _CHECKPOINT_DB = Path.home() / ".yumii" / "memory" / "checkpoints.db"
 
 
-async def build_graph() -> Any:
+async def build_graph(checkpointer: AsyncSqliteSaver | None = None) -> Any:
     """Build and return the compiled LangGraph for Yumii's reasoning engine.
 
     Uses :class:`AsyncSqliteSaver` so conversation history survives
@@ -57,6 +57,8 @@ async def build_graph() -> Any:
     workflow.set_entry_point("think")
     workflow.add_edge("think", END)
 
-    _CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
-    saver = AsyncSqliteSaver.from_conn_string(str(_CHECKPOINT_DB))
-    return workflow.compile(checkpointer=saver)
+    if checkpointer is None:
+        _CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
+        async with AsyncSqliteSaver.from_conn_string(str(_CHECKPOINT_DB)) as saver:
+            return workflow.compile(checkpointer=saver)
+    return workflow.compile(checkpointer=checkpointer)

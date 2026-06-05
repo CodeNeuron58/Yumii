@@ -39,6 +39,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     asyncio.create_task(engine.reasoning_engine_task())
     asyncio.create_task(engine.tts_speaker_task())
     yield
+    # --- shutdown ---
+    await engine.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)

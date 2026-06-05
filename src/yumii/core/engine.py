@@ -11,9 +11,11 @@ import asyncio
 import json
 from typing import Any, Dict, List
 
+import aiosqlite
 from fastapi import WebSocket
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from yumii.agent.graph import build_graph
+from yumii.agent.graph import _CHECKPOINT_DB, build_graph
 from yumii.audio.stt import AudioPipeline
 from yumii.core.config import settings
 from yumii.core.interfaces import BaseSpeaker
@@ -62,13 +64,33 @@ class YumiiEngine:
         # graph_app is initialized lazily via initialize() because
         # AsyncSqliteSaver requires an async context.
         self.graph_app: Any | None = None
+        self._conn: aiosqlite.Connection | None = None
 
     async def initialize(self) -> None:
         """Async one-time initialization: database tables + compiled graph."""
         log.info("engine_initializing")
         await init_db()
-        self.graph_app = await build_graph()
+
+        # Open the SQLite connection directly and keep it alive for the
+        # engine lifetime.  AsyncSqliteSaver.from_conn_string() is a
+        # short-lived context manager; using it here would GC-close the
+        # connection after the first turn and crash on restart.
+        _CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = await aiosqlite.connect(str(_CHECKPOINT_DB))
+        saver = AsyncSqliteSaver(self._conn)
+        self.graph_app = await build_graph(checkpointer=saver)
         log.info("engine_ready")
+
+    async def shutdown(self) -> None:
+        """Clean shutdown: close SQLite connections and memory store."""
+        log.info("engine_shutting_down")
+        if self._conn is not None:
+            try:
+                await self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+        await memory_manager.close()
 
     # ------------------------------------------------------------------
     # Session lifecycle
