@@ -1,86 +1,119 @@
 ---
 title: "State & Memory Architecture"
-description: "How Yumii maintains conversational memory in v1 — and what is planned for v1.1."
+description: "How Yumii maintains conversational memory in v0.2.0 — sessions, facts, and checkpoints."
 layout: "cards"
 icon: "network"
 ---
 
 <ContentCard>
-## What v0.1.0 actually does
+## What v0.2.0 ships
 
-Yumii v0.1.0 uses **LangGraph's `InMemorySaver`** checkpointer
-(`src/yumii/agent/graph.py`):
+Yumii v0.2.0 ships **two layers of persistent memory**, both backed by
+local SQLite at `~/.yumii/memory/`:
 
-```python
-from langgraph.checkpoint.memory import InMemorySaver
+| File | Backed by | Holds |
+|------|-----------|-------|
+| `yumii.db` | `aiosqlite` + `memory_db.py` | Session metadata (`sessions`, `session_summaries`) |
+| `checkpoints.db` | `langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver` | LangGraph conversation history, keyed by `thread_id` = session UUID |
+| `store.db` | `langgraph.store.sqlite.AsyncSqliteStore` | User facts (preferences, identity, habits, goals) under namespace `("facts",)` |
 
-saver = InMemorySaver()
-return workflow.compile(checkpointer=saver)
-```
-
-This means:
-
-* Conversation history is preserved **for the lifetime of one running
-  server process**.
-* The checkpointer is keyed by `thread_id`. The current engine uses a
-  single hardcoded thread (`yumii_session_1`), so all WebSocket clients
-  share the same history.
-* **Restarting the server clears all memory.** There is no disk-backed
-  storage in v1.
-
-This is sufficient for a single-session demo and matches the
-prototyping posture of the project. The v1 README, `VISION.md`, and
-this page are explicit about it.
+`engine.py` opens `checkpoints.db` once and keeps the connection
+alive for the lifetime of the process — `AsyncSqliteSaver.from_conn_string`
+is a short-lived context manager and would GC-close the connection
+on the first turn otherwise. `MemoryManager` lazily opens `store.db`
+on first fact read/write.
 
 ---
 
 </ContentCard>
 
 <ContentCard>
-## What is planned for v1.1
+## Sessions
 
-The v1.1 release (target: shortly after v1.0) introduces two new
-storage layers:
+Each browser tab gets its own UUID session. The session is created on
+WebSocket connect (or resumed via the `session_select` JSON command)
+and lives in `sessions` (`id`, `name`, `created_at`, `last_active_at`,
+`message_count`, `is_archived`). On every successful LLM turn the
+engine bumps `last_active_at` via `session_manager.update_session_activity`.
 
-1. **Conversation log** — every `(turn_id, role, content, timestamp)`
-   tuple appended to a SQLite database at
-   `~/.yumii/memory/conversations.db`. Append-only.
-2. **User facts** — a `UserFacts` table
-   `(user_id, key, value, source_turn_id, last_seen)` populated by a
-   lightweight extraction step (probably an LLM pass at the end of each
-   session, or a daily cron).
+The LangGraph `thread_id` for `graph_app.ainvoke(...)` is the active
+session id, so checkpoints are namespaced per conversation. Restarting
+the server does **not** clear conversation history — your last chat is
+exactly where you left it.
 
-The LLM Planner (in v2.0) will read from this store. v1.1 only writes
-to it.
+CLI:
+* `/chat` — TUI session picker (resume, new, delete)
+* `/resume` — resume most recent session
+* `/sessions` — list all saved sessions
+* `/name <name>` — rename the active session (browser only)
 
-The intent is to avoid building a vector store on day one. SQLite +
-keyword matching covers the v1.1 use case. If retrieval quality becomes
-the bottleneck, embeddings come later.
+REST:
+* `GET /api/sessions`
+* `POST /api/sessions` (optional `?name=`)
+* `POST /api/sessions/{id}/resume`
+* `DELETE /api/sessions/{id}`
 
 ---
 
 </ContentCard>
 
 <ContentCard>
-## Why not SQLite / Postgres today?
+## Long-term memory (user facts)
 
-It would be ~150 lines of code. The reason to defer is not effort, it
-is **observability**. Memory bugs only show up under real use. v1.0
-shipped without memory is a clean baseline. v1.1 ships with memory and
-is debugged against real conversation logs from v1.0 users.
+After every conversation turn, `memory_manager.extract_facts_from_messages(...)`
+runs a **fire-and-forget** background task: a cheap LLM pass
+(Groq `llama-3.1-8b-instant` by default, OpenAI `gpt-4o-mini` or
+`claude-3-5-sonnet-latest` as fallbacks) analyses the user/assistant
+exchange and returns a JSON list of atomic facts:
 
-If you want to enable persistent memory on a v1.0 build today, the
-cleanest path is to fork `graph.py` and swap the checkpointer:
-
-```python
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-
-async with AsyncSqliteSaver.from_conn_string(
-    "~/.yumii/memory/checkpoints.db"
-) as saver:
-    app = workflow.compile(checkpointer=saver)
+```json
+{
+  "facts": [
+    {"fact": "user is vegetarian", "category": "preference", "confidence": 0.9},
+    {"fact": "user lives in Berlin", "category": "identity",    "confidence": 0.95}
+  ]
+}
 ```
 
-This is not officially supported in v1, but the seam is small enough
-that a contributor PR is welcome.
+Each fact is deduplicated against existing memory (substring match)
+before being stored under the `("facts",)` namespace. The categories
+are: `preference`, `identity`, `habit`, `relationship`, `goal`, `general`.
+
+On every new or resumed session, the engine pre-loads
+`memory_manager.get_facts_raw()` and injects them into the
+`MainState` of the LangGraph run. `chat_node` formats them as
+bullet points and appends to the personality system prompt at agent
+build time. The agent is cached per `(personality, hash(facts))` —
+editing a fact invalidates the cache and the next turn picks up the
+new memory.
+
+CLI:
+* `/memory` — TUI fact browser / editor / deleter
+* `/forget` — wipe **all** facts (sessions are kept)
+
+REST:
+* `GET /api/facts`
+* `PUT /api/facts/{id}` (body: `{"fact": "..."}`)
+* `DELETE /api/facts/{id}`
+
+---
+
+</ContentCard>
+
+<ContentCard>
+## Why SQLite, not Postgres or a vector store?
+
+* **Local-first.** No cloud roundtrip for memory, no API key for storage.
+* **Tiny corpus.** The fact store is bounded by what one user can
+  possibly say in a few years of conversation — well under 10 000 rows.
+  Substring deduplication is more than fast enough.
+* **LangGraph native.** `AsyncSqliteStore` and `AsyncSqliteSaver` are
+  the project's reference implementations, so the integration is
+  ~30 lines, not 300.
+* **Embeddings later.** If retrieval quality (not storage size) ever
+  becomes the bottleneck, swapping the fact lookup for a vector
+  similarity search is a single-function change in `MemoryManager`.
+
+---
+
 </ContentCard>
