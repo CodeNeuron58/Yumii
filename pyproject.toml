@@ -32,6 +32,7 @@ dependencies = [
     "langchain-groq>=1.1.2",
     "langchain-openai>=1.2.1",
     "langgraph>=1.0.10",
+    "langchain-mcp-adapters>=0.2.0",
     "numpy>=2.4.2",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.14.0",
