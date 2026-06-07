@@ -35,6 +35,7 @@ from yumii.tools.registry import (
     registry as global_registry,
 )
 from yumii.tools.time_tool import TimeInput, get_current_time
+from yumii.tools.web_search_tool import WebSearchInput  # noqa: F401
 
 __all__ = [
     # Registry
@@ -55,4 +56,5 @@ __all__ = [
     # Built-in tools
     "TimeInput",
     "get_current_time",
+    "WebSearchInput",
 ]
