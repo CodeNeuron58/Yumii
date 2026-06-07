@@ -22,4 +22,4 @@ AVAILABLE FACIAL EXPRESSIONS (Choose exactly one):
 AVAILABLE BODY MOTIONS (Choose exactly one):
 "nod", "shakehead", "tilthead", "fidget", "forward", "lookaway", "greeting", "idle"
 
-CRITICAL RULE: Return ONLY structured JSON with `response_text`, `expression`, and `motion` fields.
+CRITICAL RULE: Respond in plain conversational text only. The system will derive facial expressions and body motions from your tone automatically — do not include any JSON, function tags, or emotion labels in your reply.

@@ -60,3 +60,32 @@ def test_get_current_personality_returns_valid_value():
     """The current personality (from config) must be a known personality name."""
     name = personality_manager.get_current_personality()
     assert name in PERSONALITY_DESCRIPTIONS
+
+
+def test_prompts_do_not_instruct_llm_to_emit_json():
+    """PR 2 removed the structured YumiiResponse output path. The LLM
+    now emits plain text and the synthesizer derives emotion/motion.
+    No personality prompt may tell the LLM to wrap its reply in JSON
+    or use ``response_text`` / structured-output syntax — that would
+    leak JSON into the TTS pipeline (and the user would hear it
+    spoken aloud).
+
+    This test guards against accidental reintroduction of the
+    pre-PR-2 ``response_format=YumiiResponse`` contract.
+    """
+    prompts_dir = Path(__file__).parent.parent / "src" / "yumii" / "assets" / "prompts"
+    forbidden_phrases = (
+        "Return ONLY structured JSON",
+        "structured JSON with `response_text`",
+        "respond with JSON",
+        "return JSON",
+        "<function>",  # legacy Groq workaround
+    )
+    for name in PERSONALITY_DESCRIPTIONS:
+        prompt = (prompts_dir / f"{name}.txt").read_text(encoding="utf-8")
+        for phrase in forbidden_phrases:
+            assert phrase not in prompt, (
+                f"Personality {name!r} still contains forbidden instruction "
+                f"{phrase!r}. PR 2 changed the agent loop to plain text; "
+                f"prompts must not instruct the LLM to emit JSON."
+            )
