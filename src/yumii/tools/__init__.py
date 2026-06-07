@@ -4,6 +4,15 @@ Importing this package registers the built-in :func:`get_current_time`
 tool on the global registry. The MCP loader is a separate
 :func:`yumii.tools.mcp_config.load_mcp_servers` call so projects that
 don't use MCP don't pay the import cost.
+
+Note on the ``registry`` re-export: we import the singleton under
+the name ``global_registry`` to avoid shadowing the submodule
+``yumii.tools.registry``. A bare ``import yumii.tools.registry`` would
+otherwise resolve to the ``ToolRegistry`` *instance* (because
+``yumii.tools.__init__`` binds that name), which breaks
+``yumii.tools.registry.list_tools()`` and similar submodule-style
+access. Callers should prefer ``from yumii.tools.registry import
+registry as global_registry`` (as the tests do).
 """
 
 from __future__ import annotations
@@ -23,14 +32,14 @@ from yumii.tools.registry import (
     list_tools,
     register,
     register_many,
-    registry,
+    registry as global_registry,
 )
 from yumii.tools.time_tool import TimeInput, get_current_time
 
 __all__ = [
     # Registry
     "ToolRegistry",
-    "registry",
+    "global_registry",
     "register",
     "register_many",
     "get",
