@@ -1,7 +1,6 @@
-"""
-ElevenLabs TTS (Text-to-Speech) provider for Yumii.
-"""
+"""ElevenLabs TTS (Text-to-Speech) provider for Yumii."""
 
+from __future__ import annotations
 
 import base64
 from typing import Any, AsyncGenerator
@@ -35,18 +34,62 @@ class YumiiSpeaker(BaseSpeaker):
             raise ValueError(msg)
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
-        """Synthesize text and yield audio metadata followed by the audio data."""
-        audio_base64, duration = self.speak(text)
-        if audio_base64:
-            # Yield metadata first to satisfy the engine's expectations
-            yield {"type": "metadata", "sampleRate": 22050}  # ElevenLabs default
-            # Yield the full audio as a single chunk
-            yield audio_base64
-        else:
-            log.error("elevenlabs_stream_speak_failed")
+        """Stream audio chunks from ElevenLabs.
+
+        Yields, in order:
+          1. ``{"type": "metadata", "sampleRate": 22050}`` — once,
+             tells the frontend the sample rate and lets it open
+             the audio context.
+          2. A sequence of base64-encoded audio chunks as they
+             arrive from ElevenLabs — one yield per chunk.
+
+        The engine consumes these in the
+        :func:`yumii.core.engine.YumiiEngine.tts_speaker_task` loop
+        and broadcasts each as a WebSocket ``audio_chunk`` event.
+        """
+        if not text or not text.strip():
+            return
+
+        # Yield metadata first so the frontend can prepare its audio
+        # context before the first chunk arrives.
+        yield {"type": "metadata", "sampleRate": 22050}
+
+        try:
+            # text_to_speech.stream returns an iterator of raw audio
+            # bytes. We base64-encode each chunk so the WebSocket
+            # payload stays JSON-safe (the engine's broadcast_payload
+            # uses json.dumps).
+            audio_stream = self.client.text_to_speech.stream(
+                voice_id=self.voice_id,
+                output_format="mp3_22050_32",
+                text=text,
+                model_id=self.model_id,
+                voice_settings=VoiceSettings(
+                    stability=0.0,
+                    similarity_boost=1.0,
+                    style=0.0,
+                    use_speaker_boost=True,
+                ),
+            )
+            for chunk in audio_stream:
+                if not chunk:
+                    continue
+                # base64-encode once, broadcast the chunk. The
+                # frontend stitches chunks together by appending raw
+                # bytes after base64-decoding.
+                yield base64.b64encode(chunk).decode("ascii")
+        except Exception as e:
+            log.error("elevenlabs_stream_error", error=str(e), exc_info=True)
+            # Re-raise so the engine's `except Exception` branch
+            # sends a final error payload to the frontend.
+            raise
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
-        """Perform blocking synthesis and return base64 encoded audio."""
+        """Perform blocking synthesis and return base64 encoded audio.
+
+        Kept for backwards-compatibility with the non-streaming
+        fallback path in :func:`yumii.core.engine.YumiiEngine.tts_speaker_task`.
+        """
         if not text:
             return None, 0.0
 

@@ -60,6 +60,32 @@
             font-weight: 500;
         }
 
+        #status-bar {
+            position: absolute;
+            z-index: 15;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.85);
+            background: rgba(0, 0, 0, 0.45);
+            padding: 6px 16px;
+            border-radius: 999px;
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none;
+            max-width: 80vw;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #status-bar.visible {
+            opacity: 1;
+        }
+
         #btn-start {
             position: absolute;
             z-index: 20;
@@ -102,6 +128,8 @@
     <div id="canvas-container"></div>
 
     <button id="btn-start">Connect &amp; Start Audio Context</button>
+
+    <div id="status-bar"></div>
 
     <div id="ui-layer">
         <div id="subtitle">Connecting to Yumii...</div>
@@ -288,6 +316,44 @@
             let scheduledSources = [];
             let currentSampleRate = 24000;
 
+            // ─── STATUS BAR (PR 3) ─────────────────────────────────────────
+            // Minimal 1-line indicator at the top-centre of the screen.
+            // Shown only while the agent is working; hidden when idle.
+            const statusBar = document.getElementById('status-bar');
+            let _statusHideTimer = null;
+            function setStatus(text) {
+                if (!statusBar) return;
+                if (_statusHideTimer) {
+                    clearTimeout(_statusHideTimer);
+                    _statusHideTimer = null;
+                }
+                if (text) {
+                    statusBar.textContent = text;
+                    statusBar.classList.add('visible');
+                } else {
+                    // Tiny fade-out delay so quick transitions don't flicker.
+                    _statusHideTimer = setTimeout(() => {
+                        statusBar.classList.remove('visible');
+                        statusBar.textContent = '';
+                    }, 250);
+                }
+            }
+
+            // Pretty name for the tool, used in the status bar. The
+            // backend may send `get_current_time` or
+            // `duckduckgo_search_results`; the user should see
+            // something human.
+            function _humanToolName(name) {
+                if (!name) return 'working';
+                const map = {
+                    get_current_time: 'Checking the time',
+                    duckduckgo_search_results: 'Searching the web',
+                    web_search: 'Searching the web',
+                    web_search_results: 'Searching the web',
+                };
+                return map[name] || `Running ${name.replace(/_/g, ' ')}`;
+            }
+
             function stopAllAudio() {
                 if (currentAudioSource) {
                     try { currentAudioSource.stop(); } catch (e) {}
@@ -312,13 +378,44 @@
                 if (data.type === "interrupt") {
                     console.log("Interrupt received! Stopping audio.");
                     stopAllAudio();
-                    
+
                     document.getElementById('ui-layer').style.opacity = 0;
+                    setStatus('');  // PR 3: clear status bar on interrupt
                     if (live2dModel) {
                         try {
                             live2dModel.motion("idle");
                         } catch (e) {}
                     }
+                    return;
+                }
+
+                // PR 3: streaming thinking / tool indicators. We update
+                // the status bar; we do NOT play streamed tokens as
+                // audio — TTS still synthesises the final full text
+                // when ``audio_start`` arrives.
+                if (data.type === "thinking_start") {
+                    setStatus('Thinking…');
+                    return;
+                }
+                if (data.type === "thinking_delta") {
+                    // Keep the indicator visible while tokens stream.
+                    // We don't accumulate text here (audio_start will
+                    // carry the canonical text). The status bar stays
+                    // as "Thinking…" — just keeping it visible.
+                    setStatus('Thinking…');
+                    return;
+                }
+                if (data.type === "thinking_end") {
+                    // TTS / audio_start will overwrite this with the
+                    // final response text. Don't hide the bar yet.
+                    return;
+                }
+                if (data.type === "tool_status") {
+                    if (data.status === "running") {
+                        setStatus(`${_humanToolName(data.tool)}…`);
+                    }
+                    // Tool done: leave the bar as-is; the next
+                    // thinking_start or audio_start will replace it.
                     return;
                 }
 
@@ -391,14 +488,15 @@
                 if (data.type === "audio_end") {
                     console.log("Stream ended.");
                     // The lip-sync loop will self-terminate when currentTime > nextPlayTime
-                    
+
                     const remainingTime = Math.max(0, nextPlayTime - audioContext.currentTime);
                     setTimeout(() => {
                         if (!isStreaming) return; // Was interrupted
                         isStreaming = false;
                         document.getElementById('ui-layer').style.opacity = 0;
+                        setStatus('');  // PR 3: clear status bar after TTS
                     }, remainingTime * 1000 + 500);
-                    
+
                     return;
                 }
 

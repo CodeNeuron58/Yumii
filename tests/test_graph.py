@@ -106,9 +106,13 @@ def test_yumii_state_includes_messages_and_yumii_fields() -> None:
 
 
 def test_synthesize_normal_text_returns_normal_and_idle() -> None:
-    """Plain text should default to ``normal`` expression, ``idle`` motion."""
-    out = synthesize("hi there!")
-    assert out.response_text == "hi there!"
+    """Plain text should default to ``normal`` expression, ``idle`` motion.
+
+    The fixture text is intentionally neutral (no emotion words, no
+    punctuation triggers) so it falls through to normal/idle.
+    """
+    out = synthesize("the sky is blue today")
+    assert out.response_text == "the sky is blue today"
     assert out.expression == "normal"
     assert out.motion == "idle"
 
@@ -128,8 +132,13 @@ def test_synthesize_empty_text_returns_safe_defaults() -> None:
 
 @pytest.mark.asyncio
 async def test_agent_node_with_text_response_fills_yumii_response_fields() -> None:
-    """A plain AIMessage should yield response / expression / motion in the state delta."""
-    bound = _make_fake_bound(text_response="hello human")
+    """A plain AIMessage should yield response / expression / motion in the state delta.
+
+    The expression / motion labels are computed by the synthesizer from the
+    raw LLM text. The neutral fixture text "the sky is blue" is chosen so it
+    doesn't match any emotion/motion regex and yields normal/idle.
+    """
+    bound = _make_fake_bound(text_response="the sky is blue")
     with patch("yumii.agent.graph.get_agent_llm", return_value=bound):
         delta = await agent_node(
             {
@@ -140,13 +149,13 @@ async def test_agent_node_with_text_response_fills_yumii_response_fields() -> No
                 "user_facts": [],
             }
         )
-    assert delta["response"] == "hello human"
+    assert delta["response"] == "the sky is blue"
     assert delta["expression"] == "normal"
     assert delta["motion"] == "idle"
     # messages delta should include the user's HumanMessage and the AIMessage.
     msgs = delta["messages"]
     assert any(isinstance(m, HumanMessage) and m.content == "hi" for m in msgs)
-    assert any(isinstance(m, AIMessage) and m.content == "hello human" for m in msgs)
+    assert any(isinstance(m, AIMessage) and m.content == "the sky is blue" for m in msgs)
 
 
 @pytest.mark.asyncio

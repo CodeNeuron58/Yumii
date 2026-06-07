@@ -214,6 +214,15 @@ class YumiiEngine:
 
         Waits for transcribed text, clears any active interruptions,
         and invokes the LangGraph reasoning engine to generate a response.
+
+        PR 3 wiring:
+          * Streams graph events via ``astream_events(version="v3")``
+            and broadcasts ``thinking_start`` / ``thinking_delta`` /
+            ``thinking_end`` / ``tool_status`` so the frontend can show
+            a responsive "thinking…" / "Searching the web…" indicator.
+          * The actual spoken YumiiResponse is still produced by the
+            synthesizer at the end of the graph run — we don't TTS
+            streamed tokens (TTS synthesizes the full final text).
         """
         log.info("reasoning_task_started")
         while True:
@@ -241,19 +250,96 @@ class YumiiEngine:
                 # Pre-load long-term facts into state so chat_node can use them.
                 facts = await memory_manager.get_facts_raw()
 
-                reasoning_result = await self.graph_app.ainvoke(
-                    {
-                        "input": user_text,
-                        "session_id": self.active_session_id,
-                        "session_name": self.active_session_name,
-                        "user_facts": facts,
-                    },
-                    config=config,
-                )
+                # Notify frontend that reasoning has begun.
+                await self.broadcast_payload({"type": "thinking_start"})
+
+                # Initial state for the graph.
+                initial_state = {
+                    "input": user_text,
+                    "session_id": self.active_session_id,
+                    "session_name": self.active_session_name,
+                    "user_facts": facts,
+                }
+
+                reasoning_result: dict | None = None
+                streamed_delta_count = 0
+
+                try:
+                    async for event in self.graph_app.astream_events(
+                        initial_state, config=config, version="v3"
+                    ):
+                        if self.interrupt_event.is_set():
+                            log.info("reasoning_interrupted_mid_stream")
+                            break
+
+                        kind = event.get("event")
+                        name = event.get("name", "")
+
+                        # Token-by-token chat-model streaming. We
+                        # surface these as ``thinking_delta`` so the
+                        # UI can show a live typing indicator. We
+                        # don't accumulate them — the graph itself
+                        # finalises the AIMessage on the agent node.
+                        if kind == "on_chat_model_stream":
+                            chunk = event.get("data", {}).get("chunk")
+                            token = getattr(chunk, "content", None) if chunk else None
+                            if token:
+                                streamed_delta_count += 1
+                                await self.broadcast_payload(
+                                    {"type": "thinking_delta", "text": token}
+                                )
+
+                        # Tool starting — show what the agent is up to.
+                        elif kind == "on_tool_start":
+                            await self.broadcast_payload(
+                                {"type": "tool_status", "tool": name, "status": "running"}
+                            )
+
+                        # Tool finished — handy for "found N results" etc.
+                        elif kind == "on_tool_end":
+                            await self.broadcast_payload(
+                                {"type": "tool_status", "tool": name, "status": "done"}
+                            )
+
+                        # Graph node finished — we capture the final
+                        # node output (the agent's final delta) for
+                        # TTS. LangGraph emits ``on_chain_end`` for
+                        # each node, with the node's output in
+                        # ``data["output"]``.
+                        elif kind == "on_chain_end" and event.get("metadata", {}).get("langgraph_node") == "agent":
+                            output = event.get("data", {}).get("output")
+                            if isinstance(output, dict) and output.get("response"):
+                                reasoning_result = output
+                except Exception as stream_exc:
+                    log.error(
+                        "reasoning_stream_error",
+                        error=str(stream_exc),
+                        exc_info=True,
+                    )
+
+                # Always close the thinking indicator, even on error.
+                await self.broadcast_payload({"type": "thinking_end"})
 
                 if self.interrupt_event.is_set():
                     log.info("reasoning_interrupted")
                     continue
+
+                # Fallback: if astream_events didn't yield an agent
+                # final output (older LangGraph behaviour), fall back
+                # to a blocking ainvoke so the conversation still
+                # produces a response. This keeps us safe against
+                # upstream API drift.
+                if reasoning_result is None:
+                    log.warning("reasoning_no_streamed_output_falling_back")
+                    reasoning_result = await self.graph_app.ainvoke(
+                        initial_state, config=config,
+                    )
+
+                log.debug(
+                    "reasoning_done",
+                    streamed_deltas=streamed_delta_count,
+                    response_len=len(reasoning_result.get("response", "")),
+                )
 
                 # Touch session activity after a successful turn.
                 await session_manager.update_session_activity(
