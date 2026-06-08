@@ -7,6 +7,21 @@ binary you downloaded. The "What's not in v1" section of
 
 ---
 
+## ✅ Shipped — 0.3.0 (June 2026)
+
+Streaming engine fix + prompt label-leak fix on top of the
+agentic-loop work. Pre-1.0 — APIs may change. See
+[`CHANGELOG.md`](CHANGELOG.md) for the full list.
+
+- Custom `StateGraph` + `ToolNode` agent loop (replaces `create_agent`)
+- Tool registry, `ToolPolicy` protocol, MCP config loader
+- Heuristic emotion / motion synthesizer (replaces structured-output
+  LLM call)
+- Streaming engine events + ElevenLabs streaming TTS
+- HITL confirmation gate (mode = `never` / `external` / `always`)
+- Web search tool (DuckDuckGo), gated by default
+- **184 tests** total — 7 new test modules since 0.2.0
+
 ## ✅ Shipped — 0.2.0 (June 2026)
 
 Memory & Sessions release. **Alpha — no API stability promise.** See
@@ -52,24 +67,37 @@ The first public release.
 
 ## 🚧 In progress — v1.0 (target: Q3 2026)
 
-The next release. Focus: **agentic loop**.
+The next release. Focus: **declaring the architecture stable** so
+downstream code can rely on the public API (tool registry,
+`YumiiResponse` shape, WebSocket event protocol,
+`engine.request_confirmation`) without breakage.
 
-- **Triage / Planner / Synthesizer agent loop.** A cheap classifier
-  (Triage) produces an immediate spoken acknowledgement, the Planner
-  builds a `Plan` of tool calls, the Tool Dispatcher runs them with
-  cancellation support, and the Synthesizer produces the final
-  spoken answer.
+Note: the original v1.0 plan called for a 3-stage
+**Triage / Planner / Synthesizer** agent loop. We abandoned that
+design in favor of a simpler custom `StateGraph` + `ToolNode`
+(shipped in 0.3.0) which is less code, more direct, and easier to
+test. The "Synthesizer" half of the original plan survives as the
+heuristic `synthesize()` classifier in 0.3.0; the Triage and
+Planner pre-pass stages were *not* built and *will not* be built
+— they are part of an abandoned design, not a backlog.
+
 - **`ToolContract` protocol.** A new tool is added in <30 lines:
   Pydantic input schema, an `async run()` method, a
-  `requires_confirmation` flag, and an idempotency key.
+  `requires_confirmation` flag, and an idempotency key. *Shipped
+  in 0.3.0 as `ToolPolicy` (no `async run()` envelope; tools remain
+  LangChain-native).*
 - **Confirmation gates.** Side-effecting tools pause the engine and
   emit a `{"type": "confirmation_request"}` WebSocket event.
+  *Shipped in 0.3.0.*
 - **MCP server transport.** Expose the tool registry over the Model
   Context Protocol so Claude Desktop, Cursor, etc. can call Yumii's
-  tools.
+  tools. *Partial in 0.3.0 — client-side loader (MCP servers → Yumii
+  tools) is in. The server-side (Yumii tools → external MCP clients)
+  is still pending.*
 - **A first real integration.** Likely Google Calendar (read-only)
   or Google Tasks.
 - **More tests.** Aim for 60% coverage of `core/` and `agent/`.
+  *184 tests in 0.3.0, but coverage % not yet measured.*
 
 ---
 

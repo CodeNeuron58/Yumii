@@ -5,6 +5,114 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-06-08
+
+Streaming engine fix + prompt label-leak fix on top of the v0.2
+agentic-loop work. **Pre-1.0 — APIs may change.** This release
+combines the four architecture PRs that landed in the 0.2 → 0.3
+window (custom `StateGraph`, tool registry + policy, heuristic
+synthesizer, HITL gate) with two follow-up fixes that surfaced
+in manual testing.
+
+### Added
+- **Custom `StateGraph` + `ToolNode` agent loop.** Replaces the
+  `create_agent` wrapper used in 0.2.0. The graph is a hand-built
+  `agent → tools → agent` cycle in `src/yumii/agent/graph.py`,
+  giving the engine full control over the message stream and
+  making `interrupt_before` meaningful for tool calls.
+- **Tool registry + `ToolPolicy` protocol.** A single
+  `yumii.tools.registry` module owns every tool (native `@tool`,
+  MCP-loaded, or hand-rolled `BaseTool`) plus its `ToolPolicy`
+  (category: `READ` / `WRITE` / `EXTERNAL`, plus a
+  `requires_confirmation` flag). Register a new tool in <30 lines:
+  the policy decides whether the gate triggers.
+- **MCP config loader.** A JSON config at
+  `~/.yumii/mcp_servers.json` is parsed at startup and the named
+  MCP servers are connected via `langchain_mcp_adapters`. Their
+  tools land in the same registry as native tools, with the same
+  `ToolPolicy` defaults.
+- **Web search tool** (`yumii.tools.web_search` → DuckDuckGo
+  Results). Registered with `ToolCategory.EXTERNAL,
+  requires_confirmation=True` so it triggers the HITL gate out of
+  the box.
+- **Heuristic emotion / motion synthesizer** (`agent/synthesizer.py`).
+  Runs after the final LLM turn and converts the agent's plain-text
+  reply into the `YumiiResponse(response_text, expression, motion)`
+  shape the Live2D frontend expects. Order-sensitive pattern
+  classifier; no extra LLM call. Replaces the structured-output
+  approach that 0.2.0 used, which was incompatible with native
+  tool-calling.
+- **Streaming engine events.** The reasoning loop now uses
+  `astream_events(version="v2")` and broadcasts three WebSocket
+  event types:
+  - `thinking_start` / `thinking_delta` / `thinking_end` — per-token
+    text from the LLM, for the typing-indicator UI.
+  - `tool_status` (`running` / `done`) — so the status bar can show
+    "Searching the web…".
+  - Falls back to `ainvoke` if the event stream produces no
+    `YumiiResponse` (defensive).
+- **ElevenLabs streaming TTS** (`tts/speaker.py`). `stream_speak`
+  yields `{"type": "metadata", "sampleRate": 22050}` first, then
+  base64-encoded audio chunks as they arrive. The frontend plays
+  them in real time instead of waiting for the full synthesis.
+- **HITL confirmation gate.** Side-effecting tools pause the engine
+  and emit a `confirmation_request` event to the frontend; the user
+  clicks Yes / No in a browser-native modal; the engine's
+  `asyncio.Future` resolves and the tool runs (or a synthetic
+  `ToolMessage` saying it was declined is appended). Three modes
+  configurable via the new `HITL_MODE` setting:
+  - `"never"` — gate is disabled.
+  - `"external"` (default) — gate only tools with
+    `ToolCategory.EXTERNAL` or `requires_confirmation=True`.
+  - `"always"` — gate every tool call.
+  Default timeout: 30 s (`HITL_TIMEOUT_SECONDS`), after which the
+  request is auto-denied. Barge-in during a confirmation vetoes
+  an in-flight Yes.
+- **HITL CLI command.** `yumii hitl-mode` (or `/hitl` in the REPL)
+  opens a radiolist to pick the mode.
+- **Frontend status bar + confirmation modal.** A 1-line pill at
+  the top of the Live2D stage shows the current thinking / tool
+  activity. The confirmation modal is a native browser `confirm`
+  variant with Yes / No buttons.
+- **7 new test files** (`test_synthesizer`, `test_streaming`,
+  `test_tts_streaming`, `test_hitl`, plus three registry / policy
+  / MCP-loader tests added during the 0.2 → 0.3 work). Test
+  suite is now **184 tests** total.
+
+### Changed
+- **Native tool calling is back.** 0.2.0 had to drop it because
+  Groq Llama 3.3 70B returned malformed tool calls; the new
+  graph uses `bind_tools` directly and Groq's tool-call
+  formatting works with the custom `StateGraph`. `get_current_time`
+  is once again a real tool the LLM can call, not a per-turn
+  `SystemMessage` injection.
+- **Structured `YumiiResponse` output is gone.** The 0.2.0
+  workaround (`response_format=`) is removed. The agent emits
+  plain text; the synthesizer produces the structured shape.
+- **Personality prompts no longer list label words.** The 6
+  personality `.txt` files (`caring`, `tsundere`, `genki`,
+  `kuudere`, `yandere`, `dandere`) no longer contain the
+  `EXPRESSION & MOTION ALIGNMENT` or `AVAILABLE *` sections. The
+  LLM was reading those as a multiple-choice list and emitting
+  label words ("smile and nod", "smile and tilthead") at the end
+  of its reply; the CRITICAL RULE alone now tells it to speak
+  plainly and let the synthesizer derive labels from the tone.
+  Regression test: `test_personality_prompts_do_not_leak_labels`
+  + `test_personality_prompts_have_critical_rule_first`.
+- **Streaming engine fixed.** `reasoning_engine_task` now uses
+  `astream_events(..., version="v2")`. The previous `version="v3"`
+  silently returned a coroutine instead of an async iterator
+  in `langchain-core` 1.4.x, causing every turn to fall back to
+  blocking `ainvoke`. Per-token streaming and the typing-indicator
+  UI are now live in production.
+
+### Removed
+- `llm.py`'s structured `YumiiResponse` instruction to the LLM
+  (the synthesizer handles this now).
+- 0.2.0's per-turn `SystemMessage` injection of the current time.
+
+---
+
 ## [0.2.0] — 2026-06-05
 
 Memory & Sessions release.
