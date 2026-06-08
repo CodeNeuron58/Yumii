@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     stt_provider: str = Field(default="local", alias="STT_PROVIDER")
     whisper_model_size: str = Field(default="base", alias="WHISPER_MODEL_SIZE")
 
+    # HITL (human-in-the-loop) confirmation gates
+    # Valid values: "never" (no gate), "external" (gate only tools whose
+    # ToolCategory is EXTERNAL or whose policy.requires_confirmation=True),
+    # "always" (gate every tool call). Default "external".
+    hitl_mode: str = Field(default="external", alias="HITL_MODE")
+    hitl_timeout_seconds: float = Field(default=30.0, alias="HITL_TIMEOUT_SECONDS")
+
     # Project paths
     project_root: str = Field(default=".", description="Root directory of the project")
 

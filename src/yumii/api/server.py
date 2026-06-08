@@ -233,6 +233,14 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         # so the engine's command handler can process it.
                         await engine.transcription_queue.put(cmd)
 
+                    # PR 4: HITL confirmation reply from the browser.
+                    # The engine is awaiting the future registered
+                    # under ``request_id``; we just resolve it.
+                    elif msg_type == "confirmation_response":
+                        request_id = payload.get("request_id", "")
+                        approved = bool(payload.get("approve", False))
+                        engine.resolve_confirmation(request_id, approved)
+
                 except Exception:
                     pass
                 continue

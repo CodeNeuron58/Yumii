@@ -16,26 +16,28 @@ The graph is a classic ReAct-style loop:
       │ tool calls
       ▼
     ┌────────┐
-    │ tools  │ (ToolNode — prebuilt dispatcher)
+    │ tools  │ (gated ToolNode — see _build_gated_tools_node)
     └────────┘
       │
       └────────► back to agent
 
-The graph is **already shaped for HITL confirmation gates**: the
-``tools`` node is a natural pause point. PR 4 will add
-``interrupt_before=["tools"]`` and an engine handler that emits a
-``confirmation_request`` to the browser and waits for the user's
-response. For now the graph runs to completion in a single
-``ainvoke`` call, matching the engine's pre-v1.0 contract.
+The ``tools`` node is wrapped with a HITL confirmation gate. Tools
+whose :class:`ToolPolicy.requires_confirmation` is ``True`` (and that
+are not opted-out by ``settings.hitl_mode``) pause execution,
+broadcast a ``confirmation_request`` event, and resume only when the
+user approves (or the timeout fires). The gate is implemented in
+:meth:`_build_gated_tools_node` so LangGraph itself stays oblivious
+to the user / WS layer.
 """
 
 from __future__ import annotations
 
 import datetime
+import uuid
 from pathlib import Path
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -43,8 +45,9 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from yumii.agent.llm import get_agent_llm
 from yumii.agent.nodes import check_personality_switch
 from yumii.agent.synthesizer import synthesize
+from yumii.core.config import settings
 from yumii.core.logging import get_logger
-from yumii.tools.registry import list_policies, list_tools
+from yumii.tools.registry import list_policies, list_tools, tools_requiring_confirmation
 
 log = get_logger(__name__)
 
@@ -176,6 +179,150 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ----------------------------------------------------------------------
+# Gated tools node (PR 4 — HITL confirmation)
+# ----------------------------------------------------------------------
+
+
+def _tool_needs_confirmation(tool_name: str) -> bool:
+    """Return ``True`` if the given tool requires a user confirmation
+    under the current :data:`settings.hitl_mode`.
+
+    Modes:
+
+    * ``"never"`` — never gate any tool.
+    * ``"external"`` (default) — gate only tools whose policy says
+      :attr:`ToolPolicy.requires_confirmation` is True (i.e. EXTERNAL
+      by default).
+    * ``"always"`` — gate every tool call.
+    """
+    mode = (settings.hitl_mode or "external").lower()
+    if mode == "never":
+        return False
+    if mode == "always":
+        return True
+    # "external" (or any unrecognised value — fail safe to external)
+    return tool_name in set(tools_requiring_confirmation())
+
+
+def _build_gated_tools_node(tools: list) -> Any:
+    """Wrap LangGraph's prebuilt :class:`ToolNode` with a HITL gate.
+
+    The returned callable mirrors the ToolNode signature: it receives
+    the agent's state, inspects the last AIMessage's ``tool_calls``,
+    and for each one whose policy demands a confirmation it pauses
+    execution and asks the engine (via the module-level
+    :data:`_gated_tools_hook`) to wait for the user's reply.
+
+    If the user approves, the tool runs normally. If they deny, the
+    timeout fires, or the user barge-ins, a synthetic
+    :class:`ToolMessage` is returned to the LLM so the conversation
+    can continue gracefully ("OK, I won't do that.").
+    """
+    inner = ToolNode(tools)
+
+    async def gated_tools_node(state: dict[str, Any]) -> dict[str, Any]:
+        messages = list(state.get("messages") or [])
+        # Find the most recent AIMessage with tool_calls. The LangGraph
+        # ``tools_condition`` guarantees this is the last message when
+        # we enter this node, but we search defensively.
+        last_ai: AIMessage | None = None
+        for m in reversed(messages):
+            if isinstance(m, AIMessage) and getattr(m, "tool_calls", None):
+                last_ai = m
+                break
+        if last_ai is None:
+            return await inner.ainvoke(state)
+
+        hook = _gated_tools_hook.get("fn")
+        denied_messages: list[ToolMessage] = []
+        approved_calls: list[dict] = []
+
+        for call in last_ai.tool_calls:
+            name = call.get("name", "")
+            args = call.get("args", {}) or {}
+            call_id = call.get("id", "")
+            if not _tool_needs_confirmation(name):
+                # Not gated. Let the inner node handle it.
+                approved_calls.append(call)
+                continue
+
+            # Gated: ask the engine's hook.
+            approved = False
+            if hook is not None:
+                request_id = uuid.uuid4().hex
+                try:
+                    approved = await hook(
+                        request_id=request_id,
+                        tool_name=name,
+                        tool_args=args,
+                    )
+                except Exception as e:
+                    log.error(
+                        "confirmation_hook_error",
+                        tool=name,
+                        error=str(e),
+                        exc_info=True,
+                    )
+                    approved = False
+
+            if approved:
+                approved_calls.append(call)
+            else:
+                denied_messages.append(
+                    ToolMessage(
+                        content="User declined to run this tool.",
+                        tool_call_id=call_id,
+                        name=name,
+                    )
+                )
+
+        if not denied_messages:
+            # No denials — let the inner node dispatch everything.
+            return await inner.ainvoke(state)
+
+        if not approved_calls:
+            # All gated calls were denied.
+            return {"messages": denied_messages}
+
+        # Mixed: run the inner node for the approved subset, then
+        # append the denial messages so every tool_call_id has a
+        # matching ToolMessage in the history.
+        trimmed_ai = AIMessage(
+            content=last_ai.content,
+            tool_calls=approved_calls,
+            id=last_ai.id,
+        )
+        sub_state = {**state, "messages": messages[:-1] + [trimmed_ai]}
+        inner_result = await inner.ainvoke(sub_state)
+        inner_messages = (
+            inner_result.get("messages", [])
+            if isinstance(inner_result, dict)
+            else []
+        )
+        return {"messages": list(inner_messages) + denied_messages}
+
+    return gated_tools_node
+
+
+# Module-level slot for the engine to inject its HITL hook. The
+# graph builder doesn't know about the engine, so we use this
+# indirection: the engine calls :func:`set_confirmation_hook` at
+# startup, and :func:`_build_gated_tools_node` reads the hook on
+# every call.
+_gated_tools_hook: dict[str, Any] = {"fn": None}
+
+
+def set_confirmation_hook(fn) -> None:
+    """Register the engine's HITL confirmation hook.
+
+    The hook is awaited with ``(request_id, tool_name, tool_args)``
+    and must return ``True`` (approved) or ``False`` (denied /
+    timed out). Pass ``None`` to clear it.
+    """
+    _gated_tools_hook["fn"] = fn
+
+
 async def build_graph(checkpointer: AsyncSqliteSaver | None = None) -> Any:
     """Build and return the compiled LangGraph for Yumii's reasoning engine.
 
@@ -204,7 +351,7 @@ async def build_graph(checkpointer: AsyncSqliteSaver | None = None) -> Any:
 
     # Nodes
     workflow.add_node("agent", agent_node)
-    workflow.add_node("tools", ToolNode(tools))
+    workflow.add_node("tools", _build_gated_tools_node(tools))
 
     # Edges
     workflow.set_entry_point("agent")

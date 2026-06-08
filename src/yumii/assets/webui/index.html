@@ -86,6 +86,40 @@
             opacity: 1;
         }
 
+        #confirm-prompt {
+            position: absolute;
+            z-index: 25;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 30, 0.92);
+            color: #fff;
+            padding: 18px 22px;
+            border-radius: 14px;
+            box-shadow: 0 6px 30px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            min-width: 280px;
+            max-width: 80vw;
+            text-align: center;
+            font-size: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        #confirm-prompt.hidden { display: none; }
+        .confirm-text { margin-bottom: 14px; line-height: 1.4; }
+        .confirm-buttons { display: flex; gap: 10px; justify-content: center; }
+        .confirm-buttons button {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .confirm-buttons button:hover { background: rgba(255, 255, 255, 0.15); }
+        #confirm-yes { background: rgba(80, 200, 120, 0.25); }
+        #confirm-yes:hover { background: rgba(80, 200, 120, 0.4); }
+
         #btn-start {
             position: absolute;
             z-index: 20;
@@ -130,6 +164,14 @@
     <button id="btn-start">Connect &amp; Start Audio Context</button>
 
     <div id="status-bar"></div>
+
+    <div id="confirm-prompt" class="hidden">
+        <div class="confirm-text"></div>
+        <div class="confirm-buttons">
+            <button id="confirm-no">Deny</button>
+            <button id="confirm-yes">Approve</button>
+        </div>
+    </div>
 
     <div id="ui-layer">
         <div id="subtitle">Connecting to Yumii...</div>
@@ -354,6 +396,35 @@
                 return map[name] || `Running ${name.replace(/_/g, ' ')}`;
             }
 
+            // PR 4: HITL confirmation prompt. The engine sends a
+            // ``confirmation_request`` with a request_id and tool
+            // details; we show a small modal and reply with
+            // ``confirmation_response`` (approve: true/false).
+            const confirmPrompt = document.getElementById('confirm-prompt');
+            const confirmText = confirmPrompt ? confirmPrompt.querySelector('.confirm-text') : null;
+            function showConfirmPrompt(requestId, tool, args) {
+                if (!confirmPrompt) return;
+                const pretty = _humanToolName(tool);
+                const argStr = args && Object.keys(args).length
+                    ? ` with ${JSON.stringify(args)}`
+                    : '';
+                confirmText.textContent = `Allow Yumii to ${pretty.toLowerCase()}${argStr}?`;
+                confirmPrompt.classList.remove('hidden');
+                // Wire the buttons (idempotent — we replace listeners)
+                const yes = document.getElementById('confirm-yes');
+                const no = document.getElementById('confirm-no');
+                const reply = (approved) => {
+                    confirmPrompt.classList.add('hidden');
+                    socket.send(JSON.stringify({
+                        type: 'confirmation_response',
+                        request_id: requestId,
+                        approve: approved,
+                    }));
+                };
+                yes.onclick = () => reply(true);
+                no.onclick = () => reply(false);
+            }
+
             function stopAllAudio() {
                 if (currentAudioSource) {
                     try { currentAudioSource.stop(); } catch (e) {}
@@ -416,6 +487,18 @@
                     }
                     // Tool done: leave the bar as-is; the next
                     // thinking_start or audio_start will replace it.
+                    return;
+                }
+
+                // PR 4: HITL confirmation gate — engine is asking
+                // for permission to run a tool.
+                if (data.type === "confirmation_request") {
+                    showConfirmPrompt(data.request_id, data.tool, data.args || {});
+                    return;
+                }
+                if (data.type === "confirmation_timeout") {
+                    // Hide the prompt (the engine auto-denied).
+                    if (confirmPrompt) confirmPrompt.classList.add('hidden');
                     return;
                 }
 

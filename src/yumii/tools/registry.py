@@ -231,6 +231,11 @@ def list_policies() -> dict[str, ToolPolicy]:
     return registry.list_policies()
 
 
+def tools_requiring_confirmation() -> list[str]:
+    """Return the names of tools that need a confirmation gate."""
+    return registry.tools_requiring_confirmation()
+
+
 def bind_to_llm(llm: BaseChatModel) -> BaseChatModel:
     """Bind the global registry's tools to an LLM via ``bind_tools``.
 

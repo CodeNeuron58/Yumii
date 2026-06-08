@@ -15,7 +15,7 @@ import aiosqlite
 from fastapi import WebSocket
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from yumii.agent.graph import _CHECKPOINT_DB, build_graph
+from yumii.agent.graph import _CHECKPOINT_DB, build_graph, set_confirmation_hook
 from yumii.audio.stt import AudioPipeline
 from yumii.core.config import settings
 from yumii.core.interfaces import BaseSpeaker
@@ -46,6 +46,14 @@ class YumiiEngine:
         self.is_speaking: bool = False
         self.active_session_id: str | None = None
         self.active_session_name: str = "New Chat"
+
+        # PR 4: HITL confirmation gate. Pending confirmations are
+        # keyed by request_id (a UUID minted when the engine asks the
+        # browser). The future is set by the WS server when the user
+        # replies (or auto-resolved to False on timeout). See
+        # :meth:`request_confirmation` and
+        # :meth:`resolve_confirmation`.
+        self.pending_confirmations: dict[str, "asyncio.Future[bool]"] = {}
 
         self.stt_provider: str = settings.stt_provider
         self.model_size: str = settings.whisper_model_size
@@ -79,6 +87,9 @@ class YumiiEngine:
         self._conn = await aiosqlite.connect(str(_CHECKPOINT_DB))
         saver = AsyncSqliteSaver(self._conn)
         self.graph_app = await build_graph(checkpointer=saver)
+        # PR 4: install the HITL confirmation hook so the gated
+        # tools node knows who to ask when a tool needs approval.
+        set_confirmation_hook(self._confirmation_hook)
         log.info("engine_ready")
 
     async def shutdown(self) -> None:
@@ -152,6 +163,106 @@ class YumiiEngine:
     # ------------------------------------------------------------------
     # Broadcast
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # HITL confirmation gate (PR 4)
+    # ------------------------------------------------------------------
+
+    async def _confirmation_hook(
+        self,
+        request_id: str,
+        tool_name: str,
+        tool_args: dict,
+    ) -> bool:
+        """Bridge between the gated tools node and the WS layer.
+
+        The graph calls this with a freshly-minted ``request_id``.
+        We delegate to :meth:`request_confirmation` (which broadcasts
+        the WS event and awaits the reply). If the user barge-ins
+        mid-confirmation, we resolve as a deny so the LLM gets
+        feedback and the loop can short-circuit.
+        """
+        # Pre-check: if the user has already interrupted (e.g. they
+        # said "stop" while the gate was being prepared), deny
+        # immediately.
+        if self.interrupt_event.is_set():
+            log.info("confirmation_bypass_interrupt", tool=tool_name)
+            return False
+
+        approved = await self.request_confirmation(
+            request_id=request_id,
+            tool_name=tool_name,
+            tool_args=tool_args,
+        )
+
+        # Post-check: a barge-in during the wait also counts as deny.
+        if self.interrupt_event.is_set() and approved:
+            log.info("confirmation_vetoed_by_interrupt", tool=tool_name)
+            approved = False
+
+        return approved
+
+    async def request_confirmation(
+        self,
+        request_id: str,
+        tool_name: str,
+        tool_args: dict,
+        timeout: float | None = None,
+    ) -> bool:
+        """Ask the browser to confirm a tool call; await the reply.
+
+        Broadcasts a ``confirmation_request`` event with the tool
+        name + args + request_id, then blocks (with optional timeout)
+        until :meth:`resolve_confirmation` is called by the WS server
+        or the timeout fires.
+
+        Returns ``True`` if the user approved, ``False`` on deny,
+        timeout, or barge-in interrupt. Caller is responsible for
+        checking the active ``interrupt_event`` after this returns.
+        """
+        if timeout is None:
+            timeout = settings.hitl_timeout_seconds
+
+        await self.broadcast_payload(
+            {
+                "type": "confirmation_request",
+                "request_id": request_id,
+                "tool": tool_name,
+                "args": tool_args,
+                "timeout_seconds": timeout,
+            }
+        )
+
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[bool] = loop.create_future()
+        self.pending_confirmations[request_id] = future
+
+        try:
+            approved = await asyncio.wait_for(future, timeout=timeout)
+        except asyncio.TimeoutError:
+            log.info("confirmation_timeout", request_id=request_id, tool=tool_name)
+            await self.broadcast_payload(
+                {
+                    "type": "confirmation_timeout",
+                    "request_id": request_id,
+                    "tool": tool_name,
+                }
+            )
+            approved = False
+        finally:
+            self.pending_confirmations.pop(request_id, None)
+
+        return approved
+
+    def resolve_confirmation(self, request_id: str, approved: bool) -> bool:
+        """Resolve a pending confirmation. Returns ``True`` if a pending
+        future was found and set, ``False`` otherwise (e.g. the
+        request already timed out or was never issued)."""
+        future = self.pending_confirmations.get(request_id)
+        if future is None or future.done():
+            return False
+        future.set_result(approved)
+        return True
 
     async def broadcast_payload(self, payload: Dict[str, Any]) -> None:
         """Push a JSON payload to all currently connected WebSocket clients."""

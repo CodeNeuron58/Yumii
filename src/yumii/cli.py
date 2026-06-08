@@ -679,6 +679,52 @@ def _cmd_personality() -> None:
         )
 
 
+def _cmd_hitl() -> None:
+    """Set the HITL (human-in-the-loop) confirmation mode.
+
+    Modes:
+      * ``external`` (default) — confirm only EXTERNAL-category tools
+        (e.g. web search).
+      * ``always`` — confirm every tool call.
+      * ``never`` — never confirm; tools run unattended.
+    """
+    config = load_global_config()
+    current = config.get("HITL_MODE", "external")
+
+    choice = radiolist_dialog(
+        title="🛡️   Confirmation Mode",
+        text=(
+            f"Currently: [bold]{current}[/]\n\n"
+            "When a tool needs your permission, Yumii will pause and "
+            "ask in the browser.\n\n"
+            "Choose a mode:\n"
+        ),
+        values=[
+            (
+                "external",
+                "external   Confirm only external tools  (default)",
+            ),
+            ("always",   "always     Confirm every tool call  (safest)"),
+            ("never",    "never      No confirmation, tools run freely"),
+            (None,       "Keep current"),
+        ],
+        ok_text="Apply",
+        cancel_text="Cancel",
+        style=_DIALOG_STYLE,
+    ).run()
+
+    if choice and choice != current:
+        update_global_config("HITL_MODE", choice)
+        console.print(
+            f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]HITL mode set to "
+            f"[bold]{choice}[/bold].[/]\n"
+        )
+    elif choice == current:
+        console.print(
+            f"\n  [{_C_DIM}]Already using [bold]{current}[/bold].[/]\n"
+        )
+
+
 # ─── Session helpers ──────────────────────────────────────────────────────────
 
 def _render_sessions_table(sessions: list) -> None:
@@ -1241,6 +1287,9 @@ def run_interactive_shell() -> None:
         elif cmd in {"/personality", "personality"}:
             _cmd_personality()
 
+        elif cmd in {"/hitl", "hitl", "/confirm", "confirm"}:
+            _cmd_hitl()
+
         elif cmd in {"/vision", "vision", "/story", "story"}:
             _cmd_vision()
 
@@ -1374,6 +1423,12 @@ def delete_session(session_id: str) -> None:
 def forget() -> None:
     """Wipe all long-term memory (user facts) without deleting sessions."""
     _cmd_forget()
+
+
+@app.command(name="hitl-mode")
+def hitl_mode() -> None:
+    """Set the HITL confirmation mode (never / external / always)."""
+    _cmd_hitl()
 
 
 if __name__ == "__main__":
