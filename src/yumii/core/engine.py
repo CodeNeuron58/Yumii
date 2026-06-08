@@ -377,7 +377,7 @@ class YumiiEngine:
 
                 try:
                     async for event in self.graph_app.astream_events(
-                        initial_state, config=config, version="v3"
+                        initial_state, config=config, version="v2"
                     ):
                         if self.interrupt_event.is_set():
                             log.info("reasoning_interrupted_mid_stream")
