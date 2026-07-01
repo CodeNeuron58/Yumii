@@ -11,6 +11,9 @@ Thank you for your interest in contributing! Yumii is designed to be open and mo
   # or on Windows (PowerShell):
   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
   ```
+- *(Optional — only for the desktop app)* [Rust](https://rustup.rs) + the MSVC
+  C++ Build Tools on Windows. Then `cd desktop && cargo tauri dev`. The Python
+  backend and browser UI need none of this.
 
 ## Getting Started
 
@@ -62,19 +65,22 @@ Run all three before opening a PR. Make sure to add tests for any new functional
 
 ```
 src/yumii/
-  agent/          # LangGraph state machine + LLM agent
-  api/            # FastAPI server + WebSocket broadcast
+  agent/          # LangGraph state machine + tool-bound LLM agent + synthesizer
+  api/            # FastAPI server + WebSocket + /health
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
   core/           # Config, settings, OS keychain integration
   tts/            # ElevenLabs + CAMB.ai TTS speakers
-  tools/          # LangChain tools (time, etc.)
+  tools/          # LangChain tools + registry/policy (time, web search)
   assets/
     prompts/      # Personality prompt files (.txt)
-    webui/        # Frontend HTML (Live2D + PixiJS)
+    webui/        # Orb UI (index.html); Live2D UI archived as _companion_live2d.reference.html
   cli.py          # Typer CLI entry point
+
+desktop/          # Tauri v2 desktop app (Rust) — wraps the web UI, launches the Python backend
 ```
 
-> Avatar files go in `~/.yumii/avatar/` (user-provided, not bundled in the package).
+> User-provided Live2D models (for the coming companion mode) go in
+> `~/.yumii/avatar/` — not bundled in the package.
 
 ## Pull Requests
 

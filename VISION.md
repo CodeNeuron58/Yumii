@@ -18,7 +18,7 @@ Tools are useful. But they are not companions.
 
 ## What Yumii Is
 
-Yumii is an open-source AI companion with a Live2D avatar — a persistent presence on your screen that speaks with emotion, reacts in real-time, and adapts her personality to match what you need in the moment.
+Yumii is an open-source AI companion — a persistent presence on your screen that speaks with emotion, reacts in real-time, and adapts her personality to match what you need in the moment.
 
 She is **caring** when you are tired. **Energetic** when you need a push. **Calm** when you need to think clearly. She is not one fixed thing — she is yours to shape.
 
@@ -26,7 +26,8 @@ Today, she can:
 - Hold natural, voice-driven conversations powered by real-time LLMs
 - Speak with an expressive, lifelike voice (ElevenLabs / CAMB.ai)
 - Listen locally via Whisper or at cloud speed via Groq
-- Animate expressively through a Live2D avatar in your browser
+- Remember you across restarts — preferences and details, stored locally
+- Live on your desktop as a small floating presence — an orb today, an expressive Live2D avatar coming soon
 - Switch personality modes to match your mood or workflow
 
 ---

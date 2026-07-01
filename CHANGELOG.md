@@ -5,6 +5,35 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Desktop pivot (in progress). Moving from a browser-served Live2D page to a
+native **desktop app** with a small floating **orb** UI. The Python brain
+(engine, agent, audio, memory) is unchanged — the desktop app wraps it.
+
+### Added
+- **Orb UI.** New single-file frontend (`src/yumii/assets/webui/index.html`):
+  a floating orb with idle / listening / thinking / speaking states, emotion
+  tint, and audio-driven pulse. Reuses the existing WebSocket, mic capture,
+  streaming-audio, interrupt, status-bar, and HITL-confirmation plumbing. A mode
+  selector shows a **"Coming soon"** panel for the companion/avatar mode.
+- **Tauri v2 desktop shell** (`desktop/src-tauri/`). Frameless, transparent,
+  always-on-top orb window with a system tray (Show/Hide, Quit) and a
+  Ctrl+Shift+Space global hotkey. Launches the Python backend
+  (`python -m yumii server`) as a managed subprocess and stops it on exit.
+- **`GET /health`** endpoint for readiness polling (used by the orb boot flow
+  and the desktop shell before connecting the WebSocket).
+
+### Changed
+- The full-screen Live2D + PixiJS UI is replaced by the orb. The previous UI is
+  archived (not served) as
+  `src/yumii/assets/webui/_companion_live2d.reference.html` for the future
+  companion mode.
+
+### Notes
+- The desktop app currently runs from source (`cd desktop && cargo tauri dev`);
+  a packaged one-click installer is not built yet.
+
 ## [0.3.0] — 2026-06-08
 
 Streaming engine fix + prompt label-leak fix on top of the v0.2

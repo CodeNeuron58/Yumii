@@ -7,6 +7,22 @@ binary you downloaded. The "What's not in v1" section of
 
 ---
 
+## 🖥️ Now: the desktop pivot (in progress)
+
+Yumii is moving from a browser-served Live2D page to a **native desktop app**
+(Tauri) with a small floating **orb** UI you can talk to any time. The Python
+brain is unchanged — the desktop app wraps it and launches it for you.
+
+- ✅ Orb UI replaces the full-screen Live2D page; the companion/avatar mode is
+  parked behind a "Coming soon" toggle.
+- ✅ Tauri v2 shell: frameless, transparent, always-on-top window; system tray;
+  global hotkey; launches the backend as a managed subprocess. Runs from source
+  today (`cd desktop && cargo tauri dev`).
+- ⏳ Next: a packaged one-click installer (PyInstaller sidecar + `cargo tauri
+  build` + GitHub Actions), then the Live2D companion mode.
+
+---
+
 ## ✅ Shipped — 0.3.0 (June 2026)
 
 Streaming engine fix + prompt label-leak fix on top of the
@@ -120,11 +136,11 @@ The flagship release. Focus: **agentic capabilities**.
 
 ## 🗑️ Explicitly NOT planned
 
-- A web-only no-install version of Yumii. The whole point is local.
-- Closed-source cloud-hosted Yumii. The project's value is that
-  every line of the brain is editable.
-- A mobile app. The browser-based Live2D client works on mobile
-  browsers; a native app would be a different project.
+- A cloud-hosted / SaaS Yumii that keeps your data on a server. The whole
+  point is local and private.
+- Closed-source. The project's value is that every line of the brain is editable.
+- A mobile app. Yumii is going desktop-first (Tauri); a phone app would be a
+  different project.
 
 ---
 
