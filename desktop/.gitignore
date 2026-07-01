@@ -1,0 +1,6 @@
+# Rust / Tauri build output
+/src-tauri/target/
+/src-tauri/gen/schemas/
+
+# Node (only used transiently for `tauri icon`)
+node_modules/

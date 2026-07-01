@@ -1,0 +1,17 @@
+[package]
+name = "yumii-desktop"
+version = "0.1.0"
+description = "Yumii — always-on desktop companion shell"
+authors = ["Biprayan"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+
+[features]
+# This feature is used for production builds where `devUrl` is not used.
+custom-protocol = ["tauri/custom-protocol"]
