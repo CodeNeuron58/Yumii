@@ -55,6 +55,18 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """Liveness probe. The desktop shell polls this before connecting the
+    WebSocket so it can show a 'waking up…' state while the brain boots."""
+    return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
 # REST API: Sessions
 # ---------------------------------------------------------------------------
 
