@@ -7,7 +7,7 @@ binary you downloaded. The "What's not in v1" section of
 
 ---
 
-## 🖥️ Now: the desktop pivot (in progress)
+## 🖥️ The desktop pivot (0.4.0 — first cut shipped, ongoing)
 
 Yumii is moving from a browser-served Live2D page to a **native desktop app**
 (Tauri) with a small floating **orb** UI you can talk to any time. The Python

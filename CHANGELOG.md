@@ -5,11 +5,12 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0] — 2026-07-02
 
-Desktop pivot (in progress). Moving from a browser-served Live2D page to a
-native **desktop app** with a small floating **orb** UI. The Python brain
-(engine, agent, audio, memory) is unchanged — the desktop app wraps it.
+Desktop pivot — first cut. Moves from a browser-served Live2D page to a native
+**desktop app** (Tauri) with a small floating **orb** UI, and stops the cloud
+STT path from transcribing non-speech. The Python brain (engine, agent, audio,
+memory) is otherwise unchanged — the desktop app wraps it.
 
 ### Added
 - **Orb UI.** New single-file frontend (`src/yumii/assets/webui/index.html`):
@@ -29,6 +30,15 @@ native **desktop app** with a small floating **orb** UI. The Python brain
   archived (not served) as
   `src/yumii/assets/webui/_companion_live2d.reference.html` for the future
   companion mode.
+
+### Fixed
+- **Cloud STT no longer transcribes humming / noise.** The Groq Whisper path
+  accepted whatever text Whisper returned, so humming, singing, and background
+  noise got transcribed and answered. It now requests `verbose_json` and drops
+  low-confidence / non-speech segments (`no_speech_prob > 0.6`,
+  `avg_logprob < -1.0`, `compression_ratio > 2.4`) — mirroring the guard the
+  local path already had. VAD energy floor nudged up (`RMS_ENERGY_GATE`
+  0.008 → 0.012) so faint background doesn't start a capture.
 
 ### Notes
 - The desktop app currently runs from source (`cd desktop && cargo tauri dev`);
