@@ -27,7 +27,11 @@ SPEECH_TRIGGER_FRAMES = 8
 SILENCE_END_FRAMES = 12
 MIN_SPEECH_DURATION_SEC = 0.7
 SILERO_THRESHOLD = 0.5
-RMS_ENERGY_GATE = 0.008
+# Energy floor before we even run the VAD on a frame. Raised slightly from
+# 0.008 so faint background noise (fans, hum) doesn't start a capture. Note:
+# this does NOT stop humming/singing (those are loud + voiced) — the Groq
+# confidence gate in stt_providers.py handles that.
+RMS_ENERGY_GATE = 0.012
 NO_SPEECH_PROB_THRESHOLD = 0.45
 
 

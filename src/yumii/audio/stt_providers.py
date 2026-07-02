@@ -11,6 +11,21 @@ from yumii.core.interfaces import BaseSTTProvider
 from yumii.core.logging import get_logger
 log = get_logger(__name__)
 
+# Confidence gates for the cloud (Groq) Whisper path. Whisper will happily
+# transcribe humming, singing, and background noise into words; these
+# thresholds drop segments it isn't confident are real speech, mirroring the
+# `no_speech_prob` filter the local path already applies.
+NO_SPEECH_THRESHOLD = 0.6        # drop if Whisper thinks it isn't speech
+MIN_AVG_LOGPROB = -1.0           # drop low-confidence guesses (humming / gibberish)
+MAX_COMPRESSION_RATIO = 2.4      # drop repetitive hallucinations (common on music)
+
+
+def _seg_field(seg: object, key: str, default: object) -> object:
+    """Read a Whisper segment field whether Groq returns dicts or objects."""
+    if isinstance(seg, dict):
+        return seg.get(key, default)
+    return getattr(seg, key, default)
+
 
 class LocalSTT(BaseSTTProvider):
     """Transcription using faster-whisper on CPU."""
@@ -73,10 +88,41 @@ class GroqSTT(BaseSTTProvider):
             result = self._groq_client.audio.transcriptions.create(
                 file=("audio.wav", buf.getvalue()),
                 model="whisper-large-v3-turbo",
-                response_format="text",
+                # verbose_json gives per-segment confidence so we can reject
+                # non-speech (humming, singing, noise) instead of voicing it.
+                response_format="verbose_json",
                 language="en",
             )
-            return result.strip() if result else None
         except Exception as e:
             log.error("groq_stt_error", error=str(e), exc_info=True)
             return None
+
+        segments = getattr(result, "segments", None) or []
+
+        # Older API / no segments — fall back to the top-level text.
+        if not segments:
+            text = (getattr(result, "text", "") or "").strip()
+            return text or None
+
+        kept: list[str] = []
+        for seg in segments:
+            text = str(_seg_field(seg, "text", "") or "").strip()
+            if not text:
+                continue
+            no_speech = float(_seg_field(seg, "no_speech_prob", 0.0))
+            avg_logprob = float(_seg_field(seg, "avg_logprob", 0.0))
+            comp_ratio = float(_seg_field(seg, "compression_ratio", 1.0))
+
+            if no_speech > NO_SPEECH_THRESHOLD:
+                log.debug("stt_dropped", reason="no_speech", no_speech=round(no_speech, 2), text=text[:40])
+                continue
+            if avg_logprob < MIN_AVG_LOGPROB:
+                log.debug("stt_dropped", reason="low_confidence", avg_logprob=round(avg_logprob, 2), text=text[:40])
+                continue
+            if comp_ratio > MAX_COMPRESSION_RATIO:
+                log.debug("stt_dropped", reason="repetitive", compression_ratio=round(comp_ratio, 2), text=text[:40])
+                continue
+            kept.append(text)
+
+        combined = " ".join(kept).strip()
+        return combined or None
