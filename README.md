@@ -202,31 +202,23 @@ Yumii will reuse the same API key — no duplicate entry needed.
 
 ## 🏗 Architecture
 
-```
-  [ Microphone ]
-       │
-  [ Silero VAD ]  ←── Neural speech detection, 4-layer noise filtering
-       │
-  [ Whisper STT ]  ←── Local (CPU) or Groq Cloud
-       │
-  [ LangGraph Agent ] ←── AsyncSqliteSaver (persistent checkpoints)
-       │
-       ├── SystemMessage (personality prompt + user facts, injected every turn)
-       ├── HumanMessage  (user speech)
-       ├── LLM invoke    (Groq / OpenAI / Anthropic) ── binds tools (HITL-gated)
-       └── Synthesizer   → YumiiResponse { response_text, expression, motion }
-               │
-          [ TTS: ElevenLabs / CAMB.ai ]  (streaming)
-               │
-          [ WebSocket ]  ──→  [ Orb UI ]  (browser, or Tauri desktop app)
-                                   ├── Pulse (real-time RMS)
-                                   └── Emotion-based colour
-                              [ Live2D avatar mode — coming soon ]
+```mermaid
+flowchart TD
+    mic["🎙 Microphone"] --> vad["Silero VAD<br/>speech detection"]
+    vad --> stt["Whisper STT<br/>local CPU · or Groq cloud"]
+    stt --> agent
 
-  [ SQLite Memory ]  ←── ~/.yumii/memory/
-       ├── sessions      (metadata: name, created_at, last_active)
-       ├── facts         (extracted user facts, deduplicated)
-       └── checkpoints   (LangGraph conversation history per session)
+    subgraph agent [LangGraph Agent]
+        direction TB
+        sys["SystemMessage<br/>personality + user facts"] --> llm["LLM invoke<br/>Groq · OpenAI · Anthropic<br/>binds tools · HITL-gated"]
+        llm --> synth["Synthesizer<br/>response_text + expression"]
+    end
+
+    agent <--> mem[("SQLite memory<br/>sessions · facts · checkpoints<br/>~/.yumii/memory")]
+    agent --> tts["TTS<br/>ElevenLabs · CAMB.ai · streaming"]
+    tts --> ws["WebSocket"]
+    ws --> orb["Orb UI<br/>browser or Tauri desktop app<br/>pulse + emotion colour"]
+    orb -.->|coming soon| live2d["Live2D avatar mode"]
 ```
 
 ---
