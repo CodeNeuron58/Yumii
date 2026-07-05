@@ -7,8 +7,6 @@ Captures audio streams, detects speech boundaries, and processes utterances.
 
 import asyncio
 import collections
-import io
-import wave
 from typing import Any, Callable
 
 import numpy as np
@@ -53,17 +51,6 @@ def normalize_audio(audio: np.ndarray) -> np.ndarray:
 def rms_energy(audio_float32: np.ndarray) -> float:
     """Calculate the Root Mean Square (RMS) energy of an audio frame."""
     return float(np.sqrt(np.mean(audio_float32**2)))
-
-
-def _pcm16_to_wav_bytes(audio_int16: np.ndarray, sample_rate: int = RATE) -> bytes:
-    """Convert a PCM int16 numpy array to a valid WAV byte string."""
-    buf = io.BytesIO()
-    with wave.open(buf, "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sample_rate)
-        wf.writeframes(audio_int16.tobytes())
-    return buf.getvalue()
 
 
 class AudioPipeline:
@@ -241,13 +228,3 @@ class AudioPipeline:
 
         text = self.transcriber.transcribe(audio_data)
         return text.strip() if text else ""
-
-    def run_cycle(self, on_speech_start: Callable[[], None] | None = None) -> str:
-        """Run one complete listen-process-transcribe cycle (synchronous)."""
-        raw_audio = self.listen_and_capture(on_speech_start=on_speech_start)
-        if len(raw_audio) == 0:
-            return ""
-        clean_audio = self.process_audio(raw_audio)
-        if len(clean_audio) == 0:
-            return ""
-        return self.transcribe(clean_audio)

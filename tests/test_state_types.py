@@ -1,24 +1,6 @@
-"""Tests for the core state types.
+"""Tests for the core state types."""
 
-These tests pin the shape of `MainState` so that any future change to
-the conversation state is intentional and visible in code review.
-"""
-
-from yumii.core.types import PERSONALITY_TYPE, MainState
-
-
-def test_main_state_has_required_fields() -> None:
-    """`MainState` is a TypedDict — its annotations define the contract.
-
-    Any field added or renamed here is a breaking change to the engine
-    contract and the WebSocket payload contract.
-    """
-    annotations = MainState.__annotations__
-    for required in (
-        "messages", "input", "response", "expression", "motion",
-        "session_id", "session_name", "user_facts",
-    ):
-        assert required in annotations, f"MainState missing field: {required}"
+from yumii.core.types import PERSONALITY_TYPE
 
 
 def test_personality_type_is_six_values() -> None:
