@@ -10,12 +10,26 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from yumii.core.memory_db import execute, fetchall, fetchone
 from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
+
+
+def _utc_now() -> str:
+    """UTC timestamp with microsecond precision.
+
+    SQLite's CURRENT_TIMESTAMP only has 1-second resolution, so sessions
+    created/touched within the same second got identical ``last_active_at``
+    values and ``ORDER BY last_active_at`` became nondeterministic (flaky
+    ordering test on fast CI machines). Same format prefix as the old
+    values ("YYYY-MM-DD HH:MM:SS"), so old and new rows still sort
+    correctly against each other as strings.
+    """
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -57,9 +71,11 @@ class SessionManager:
         """Create a new session and return its UUID."""
         session_id = str(uuid.uuid4())
         name = name or "New Chat"
+        now = _utc_now()
         await execute(
-            "INSERT INTO sessions (id, name) VALUES (?, ?)",
-            (session_id, name),
+            "INSERT INTO sessions (id, name, created_at, last_active_at)"
+            " VALUES (?, ?, ?, ?)",
+            (session_id, name, now, now),
         )
         log.info("session_created", session_id=session_id, name=name)
         return session_id
@@ -104,15 +120,15 @@ class SessionManager:
         """Touch ``last_active_at`` and optionally bump ``message_count``."""
         if message_count is not None:
             await execute(
-                "UPDATE sessions SET last_active_at = CURRENT_TIMESTAMP,"
+                "UPDATE sessions SET last_active_at = ?,"
                 " message_count = ? WHERE id = ?",
-                (message_count, session_id),
+                (_utc_now(), message_count, session_id),
             )
         else:
             await execute(
-                "UPDATE sessions SET last_active_at = CURRENT_TIMESTAMP"
+                "UPDATE sessions SET last_active_at = ?"
                 " WHERE id = ?",
-                (session_id,),
+                (_utc_now(), session_id),
             )
 
     async def rename_session(self, session_id: str, name: str) -> None:
