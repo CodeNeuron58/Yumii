@@ -306,16 +306,31 @@ class YumiiEngine:
         log.info("listener_task_started")
         while True:
             try:
-                audio_segment = await self.pipeline.stream_capture(
-                    self.audio_input_queue, on_speech_start
-                )
-                if audio_segment is not None and len(audio_segment) > 0:
-                    processed_audio = self.pipeline.process_audio(audio_segment)
-                    if len(processed_audio) > 0:
-                        transcribed_text = self.pipeline.transcribe(processed_audio)
-                        if transcribed_text and transcribed_text.strip():
-                            log.info("transcription_complete", text=transcribed_text)
-                            await self.transcription_queue.put(transcribed_text)
+                if hasattr(self.pipeline.transcriber, "process_chunk"):
+                    async def on_partial(text: str):
+                        await self.broadcast_payload({
+                            "type": "partial_transcript",
+                            "text": text
+                        })
+                    
+                    transcribed_text = await self.pipeline.stream_capture_and_transcribe(
+                        self.audio_input_queue, on_speech_start, on_partial
+                    )
+                    if transcribed_text and transcribed_text.strip():
+                        # Let the text remain on screen until Yumii starts speaking.
+                        log.info("transcription_complete", text=transcribed_text)
+                        await self.transcription_queue.put(transcribed_text)
+                else:
+                    audio_segment = await self.pipeline.stream_capture(
+                        self.audio_input_queue, on_speech_start
+                    )
+                    if audio_segment is not None and len(audio_segment) > 0:
+                        processed_audio = self.pipeline.process_audio(audio_segment)
+                        if len(processed_audio) > 0:
+                            transcribed_text = self.pipeline.transcribe(processed_audio)
+                            if transcribed_text and transcribed_text.strip():
+                                log.info("transcription_complete", text=transcribed_text)
+                                await self.transcription_queue.put(transcribed_text)
             except Exception as e:
                 log.error("audio_listener_crash", error=str(e), exc_info=True)
                 await asyncio.sleep(1)

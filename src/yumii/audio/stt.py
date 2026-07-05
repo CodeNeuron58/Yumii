@@ -9,7 +9,7 @@ import asyncio
 import collections
 import io
 import wave
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -155,6 +155,78 @@ class AudioPipeline:
                         )
 
         return np.array([], dtype=np.int16)
+
+    async def stream_capture_and_transcribe(
+        self, 
+        queue: asyncio.Queue, 
+        on_speech_start: Callable[[], None] | None = None,
+        on_partial: Callable[[str], Any] | None = None
+    ) -> str | None:
+        """Continuously consume audio chunks, streaming them to the transcriber."""
+        self._reset_vad()
+        pre_buffer: collections.deque = collections.deque(maxlen=15)
+        triggered = False
+        accumulation_buffer = np.array([], dtype=np.float32)
+
+        while True:
+            chunk_bytes = await queue.get()
+            audio_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
+            audio_f32 = audio_int16.astype(np.float32) / 32768.0
+            accumulation_buffer = np.append(accumulation_buffer, audio_f32)
+
+            while len(accumulation_buffer) >= FRAME_SIZE:
+                frame = accumulation_buffer[:FRAME_SIZE]
+                accumulation_buffer = accumulation_buffer[FRAME_SIZE:]
+
+                if not triggered and rms_energy(frame) < RMS_ENERGY_GATE:
+                    pre_buffer.append((float_to_pcm16(frame), False))
+                    continue
+
+                is_speech = self._is_speech_silero(frame)
+                pcm16 = float_to_pcm16(frame)
+
+                if not triggered:
+                    pre_buffer.append((pcm16, is_speech))
+                    speech_count = sum(1 for _, s in pre_buffer if s)
+                    if speech_count >= SPEECH_TRIGGER_FRAMES:
+                        triggered = True
+                        log.debug("speech_started")
+                        if on_speech_start:
+                            on_speech_start()
+                        
+                        if hasattr(self.transcriber, "process_chunk"):
+                            for f, _ in pre_buffer:
+                                event = await asyncio.to_thread(self.transcriber.process_chunk, f.tobytes())
+                                if event and event.get("type") == "partial_transcript" and on_partial:
+                                    log.info("partial_transcript_generated", text=event["text"])
+                                    import inspect
+                                    if inspect.iscoroutinefunction(on_partial):
+                                        await on_partial(event["text"])
+                                    else:
+                                        on_partial(event["text"])
+                        pre_buffer.clear()
+                else:
+                    # Stream to transcriber
+                    if hasattr(self.transcriber, "process_chunk"):
+                        event = await asyncio.to_thread(self.transcriber.process_chunk, pcm16.tobytes())
+                        if event and event.get("type") == "partial_transcript" and on_partial:
+                            # Debug log to terminal
+                            log.info("partial_transcript_generated", text=event["text"])
+                            import inspect
+                            if inspect.iscoroutinefunction(on_partial):
+                                await on_partial(event["text"])
+                            else:
+                                on_partial(event["text"])
+
+                    pre_buffer.append((pcm16, is_speech))
+                    silence_count = sum(1 for _, s in pre_buffer if not s)
+                    if silence_count >= SILENCE_END_FRAMES:
+                        log.debug("speech_ended")
+                        if hasattr(self.transcriber, "get_final"):
+                            return self.transcriber.get_final()
+                        return None
+
+        return None
 
     def process_audio(self, audio: np.ndarray) -> np.ndarray:
         """Apply post-capture processing (normalization) to the audio array."""

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # STT configuration
     stt_provider: str = Field(default="local", alias="STT_PROVIDER")
     whisper_model_size: str = Field(default="base", alias="WHISPER_MODEL_SIZE")
+    vosk_model_size: str = Field(default="small", alias="VOSK_MODEL_SIZE")
 
     # HITL (human-in-the-loop) confirmation gates
     # Valid values: "never" (no gate), "external" (gate only tools whose

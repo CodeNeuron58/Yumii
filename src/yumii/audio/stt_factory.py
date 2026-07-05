@@ -11,6 +11,12 @@ def get_stt_provider() -> BaseSTTProvider:
 
     if provider == "groq":
         return GroqSTT(api_key=settings.groq_api_key)
+    elif provider == "vosk":
+        from yumii.audio.vosk_provider import VoskSTT
+        from yumii.audio.vosk_model import get_vosk_model_path
+        
+        model_path = get_vosk_model_path(settings.vosk_model_size)
+        return VoskSTT(model_path=model_path)
 
     # Default to local
     return LocalSTT(model_size=settings.whisper_model_size)

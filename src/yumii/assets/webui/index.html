@@ -539,6 +539,17 @@
                     return;
                 }
 
+                // Live user transcription (word-by-word) from the streaming STT.
+                // Only shown while she's idle/listening so it doesn't clobber
+                // Yumii's own reply once she starts thinking/speaking.
+                if (data.type === "partial_transcript") {
+                    if (orbState === 'idle' || orbState === 'listening') {
+                        setOrbState('listening');
+                        if (data.text && data.text.trim()) showCard(data.text);
+                    }
+                    return;
+                }
+
                 // ── Streaming audio (ElevenLabs + CAMB.ai) ──────────────
                 if (data.type === "audio_start") {
                     stopAllAudio();

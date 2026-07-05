@@ -385,6 +385,7 @@ def run_attune_wizard() -> bool:
         values=[
             ("local", "Local Whisper   Private, works offline, no API key needed"),
             ("groq",  "Groq Whisper    Cloud-based, ~5-10× faster (uses Groq API)"),
+            ("vosk",  "Vosk Streaming  Offline & fast, but LOW ACCURACY — not recommended"),
         ],
         ok_text="Next  ❯",
         cancel_text="Skip",
@@ -421,6 +422,21 @@ def run_attune_wizard() -> bool:
             ).run()
             if groq_key:
                 save_credential("GROQ_API_KEY", groq_key)
+
+    elif stt_choice == "vosk":
+        update_global_config("STT_PROVIDER", "vosk")
+        model = radiolist_dialog(
+            title="🌿  Vosk Model Size",
+            text="Choose the Vosk model size:\n(Small is fast, Medium is more accurate)\n",
+            values=[
+                ("small",  "small   Recommended — ~40MB, fastest  (default)"),
+                ("medium", "medium  More accurate, ~128MB"),
+            ],
+            ok_text="Save",
+            cancel_text="Use Default",
+            style=_DIALOG_STYLE,
+        ).run()
+        update_global_config("VOSK_MODEL_SIZE", model or "small")
 
     # ── Done ──────────────────────────────────────────────────────────────────
     message_dialog(
@@ -543,6 +559,7 @@ def run_models_wizard() -> None:
         values=[
             ("local", f"Local Whisper   Private, offline{' ✓' if current_stt == 'local' else ''}"),
             ("groq",  f"Groq Whisper    Cloud, ~5-10× faster{' ✓' if current_stt == 'groq' else ''}"),
+            ("vosk",  f"Vosk Streaming  Offline · LOW ACCURACY, not recommended{' ✓' if current_stt == 'vosk' else ''}"),
             (None,    "Keep current"),
         ],
         ok_text="Save",
@@ -585,6 +602,24 @@ def run_models_wizard() -> None:
         ).run()
         if key:
             save_credential("GROQ_API_KEY", key)
+            
+    elif stt_choice == "vosk":
+        update_global_config("STT_PROVIDER", "vosk")
+        current_model = config.get("VOSK_MODEL_SIZE", "small")
+        model = radiolist_dialog(
+            title="⚙️   Vosk Model Size",
+            text=f"Currently using: {current_model}\n\nChoose model size:\n",
+            values=[
+                ("small",  "small   Recommended — ~40MB  (default)"),
+                ("medium", "medium  More accurate, ~128MB"),
+                (None,    "Keep current"),
+            ],
+            ok_text="Save",
+            cancel_text="Skip",
+            style=_DIALOG_STYLE,
+        ).run()
+        if model:
+            update_global_config("VOSK_MODEL_SIZE", model)
 
     console.print(
         f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Configuration saved.[/]\n"

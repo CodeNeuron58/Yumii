@@ -56,6 +56,7 @@ dependencies = [
     "composio-langchain>=0.13,<2.0",
     "langgraph-prebuilt>=1.1,<2.0",
     "langgraph-checkpoint>=4.1,<5.0",
+    "vosk>=0.3.45",
 ]
 
 [project.optional-dependencies]
