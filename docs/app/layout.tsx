@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import TopNav from "./TopNav";
-import { Toaster } from 'sonner';
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Yumii Documentation",
-  description: "Real-time AI companion for terminal-native interaction.",
+  description:
+    "Docs for Yumii — the open-source AI companion that lives on your desktop. Voice-first, private by design, remembers you.",
 };
 
 export default function RootLayout({
@@ -16,10 +17,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-        <meta name="theme-color" content="#050505" />
+        <meta name="theme-color" content="#07100c" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Inter:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
       </head>
       <body>
         <div className="app-container">
@@ -29,22 +37,6 @@ export default function RootLayout({
           <TopNav />
           {children}
           <Toaster theme="dark" position="bottom-right" />
-          <script dangerouslySetInnerHTML={{
-            __html: `
-              if (typeof window !== 'undefined') {
-                document.addEventListener('mousemove', function(e) {
-                  const cards = document.querySelectorAll('.card');
-                  cards.forEach(card => {
-                    const rect = card.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    card.style.setProperty('--mouse-x', \`\${x}px\`);
-                    card.style.setProperty('--mouse-y', \`\${y}px\`);
-                  });
-                });
-              }
-            `
-          }} />
         </div>
       </body>
     </html>

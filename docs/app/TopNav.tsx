@@ -49,7 +49,7 @@ export default function TopNav() {
       <div className="top-nav-shell">
         <div className="top-nav-row top-nav-row--primary">
           <a href="/" className="logo">
-            <img src="/docs/images/yumii-nav.png" alt="Yumii" width={30} height={30} />
+            <img src="/docs/images/orb-logo.png" alt="Yumii" width={28} height={28} />
             <span>Yumii</span>
           </a>
 

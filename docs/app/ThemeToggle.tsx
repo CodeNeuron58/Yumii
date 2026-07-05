@@ -7,7 +7,7 @@ export default function ThemeToggle() {
   return (
     <button
       className="theme-toggle nav-utility nav-utility--icon"
-      onClick={() => toast("Terminal aesthetics currently support dark mode only.")}
+      onClick={() => toast("Yumii's world is night-only, for now.")}
       aria-label="Toggle theme"
       title="Only dark mode is supported"
       type="button"
