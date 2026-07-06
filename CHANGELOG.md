@@ -5,6 +5,87 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-07-07
+
+Local voice release. Yumii's voice now runs fully offline (Kokoro-82M on
+CPU, no API key) with reply-to-speech latency cut from ~4 s to ~0.8–1.5 s,
+an offline streaming STT option (Vosk) shows your words as you say them,
+sessions actually resume, and a security sweep closes a localhost
+data-exfiltration hole. 85 tests, all green; the fixes below were verified
+against a live server.
+
+### Added
+- **Kokoro local TTS** (`tts/kokoro_speaker.py`). Fully offline TTS on CPU
+  via ONNX Runtime — no API key, no cloud, no torch. Model files (~350 MB)
+  download to `~/.yumii/models/kokoro` on first use. 54 built-in voices
+  (`KOKORO_VOICE`, default `af_heart`) with a curated picker in both CLI
+  wizards; listed first as the recommended provider. fp32 is the default
+  variant: int8 measured ~3.7× *slower* than fp32 on x86 (quantized ops
+  hit onnxruntime fallback kernels).
+- **Vosk offline streaming STT** (`audio/vosk_provider.py`). Third STT
+  backend — fully offline, with word-by-word partial transcripts rendered
+  live in the orb card. Flagged low-accuracy / not recommended; opt-in.
+- **Real session resume over WebSocket.** The frontend sends a
+  `session_select` frame (`new` / `resume` / `auto`) as its first WS
+  message; `auto` keeps the active session across reconnects. The CLI's
+  `/resume` and `/chat` deep-link the browser with `?session=<id>`, so
+  resuming actually resumes.
+- `YUMII_ALLOWED_ORIGINS` env var plus server-side logging of rejected
+  origins (`http_origin_not_allowlisted` / `ws_origin_rejected`), so an
+  allowlist miss is self-diagnosing instead of a silent client-side CORS
+  failure.
+
+### Changed
+- **Reply-to-speech latency cut from ~4 s to ~0.8–1.5 s** (Kokoro).
+  Replies split at sentence / clause / conjunction boundaries and
+  synthesize incrementally under a pacing budget — a small first chunk so
+  the voice starts fast, later chunks capped so synthesis stays ahead of
+  playback and never stalls mid-reply. The ONNX session warms up in the
+  background at startup so the first real reply doesn't pay the ~30%
+  cold-run penalty.
+- **STT no longer blocks the event loop.** Whisper inference / the Groq
+  HTTP call run in a worker thread; the WebSocket, TTS streaming, and
+  barge-in stay responsive during transcription.
+- ElevenLabs streaming now requests `pcm_22050` instead of MP3 — the orb
+  frontend decodes streamed chunks as raw PCM16, so the MP3 stream played
+  as static.
+- Dropped Groq STT segments now log at `info` (`stt_dropped` + reason), so
+  a discarded utterance is distinguishable from a slow one.
+- Log streams forced to UTF-8 (`errors="replace"`); Unicode in a log line
+  no longer raises `UnicodeEncodeError` on Windows consoles or redirected
+  output. The Tauri sidecar also sets `PYTHONIOENCODING=utf-8`.
+
+### Fixed
+- **A new session was created on every WebSocket reconnect** (one per 3 s
+  retry) — the orb frontend never negotiated a session, so history was
+  unreachable and the sessions table filled with junk. See "Real session
+  resume" above.
+- **Repeated identical utterances corrupted history.** Message IDs were
+  derived from `hash(user_input)`, so saying "yes" twice made LangGraph's
+  `add_messages` reducer overwrite the earlier entry instead of appending.
+  IDs are now scoped to a per-turn UUID.
+- **Voice personality switching ignored punctuation.** "Switch to
+  tsundere." (with STT punctuation) never matched the detector; input is
+  normalized before matching, with regression tests.
+- **Every client disconnect raised `RuntimeError`** ("Cannot call
+  'receive' once a disconnect message has been received") — Starlette
+  returns the disconnect message rather than raising, and the WS loop
+  called `receive()` again.
+- `PUT /api/facts/{id}` with a missing field returned HTTP 200 with a
+  tuple-shaped body; now a proper 400.
+- The Tauri **dev-mode** webview couldn't connect after the security
+  hardening below: `tauri dev` serves the frontend from its own local
+  static server (port 1430), not `tauri://localhost`. Dev origins are now
+  allowlisted.
+
+### Security
+- **CORS wildcard removed.** `allow_origins=["*"]` let any website the
+  user visits read `/api/facts` (personal memory) and manage sessions off
+  `127.0.0.1`. Requests are now restricted to an allowlist of Yumii's own
+  frontends (localhost:8000 and the Tauri webview / dev-server origins),
+  and WebSocket handshakes from foreign browser origins are rejected
+  with 403.
+
 ## [0.4.0] — 2026-07-02
 
 Desktop pivot — first cut. Moves from a browser-served Live2D page to a native

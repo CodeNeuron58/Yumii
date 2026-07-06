@@ -1,6 +1,6 @@
 # Yumii 🌸 — Real-Time AI Companion
 
-[![Version](https://img.shields.io/badge/version-0.4.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![uv](https://img.shields.io/badge/package%20manager-uv-green.svg)](https://docs.astral.sh/uv/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -12,7 +12,7 @@ Yumii is an open-source, locally-runnable AI companion with real-time voice
 conversation and expressive personality. She runs on a standard CPU — no
 expensive GPU required.
 
-> ⚠️ **This is v0.4.0 — an alpha release. No API stability promise yet.**
+> ⚠️ **This is v0.5.0 — an alpha release. No API stability promise yet.**
 > The voice loop, six personalities, persistent memory, multi-session support,
 > and tool-calling (with a human-in-the-loop confirmation gate) all work
 > end-to-end.

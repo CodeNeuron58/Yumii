@@ -23,6 +23,24 @@ brain is unchanged — the desktop app wraps it and launches it for you.
 
 ---
 
+## ✅ Shipped — 0.5.0 (July 2026)
+
+Local voice release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
+
+- **Kokoro-82M local TTS** — fully offline voice on CPU (ONNX, no torch,
+  no API key), 54 voices, recommended default in the setup wizards
+- Reply-to-speech latency cut from ~4 s to ~0.8–1.5 s (pacing-aware
+  incremental synthesis + startup warmup)
+- **Vosk offline streaming STT** with live word-by-word partials (opt-in,
+  flagged low-accuracy)
+- Real session resume over WebSocket; reconnects no longer create junk
+  sessions; CLI `/resume` deep-links the session
+- Security: CORS wildcard replaced with a local-frontend allowlist + WS
+  origin gate (closes drive-by localhost reads of `/api/facts`)
+- Stability sweep: STT off the event loop, per-turn message IDs,
+  disconnect handling, UTF-8-safe logging, ElevenLabs PCM streaming
+- **85 tests** total, verified against a live server
+
 ## ✅ Shipped — 0.3.0 (June 2026)
 
 Streaming engine fix + prompt label-leak fix on top of the
@@ -126,7 +144,8 @@ The flagship release. Focus: **agentic capabilities**.
   Claude 3.5 Sonnet).
 - **Local TTS (Kokoro or similar).** A fully offline TTS provider
   for users who don't want to depend on ElevenLabs or CAMB.ai.
-  Currently in research.
+  *Shipped in 0.5.0 (Kokoro-82M). A second local provider with voice
+  cloning (NeuTTS Nano) is under consideration.*
 - **Proactive reach-outs.** Yumii is currently 100% reactive. The
   vision is for her to occasionally check in unprompted ("It's been
   a long day — how are you holding up?"). This requires a scheduler
