@@ -23,6 +23,17 @@ brain is unchanged — the desktop app wraps it and launches it for you.
 
 ---
 
+## ✅ Shipped — 0.6.0 (July 2026)
+
+Configuration rework. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
+
+- **File-based credentials**: API keys in `~/.yumii/auth.json` (owner-only,
+  atomic writes — the Claude Code / opencode model); OS keychain and the
+  `keyring` dependency removed, with automatic one-time migration
+- Dependency prune: composio, composio-langchain, sounddevice, appdirs
+  (85 transitive packages) removed — nothing imported them
+- **91 tests** total
+
 ## ✅ Shipped — 0.5.0 (July 2026)
 
 Local voice release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.

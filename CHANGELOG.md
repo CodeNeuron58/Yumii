@@ -5,6 +5,41 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-07-07
+
+Configuration rework. API keys move out of the OS keychain into a plain,
+owner-only file — the same model Claude Code and opencode use — making
+credentials visible, portable, and editable, and clearing the path for the
+planned in-app settings UI. Plus a dependency prune.
+
+### Changed
+- **Credentials live in `~/.yumii/auth.json`** (owner-only permissions,
+  atomic tmp+rename writes), not the OS keychain. The keychain was a
+  packaging and portability tax: keyring backends misbehave on
+  Linux/headless, the entries are invisible to users, and a settings GUI
+  wants a file it can read and write. `credential_store.py` keeps the same
+  public API, so the CLI wizards and config loading work unchanged.
+- A corrupt `auth.json` is set aside as `auth.json.corrupt` instead of being
+  clobbered by the next save, and `load_all()` only accepts known credential
+  keys — a hand-edited file can't inject arbitrary environment variables at
+  startup.
+
+### Removed
+- **`keyring` dependency.** Upgrading installs migrate automatically: if
+  `auth.json` doesn't exist yet and the keyring package is still importable,
+  legacy keychain entries are copied over on first run. The keychain entries
+  themselves are left in place — remove them via your OS's credential
+  manager (Windows: Control Panel → Credential Manager → Windows
+  Credentials → entries named "Yumii").
+- Four dependencies nothing imported (85 transitive packages): `composio`
+  and `composio-langchain` (added ahead of an integration that hasn't
+  started — will return when it does), `sounddevice` (the mic has come from
+  the browser/webview for a long time), and `appdirs`.
+
+### Notes
+- Test suite is 91 tests; the release was verified against a live server
+  running with keyring absent from the environment.
+
 ## [0.5.0] — 2026-07-07
 
 Local voice release. Yumii's voice now runs fully offline (Kokoro-82M on
