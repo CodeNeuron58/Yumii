@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -19,8 +20,11 @@ from starlette.websockets import WebSocketState
 
 from yumii.core.engine import YumiiEngine
 from yumii.core.global_config import load_global_config
+from yumii.core.logging import get_logger
 from yumii.core.memory_manager import UserFact, memory_manager
 from yumii.core.session_manager import SessionRow, session_manager
+
+log = get_logger(__name__)
 
 # The Engine handles all the heavy lifting: STT, LLM, TTS, and state
 engine = YumiiEngine()
@@ -52,9 +56,21 @@ app = FastAPI(lifespan=lifespan)
 _ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
+    # Packaged Tauri webview origins (platform-dependent).
     "tauri://localhost",
     "http://tauri.localhost",
     "https://tauri.localhost",
+    # `tauri dev` serves frontendDist from its own local static server
+    # (default port 1430) — the webview's origin in development.
+    "http://127.0.0.1:1430",
+    "http://localhost:1430",
+]
+# Escape hatch for nonstandard setups (e.g. a custom Tauri dev port):
+# comma-separated origins appended to the allowlist.
+_ALLOWED_ORIGINS += [
+    o.strip()
+    for o in os.environ.get("YUMII_ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
 ]
 
 app.add_middleware(
@@ -64,6 +80,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _log_foreign_origins(request, call_next):
+    """Surface requests from origins outside the allowlist.
+
+    CORS failures are invisible server-side (the browser blocks the
+    *response*), so without this a legitimate frontend blocked by a
+    missing allowlist entry just polls forever with no clue in the logs.
+    """
+    origin = request.headers.get("origin")
+    if origin and origin not in _ALLOWED_ORIGINS:
+        log.warning(
+            "http_origin_not_allowlisted", origin=origin, path=request.url.path
+        )
+    return await call_next(request)
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +245,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     # already running with the user's privileges — allowed.
     origin = websocket.headers.get("origin")
     if origin is not None and origin not in _ALLOWED_ORIGINS:
+        log.warning("ws_origin_rejected", origin=origin)
         await websocket.close(code=1008)
         return
 
