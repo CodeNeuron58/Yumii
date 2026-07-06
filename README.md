@@ -69,7 +69,7 @@ uv run yumii
 - 🟢 **Reacts** — a floating orb that pulses and shifts colour with the conversation (Live2D avatar mode coming soon)
 - 🧠 **Remembers** — extracts and stores user facts in local SQLite, injects them into every session
 - 💬 **Sessions** — multiple independent conversations with resume, rename, and delete
-- 🔐 **Private** — API keys stored in your OS keychain (Windows Credential Manager / macOS Keychain), never on disk
+- 🔐 **Private** — API keys stored in `~/.yumii/auth.json`, an owner-only local file (the same model Claude Code and opencode use); never sent anywhere except your chosen provider
 
 ---
 
@@ -137,9 +137,9 @@ On first launch, an interactive wizard walks you through:
 | **Ears** | STT backend — Local Whisper (private, offline) or Groq Whisper (cloud, 5-10x faster) |
 | **Personality** | Caring · Tsundere · Genki · Kuudere · Yandere · Dandere |
 
-All API keys are saved to your **OS keychain** (Windows Credential Manager or macOS
-Keychain) — never written to a file. You can change any setting later via the
-dashboard.
+All API keys are saved to **`~/.yumii/auth.json`** — a local file with owner-only
+permissions, created by the wizard. You can change any setting later via the
+dashboard or by editing the file directly.
 
 ### 5. Wake Up
 
@@ -236,7 +236,7 @@ src/yumii/
   api/            # FastAPI server, WebSocket, REST endpoints
                   #   server.py     → /health, /api/sessions, /api/facts, /ws
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
-  core/           # Pydantic settings, OS keychain, engine orchestrator
+  core/           # Pydantic settings, auth.json credential store, engine orchestrator
                   #   engine.py     → Session lifecycle + command interception
                   #   memory_db.py  → Low-level SQLite schema
                   #   memory_manager.py → Fact CRUD + extraction trigger
@@ -260,15 +260,18 @@ desktop/
 
 ## 🔐 Security
 
-Yumii never stores API keys on disk in plaintext.
-All secrets go through the [`credential_store.py`](src/yumii/core/credential_store.py)
-module which delegates to your OS's native keychain:
+Yumii keeps secrets and preferences in two separate local files, and nothing
+ever leaves your machine except calls to the providers you configured:
 
-- **Windows** → Windows Credential Manager
-- **macOS** → macOS Keychain
-- **Linux** → GNOME Keyring / KWallet (via libsecret)
+- **`~/.yumii/auth.json`** — API keys. Created with owner-only permissions
+  (0600) and written atomically by
+  [`credential_store.py`](src/yumii/core/credential_store.py). This is the
+  same storage model Claude Code and opencode use.
+- **`~/.yumii/config.json`** — non-sensitive preferences (personality,
+  provider choice, model sizes).
 
-Non-sensitive preferences (personality, provider choice) are saved to `~/.yumii/config.json`.
+Upgrading from an older version that used the OS keychain? Your keys are
+migrated to `auth.json` automatically on first run.
 
 ---
 

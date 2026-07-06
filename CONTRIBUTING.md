@@ -45,8 +45,8 @@ Thank you for your interest in contributing! Yumii is designed to be open and mo
    ```bash
    uv run yumii
    ```
-   The first-run wizard stores your keys securely in your OS keychain.
-   Do **not** create a `.env` file — it will have no effect.
+   The first-run wizard stores your keys in `~/.yumii/auth.json` (an
+   owner-only file). Do **not** create a `.env` file — it will have no effect.
 
 4. Create a feature branch:
    ```bash
@@ -68,7 +68,7 @@ src/yumii/
   agent/          # LangGraph state machine + tool-bound LLM agent + synthesizer
   api/            # FastAPI server + WebSocket + /health
   audio/          # STT pipeline (Silero VAD + Whisper/Groq)
-  core/           # Config, settings, OS keychain integration
+  core/           # Config, settings, auth.json credential store
   tts/            # ElevenLabs + CAMB.ai TTS speakers
   tools/          # LangChain tools + registry/policy (time, web search)
   assets/

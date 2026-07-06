@@ -39,7 +39,6 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.14.0",
     "groq>=0.28.0",
-    "keyring>=25.0.0",
     "prompt_toolkit>=3.0.36",
     "rich>=15.0.0",
     "sounddevice>=0.5.5",

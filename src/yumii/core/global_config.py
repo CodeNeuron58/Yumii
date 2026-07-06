@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 # ~/.yumii/config.json stores ONLY non-sensitive preferences.
-# Secrets (API keys) live in the OS keychain — see credential_store.py.
+# Secrets (API keys) live in ~/.yumii/auth.json — see credential_store.py.
 CONFIG_DIR = Path.home() / ".yumii"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
@@ -13,7 +13,7 @@ def load_global_config() -> dict:
     """Load preferences from ~/.yumii/config.json.
 
     On first load after an upgrade, any credential keys still present in the
-    file are automatically migrated to the OS keychain and removed from disk.
+    file are automatically migrated to auth.json and removed from this file.
     """
     if not CONFIG_FILE.exists():
         return {}
@@ -24,7 +24,7 @@ def load_global_config() -> dict:
     except json.JSONDecodeError:
         return {}
 
-    # Auto-migrate stale plaintext credentials to the OS keychain
+    # Auto-migrate stale credentials out of config.json into auth.json
     from yumii.core.credential_store import CREDENTIAL_KEYS, migrate_from_plaintext
 
     if any(k in CREDENTIAL_KEYS for k in raw):

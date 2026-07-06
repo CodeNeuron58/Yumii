@@ -1,6 +1,7 @@
 """Central configuration settings model for Yumii.
 
-Loads values from the environment, preferring secrets mapped from the OS keychain.
+Loads values from the environment, pre-populated from the user's config
+files: ~/.yumii/config.json (preferences) and ~/.yumii/auth.json (secrets).
 """
 
 import os
@@ -15,8 +16,8 @@ _prefs = load_global_config()
 for key, value in _prefs.items():
     os.environ[key] = value
 
-# Credentials — secrets from the OS keychain (always take priority)
-# These overwrite any preference-level env vars so the keychain is
+# Credentials — secrets from ~/.yumii/auth.json (always take priority)
+# These overwrite any preference-level env vars so auth.json is
 # always the authoritative source for API keys.
 _creds = load_all_credentials()
 for key, value in _creds.items():
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     """Pydantic settings model for the application configuration.
 
     Values are loaded from environment variables, which are pre-populated
-    from the OS keychain and user preferences.
+    from auth.json (secrets) and config.json (preferences).
     """
 
     tts_provider: str = Field(default="ElevenLabs", alias="TTS_PROVIDER")
@@ -62,9 +63,7 @@ class Settings(BaseSettings):
     project_root: str = Field(default=".", description="Root directory of the project")
 
     # No env_file — project-local .env files must never shadow user config.
-
-    # No env_file — project-local .env files must never shadow user config.
-    # All values come from os.environ (populated above from keychain + config.json).
+    # All values come from os.environ (populated above from auth.json + config.json).
     model_config = SettingsConfigDict(extra="ignore")
 
 

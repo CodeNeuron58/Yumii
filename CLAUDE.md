@@ -3,8 +3,9 @@
 ## What is Yumii?
 An open-source, locally-runnable AI companion with real-time voice
 conversation (STT → LLM → TTS) and 6 switchable personalities. Memory lives
-locally in SQLite; API keys live in the OS keychain. Runs on CPU (cloud STT/LLM
-by default, or fully local models).
+locally in SQLite; API keys live in `~/.yumii/auth.json` (owner-only file, the
+Claude Code / opencode model). Runs on CPU (cloud STT/LLM by default, or fully
+local models).
 
 **Current direction:** Yumii is pivoting from a browser-served Live2D page to a
 **native desktop app** (Tauri) with a small floating **orb** UI. The animated
@@ -29,9 +30,9 @@ unchanged by the pivot; the desktop app wraps it.
   the Python backend (`python -m yumii server`) as a managed subprocess.
 - **AI framework:** LangChain + LangGraph (`langgraph>=1.2`)
 - **LLM providers:** Groq (default, llama-3.3-70b), OpenAI (gpt-4o), Anthropic (claude-3-5-sonnet)
-- **STT:** faster-whisper (local, CPU, int8) OR Groq Whisper (cloud)
+- **STT:** faster-whisper (local, CPU, int8) OR Groq Whisper (cloud) OR Vosk (local, streaming partials)
 - **VAD:** Silero VAD (snakers4/silero-vad via torch.hub) — always local
-- **TTS:** ElevenLabs OR CAMB.ai (both streaming)
+- **TTS:** Kokoro-82M (local ONNX, recommended default) OR ElevenLabs OR CAMB.ai (all streaming)
 - **CLI:** Typer + Rich + prompt_toolkit (now primarily the launcher for
   `yumii server`; its wizards are slated to move into an in-app settings GUI)
 
@@ -46,9 +47,9 @@ src/yumii/
                   # fact_extractor, personality_manager
   api/            # FastAPI server, WebSocket endpoint, /health, REST (sessions, facts, config)
   audio/          # STT pipeline: Silero VAD + Whisper/Groq
-  core/           # Config (Pydantic Settings), OS keychain, engine orchestrator,
+  core/           # Config (Pydantic Settings), auth.json credential store, engine orchestrator,
                   # memory_db (SQLite), memory_manager, session_manager
-  tts/            # ElevenLabs + CAMB.ai speakers
+  tts/            # Kokoro (local) + ElevenLabs + CAMB.ai speakers
   tools/          # LangChain tools + registry/policy: get_current_time, web_search,
                   # tool registry, ToolPolicy, MCP config loader
   assets/
@@ -65,8 +66,10 @@ desktop/
 
 ## Critical Rules
 1. **NEVER use `pip install`** — always `uv sync`. torch is pinned to CPU-only index.
-2. **API keys live in the OS keychain** — never in .env files. Use `credential_store.py`.
-   (A `.env` at the repo root is gitignored and NOT read by the app.)
+2. **API keys live in `~/.yumii/auth.json`** (owner-only permissions, atomic writes) —
+   never in .env files and never in config.json. Use `credential_store.py`.
+   (A `.env` at the repo root is gitignored and NOT read by the app. The old
+   OS-keychain storage is gone; a one-time migration copies legacy entries.)
 3. **Non-sensitive config** (personality, provider choice) lives in `~/.yumii/config.json`.
 4. **Avatar files** (user-provided Live2D models, for the future companion mode) live in `~/.yumii/avatar/`.
 5. **Asset files** (prompts, webui) live in `src/yumii/assets/` — inside the package, so they're bundled in the wheel.
@@ -95,7 +98,9 @@ desktop/
 - **HITL confirmation gate** for tool calls (`settings.hitl_mode`: never / external / always)
 - **Fire-and-forget fact extraction** after every turn using a cheap LLM pass (Groq `llama-3.1-8b-instant` by default); deduplicated against existing memory
 - **beam_size=1** in Whisper — greedy decoding, fastest CPU inference, low latency trade-off
-- **OS keychain** via `keyring` library — security-first, no plaintext secrets
+- **File-based credentials** (`~/.yumii/auth.json`, 0600, atomic tmp+rename writes) —
+  the Claude Code / opencode model; replaced the OS keychain (keyring), which was
+  a packaging/portability tax and invisible to users
 
 ---
 
