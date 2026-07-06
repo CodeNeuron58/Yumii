@@ -22,7 +22,6 @@ classifiers = [
     "Intended Audience :: Developers",
 ]
 dependencies = [
-    "appdirs>=1.4.4",
     "ddgs>=9.0.0",
     "elevenlabs>=2.38.1",
     "fastapi>=0.135.1",
@@ -41,7 +40,6 @@ dependencies = [
     "groq>=0.28.0",
     "prompt_toolkit>=3.0.36",
     "rich>=15.0.0",
-    "sounddevice>=0.5.5",
     "structlog>=24.1.0",
     "torch>=2.0.0",
     "torchaudio>=2.0.0",
@@ -51,8 +49,6 @@ dependencies = [
     "aiohttp>=3.13.5",
     "aiosqlite>=0.20.0",
     "langgraph-checkpoint-sqlite>=2.0.0",
-    "composio>=0.13,<2.0",
-    "composio-langchain>=0.13,<2.0",
     "langgraph-prebuilt>=1.1,<2.0",
     "langgraph-checkpoint>=4.1,<5.0",
     "vosk>=0.3.45",
