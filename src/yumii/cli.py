@@ -315,8 +315,9 @@ def run_attune_wizard() -> bool:
         title="🌿  Yumii's Voice — How should she sound?",
         text="Choose a text-to-speech provider:\n",
         values=[
-            ("ElevenLabs", "ElevenLabs   Most expressive and lifelike  (recommended)"),
-            ("CAMB.ai",    "CAMB.ai      High-quality alternative"),
+            ("Kokoro",     "Kokoro       Local & free — offline, no API key  (recommended)"),
+            ("ElevenLabs", "ElevenLabs   Most expressive and lifelike (cloud, API key)"),
+            ("CAMB.ai",    "CAMB.ai      High-quality alternative (cloud, API key)"),
         ],
         ok_text="Next  ❯",
         cancel_text="Back",
@@ -327,7 +328,10 @@ def run_attune_wizard() -> bool:
         return False
     update_global_config("TTS_PROVIDER", tts_choice)
 
-    if tts_choice == "ElevenLabs":
+    if tts_choice == "Kokoro":
+        _pick_kokoro_voice()
+
+    elif tts_choice == "ElevenLabs":
         el_key = input_dialog(
             title="🌿  ElevenLabs API Key",
             text=(
@@ -453,6 +457,40 @@ def run_attune_wizard() -> bool:
     return True
 
 
+# ─── Kokoro voice picker (shared by both wizards) ─────────────────────────────
+
+# Curated subset of Kokoro's ~50 built-in voices. a=American, b=British;
+# f=female, m=male. The full list is available via Kokoro.get_voices().
+_KOKORO_VOICES: list[tuple[str, str]] = [
+    ("af_heart",  "Heart     Warm American female  (default)"),
+    ("af_bella",  "Bella     Bright American female"),
+    ("af_sky",    "Sky       Soft American female"),
+    ("af_nicole", "Nicole    Whispery American female"),
+    ("bf_emma",   "Emma      Calm British female"),
+    ("am_michael","Michael   Deep American male"),
+    ("bm_george", "George    Warm British male"),
+]
+
+
+def _pick_kokoro_voice() -> None:
+    """Dialog to choose the Kokoro voice; keeps current on cancel."""
+    config = load_global_config()
+    current = config.get("KOKORO_VOICE", "af_heart")
+    choice = radiolist_dialog(
+        title="🌿  Kokoro Voice",
+        text=(
+            f"Currently: {current}\n\n"
+            "Choose a voice (the ~120 MB model downloads on first use):\n"
+        ),
+        values=_KOKORO_VOICES + [(None, "Keep current")],
+        ok_text="Save",
+        cancel_text="Skip",
+        style=_DIALOG_STYLE,
+    ).run()
+    if choice:
+        update_global_config("KOKORO_VOICE", choice)
+
+
 # ─── Wizard: Configure (Models / Providers) ───────────────────────────────────
 
 def run_models_wizard() -> None:
@@ -495,8 +533,9 @@ def run_models_wizard() -> None:
         title="⚙️   Configure Voice (TTS)",
         text=f"Currently using: {current_tts}\n\nSwitch to:\n",
         values=[
-            ("ElevenLabs", f"ElevenLabs   Most expressive{' ✓' if current_tts == 'ElevenLabs' else ''}"),
-            ("CAMB.ai",    f"CAMB.ai      High-quality alternative{' ✓' if current_tts == 'CAMB.ai' else ''}"),
+            ("Kokoro",     f"Kokoro       Local & free, offline{' ✓' if current_tts == 'Kokoro' else ''}"),
+            ("ElevenLabs", f"ElevenLabs   Most expressive (cloud){' ✓' if current_tts == 'ElevenLabs' else ''}"),
+            ("CAMB.ai",    f"CAMB.ai      High-quality alternative (cloud){' ✓' if current_tts == 'CAMB.ai' else ''}"),
             (None,         "Keep current"),
         ],
         ok_text="Next  ❯",
@@ -506,7 +545,10 @@ def run_models_wizard() -> None:
 
     if tts_choice:
         update_global_config("TTS_PROVIDER", tts_choice)
-        if tts_choice == "ElevenLabs":
+        if tts_choice == "Kokoro":
+            _pick_kokoro_voice()
+
+        elif tts_choice == "ElevenLabs":
             key = input_dialog(
                 title="⚙️   ElevenLabs API Key",
                 text="New API key (blank = keep current):",

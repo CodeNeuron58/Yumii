@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     elevenlabs_voice_id: str | None = Field(default=None, alias="ELEVENLABS_VOICE_ID")
     camb_api_key: str | None = Field(default=None, alias="CAMB_API_KEY")
     camb_voice_id: str | None = Field(default=None, alias="CAMB_VOICE_ID")
+    # Kokoro (local TTS) — no API key; voice is a built-in voice name.
+    # fp32 by default: the int8 variant measured ~3.7x SLOWER than fp32
+    # on x86 (quantized ops fall back to slow kernels) — RTF 2.6 vs 0.7
+    # on an i5-13500H. int8 stays available for machines where it wins.
+    kokoro_voice: str = Field(default="af_heart", alias="KOKORO_VOICE")
+    kokoro_model_size: str = Field(default="fp32", alias="KOKORO_MODEL_SIZE")
     llm_provider: str = Field(default="Groq", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")

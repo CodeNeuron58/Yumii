@@ -41,6 +41,10 @@ PREFERENCE_KEYS: frozenset[str] = frozenset(
         "TTS_PROVIDER",
         "STT_PROVIDER",
         "WHISPER_MODEL_SIZE",
+        "VOSK_MODEL_SIZE",
+        "KOKORO_VOICE",
+        "KOKORO_MODEL_SIZE",
+        "HITL_MODE",
         "COMPUTE_PROFILE",
     }
 )
