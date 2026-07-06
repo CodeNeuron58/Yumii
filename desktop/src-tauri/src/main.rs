@@ -57,6 +57,33 @@ fn toggle_window(app: &tauri::AppHandle) {
     }
 }
 
+/// Open (or focus) the dashboard as a normal decorated window served
+/// by the Python backend.
+fn show_dashboard(app: &tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("dashboard") {
+        let _ = win.show();
+        let _ = win.set_focus();
+        return;
+    }
+    if let Ok(url) = "http://127.0.0.1:8000/dashboard.html".parse() {
+        let _ = tauri::WebviewWindowBuilder::new(
+            app,
+            "dashboard",
+            tauri::WebviewUrl::External(url),
+        )
+        .title("Yumii — Dashboard")
+        .inner_size(840.0, 640.0)
+        .build();
+    }
+}
+
+/// The orb page calls this via IPC when the user picks "Dashboard"
+/// from the gear menu.
+#[tauri::command]
+fn open_dashboard(app: tauri::AppHandle) {
+    show_dashboard(&app);
+}
+
 fn main() {
     // Ctrl+Shift+Space toggles the window from anywhere.
     let toggle_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Space);
@@ -75,20 +102,24 @@ fn main() {
                 .build(),
         )
         .manage(Backend(Mutex::new(None)))
+        .invoke_handler(tauri::generate_handler![open_dashboard])
         .setup(move |app| {
             // 1. Launch the Python brain in the background.
             let child = spawn_backend();
             *app.state::<Backend>().0.lock().unwrap() = child;
 
-            // 2. System tray: Show/Hide + Quit.
+            // 2. System tray: Show/Hide + Dashboard + Quit.
             let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
+            let dashboard =
+                MenuItem::with_id(app, "dashboard", "Dashboard", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &dashboard, &quit])?;
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => toggle_window(app),
+                    "dashboard" => show_dashboard(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })

@@ -158,6 +158,51 @@ async def delete_session_endpoint(session_id: str) -> dict[str, Any]:
     return {"deleted": True, "session_id": session_id}
 
 
+@app.put("/api/sessions/{session_id}")
+async def rename_session_endpoint(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Rename a session."""
+    name = str(body.get("name", "")).strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing 'name' field")
+    if await session_manager.get_session(session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await session_manager.rename_session(session_id, name[:64])
+    return {"renamed": True, "session_id": session_id, "name": name[:64]}
+
+
+@app.get("/api/sessions/{session_id}/messages")
+async def session_messages_endpoint(session_id: str) -> list[dict[str, str]]:
+    """Return the conversation transcript from the LangGraph checkpoint.
+
+    Only user and assistant turns are included; tool traffic is
+    summarised as a one-line event so the dashboard can render a clean
+    transcript.
+    """
+    if engine.graph_app is None:
+        raise HTTPException(status_code=503, detail="Engine not ready")
+    if await session_manager.get_session(session_id) is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    state = await engine.graph_app.aget_state(
+        {"configurable": {"thread_id": session_id}}
+    )
+    messages = (state.values or {}).get("messages", []) if state else []
+
+    out: list[dict[str, str]] = []
+    for m in messages:
+        kind = type(m).__name__
+        content = m.content if isinstance(m.content, str) else str(m.content)
+        if kind == "HumanMessage":
+            out.append({"role": "user", "text": content})
+        elif kind == "AIMessage":
+            if getattr(m, "tool_calls", None):
+                names = ", ".join(c.get("name", "?") for c in m.tool_calls)
+                out.append({"role": "event", "text": f"used tool: {names}"})
+            if content.strip():
+                out.append({"role": "assistant", "text": content})
+    return out
+
+
 # ---------------------------------------------------------------------------
 # REST API: Facts (Long-term Memory)
 # ---------------------------------------------------------------------------
@@ -194,6 +239,95 @@ async def delete_fact_endpoint(fact_id: str) -> dict[str, Any]:
     """Delete a single fact."""
     await memory_manager.delete_fact(fact_id)
     return {"deleted": True, "fact_id": fact_id}
+
+
+# ---------------------------------------------------------------------------
+# REST API: Settings (dashboard)
+# ---------------------------------------------------------------------------
+
+# What the dashboard may read/write. Everything else is rejected so a
+# compromised page can't write arbitrary preference keys.
+_SETTING_CHOICES: dict[str, list[str]] = {
+    "LLM_PROVIDER": ["Groq", "OpenAI", "Anthropic"],
+    "TTS_PROVIDER": ["Kokoro", "ElevenLabs", "CAMB.ai"],
+    "STT_PROVIDER": ["local", "groq", "vosk"],
+    "PERSONALITY": ["caring", "tsundere", "genki", "kuudere", "yandere", "dandere"],
+    "WHISPER_MODEL_SIZE": ["tiny", "base", "small"],
+    "KOKORO_VOICE": [
+        "af_heart", "af_bella", "af_sky", "af_nicole",
+        "bf_emma", "am_michael", "bm_george",
+    ],
+    "HITL_MODE": ["external", "always", "never"],
+}
+# Provider/key changes need a backend restart (settings load once at
+# import). Personality applies live (read from config.json every turn).
+_RESTART_KEYS = {
+    "LLM_PROVIDER", "TTS_PROVIDER", "STT_PROVIDER",
+    "WHISPER_MODEL_SIZE", "KOKORO_VOICE", "HITL_MODE",
+}
+
+
+def _mask(value: str) -> str:
+    if len(value) <= 8:
+        return "●●●●●●●●"
+    return f"{value[:4]}···{value[-4:]}"
+
+
+@app.get("/api/settings")
+async def get_settings() -> dict[str, Any]:
+    """Current preferences + masked credentials for the dashboard."""
+    from yumii.core.credential_store import CREDENTIAL_KEYS, get_credential
+
+    config = load_global_config()
+    preferences = {
+        key: config.get(key, choices[0])
+        for key, choices in _SETTING_CHOICES.items()
+    }
+    credentials = {}
+    for key in sorted(CREDENTIAL_KEYS):
+        value = get_credential(key)
+        credentials[key] = {"set": bool(value), "masked": _mask(value) if value else ""}
+    return {
+        "preferences": preferences,
+        "choices": _SETTING_CHOICES,
+        "credentials": credentials,
+    }
+
+
+@app.put("/api/settings")
+async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
+    """Save preferences and/or credentials from the dashboard.
+
+    Credentials with empty values are ignored (the UI sends passwords
+    write-only), and unknown keys are rejected.
+    """
+    from yumii.core.credential_store import CREDENTIAL_KEYS, save_credential
+    from yumii.core.global_config import update_global_config
+
+    restart_required = False
+
+    prefs = body.get("preferences", {}) or {}
+    for key, value in prefs.items():
+        if key not in _SETTING_CHOICES:
+            raise HTTPException(status_code=400, detail=f"Unknown preference: {key}")
+        if value not in _SETTING_CHOICES[key]:
+            raise HTTPException(status_code=400, detail=f"Invalid value for {key}: {value}")
+        current = load_global_config().get(key)
+        if current != value:
+            update_global_config(key, value)
+            if key in _RESTART_KEYS:
+                restart_required = True
+
+    creds = body.get("credentials", {}) or {}
+    for key, value in creds.items():
+        if key not in CREDENTIAL_KEYS:
+            raise HTTPException(status_code=400, detail=f"Unknown credential: {key}")
+        value = str(value).strip()
+        if value:
+            save_credential(key, value)
+            restart_required = True
+
+    return {"saved": True, "restart_required": restart_required}
 
 
 # ---------------------------------------------------------------------------

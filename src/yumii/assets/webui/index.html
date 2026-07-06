@@ -257,6 +257,9 @@
         <div class="mode-item" data-mode="companion">
             <span>Companion (avatar)</span><span class="soon">soon</span>
         </div>
+        <div class="mode-item" data-mode="dashboard">
+            <span>Dashboard</span><span class="tag">⇱</span>
+        </div>
     </div>
 
     <div id="status-bar"></div>
@@ -351,6 +354,15 @@
                 modeMenu.classList.add('hidden');
                 if (item.dataset.mode === 'companion') {
                     document.getElementById('soon-modal').classList.remove('hidden');
+                }
+                if (item.dataset.mode === 'dashboard') {
+                    // Tauri: ask the shell for a proper second window;
+                    // browser mode: just open a tab.
+                    if (IS_TAURI && window.__TAURI__?.core?.invoke) {
+                        window.__TAURI__.core.invoke('open_dashboard');
+                    } else {
+                        window.open(HTTP_BASE + '/dashboard.html', '_blank');
+                    }
                 }
             });
         });

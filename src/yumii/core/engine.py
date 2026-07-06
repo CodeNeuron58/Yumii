@@ -478,10 +478,18 @@ class YumiiEngine:
                     response_len=len(reasoning_result.get("response", "")),
                 )
 
-                # Touch session activity after a successful turn.
-                await session_manager.update_session_activity(
-                    self.active_session_id
+                # Book-keeping after a successful turn: bump the message
+                # count, touch activity, and auto-title the session from
+                # the first utterance.
+                await session_manager.bump_after_turn(
+                    self.active_session_id, user_text
                 )
+                if self.active_session_name == "New Chat":
+                    refreshed = await session_manager.get_session(
+                        self.active_session_id
+                    )
+                    if refreshed:
+                        self.active_session_name = refreshed.name
 
                 # Fire-and-forget fact extraction from this turn.
                 asyncio.create_task(

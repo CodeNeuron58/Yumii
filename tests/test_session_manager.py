@@ -103,3 +103,37 @@ async def test_last_active_session(isolated_sessions: SessionManager) -> None:
     last = await isolated_sessions.get_last_active_session()
     assert last is not None
     assert last.id == sid1
+
+
+@pytest.mark.asyncio
+async def test_bump_after_turn_titles_and_counts(isolated_sessions: SessionManager) -> None:
+    """A turn should auto-title a default-named session and bump the count."""
+    sid = await isolated_sessions.create_session()  # default "New Chat"
+    await isolated_sessions.bump_after_turn(sid, "  Help me   plan a trip to Japan next spring, ok?  ")
+    s = await isolated_sessions.get_session(sid)
+    assert s.name == "Help me plan a trip to Japan next spring, ok?"
+    assert s.message_count == 2
+
+    # A second turn bumps the count but never re-titles.
+    await isolated_sessions.bump_after_turn(sid, "something completely different")
+    s = await isolated_sessions.get_session(sid)
+    assert s.name == "Help me plan a trip to Japan next spring, ok?"
+    assert s.message_count == 4
+
+
+@pytest.mark.asyncio
+async def test_bump_after_turn_keeps_user_chosen_name(isolated_sessions: SessionManager) -> None:
+    """An explicitly named session must never be auto-renamed."""
+    sid = await isolated_sessions.create_session("Trip planning")
+    await isolated_sessions.bump_after_turn(sid, "hello there")
+    s = await isolated_sessions.get_session(sid)
+    assert s.name == "Trip planning"
+    assert s.message_count == 2
+
+
+@pytest.mark.asyncio
+async def test_bump_after_turn_truncates_long_titles(isolated_sessions: SessionManager) -> None:
+    sid = await isolated_sessions.create_session()
+    await isolated_sessions.bump_after_turn(sid, "x" * 200)
+    s = await isolated_sessions.get_session(sid)
+    assert len(s.name) == 48

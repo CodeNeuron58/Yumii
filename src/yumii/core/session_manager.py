@@ -8,6 +8,7 @@ separate database file; this module only stores the session *metadata*.
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -130,6 +131,27 @@ class SessionManager:
                 " WHERE id = ?",
                 (_utc_now(), session_id),
             )
+
+    async def bump_after_turn(self, session_id: str, user_text: str) -> None:
+        """Book-keeping after a completed conversation turn.
+
+        Bumps ``message_count`` by 2 (user + assistant), touches
+        ``last_active_at``, and — if the session still has the default
+        name — titles it from the user's first utterance so the history
+        UI shows something recognisable instead of a wall of "New Chat".
+        """
+        session = await self.get_session(session_id)
+        if session is None:
+            return
+        if session.name == "New Chat":
+            title = re.sub(r"\s+", " ", user_text).strip()[:48]
+            if title:
+                await self.rename_session(session_id, title)
+        await execute(
+            "UPDATE sessions SET message_count = message_count + 2,"
+            " last_active_at = ? WHERE id = ?",
+            (_utc_now(), session_id),
+        )
 
     async def rename_session(self, session_id: str, name: str) -> None:
         """Change the human-readable name of a session."""

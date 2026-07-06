@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yumii — Dashboard</title>
+    <style>
+        :root {
+            --c-primary: #00d4aa;
+            --c-neon: #00ff88;
+            --c-cyan: #00b8d4;
+            --c-text: #e6f1f0;
+            --c-dim: #9aa7a5;
+            --c-bg: #0d1117;
+            --c-panel: #161b22;
+            --c-line: rgba(255, 255, 255, 0.08);
+            --c-danger: #f85149;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--c-bg);
+            color: var(--c-text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+        }
+
+        #app { max-width: 780px; margin: 0 auto; padding: 24px 20px 60px; }
+
+        header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+        header .mini-orb {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: radial-gradient(circle at 32% 28%, var(--c-neon) 0%, var(--c-cyan) 75%);
+            box-shadow: 0 0 12px 2px rgba(0, 255, 136, 0.35);
+        }
+        header h1 { font-size: 18px; font-weight: 600; margin: 0; }
+        header .ver { color: var(--c-dim); font-size: 12px; margin-left: auto; }
+
+        nav { display: flex; gap: 6px; border-bottom: 1px solid var(--c-line); margin-bottom: 18px; }
+        nav button {
+            background: none; border: none; color: var(--c-dim);
+            padding: 10px 14px; font-size: 14px; cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        nav button.active { color: var(--c-primary); border-bottom-color: var(--c-primary); }
+        nav button:hover { color: var(--c-text); }
+
+        .view { display: none; }
+        .view.active { display: block; }
+
+        .panel {
+            background: var(--c-panel); border: 1px solid var(--c-line);
+            border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
+        }
+        .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+                    color: var(--c-dim); margin: 0 0 12px; font-weight: 600; }
+
+        .row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+        .row label { flex: 0 0 190px; color: var(--c-text); }
+        .row .hint { color: var(--c-dim); font-size: 12px; }
+
+        select, input[type="password"], input[type="text"] {
+            background: var(--c-bg); color: var(--c-text);
+            border: 1px solid var(--c-line); border-radius: 8px;
+            padding: 7px 10px; font-size: 13px; min-width: 210px;
+        }
+        select:focus, input:focus { outline: 1px solid var(--c-primary); }
+
+        button.btn {
+            background: rgba(0, 212, 170, 0.15); color: var(--c-primary);
+            border: 1px solid rgba(0, 212, 170, 0.45); border-radius: 8px;
+            padding: 7px 16px; font-size: 13px; cursor: pointer;
+        }
+        button.btn:hover { background: rgba(0, 212, 170, 0.3); }
+        button.btn.ghost { background: none; border-color: var(--c-line); color: var(--c-dim); }
+        button.btn.ghost:hover { color: var(--c-text); }
+        button.btn.danger { background: rgba(248, 81, 73, 0.12); border-color: rgba(248, 81, 73, 0.4); color: var(--c-danger); }
+        button.btn.sm { padding: 4px 10px; font-size: 12px; }
+
+        #save-bar { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+        #save-note { color: var(--c-dim); font-size: 13px; }
+        #save-note.warn { color: #d29922; }
+
+        .list-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 4px; border-bottom: 1px solid var(--c-line);
+        }
+        .list-item:last-child { border-bottom: none; }
+        .list-item .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .list-item .meta { color: var(--c-dim); font-size: 12px; white-space: nowrap; }
+        .list-item.active-session .title::after {
+            content: " · active"; color: var(--c-primary); font-size: 12px;
+        }
+
+        .transcript { background: var(--c-bg); border: 1px solid var(--c-line);
+                      border-radius: 10px; margin: 4px 4px 10px; padding: 12px 14px;
+                      max-height: 320px; overflow-y: auto; }
+        .msg { margin: 0 0 10px; line-height: 1.45; }
+        .msg .who { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+        .msg.user .who { color: var(--c-cyan); }
+        .msg.assistant .who { color: var(--c-primary); }
+        .msg.event { color: var(--c-dim); font-size: 12px; font-style: italic; }
+
+        .empty { color: var(--c-dim); padding: 14px 4px; }
+        .fact-cat { color: var(--c-primary); font-size: 11px; margin-right: 8px; text-transform: uppercase; }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header>
+            <div class="mini-orb"></div>
+            <h1>Yumii Dashboard</h1>
+            <span class="ver" id="ver"></span>
+        </header>
+
+        <nav>
+            <button data-view="settings" class="active">Settings</button>
+            <button data-view="chats">Chats</button>
+            <button data-view="memory">Memory</button>
+        </nav>
+
+        <!-- ── Settings ─────────────────────────────────────────────── -->
+        <section id="view-settings" class="view active">
+            <div class="panel">
+                <h2>Mind · Voice · Ears</h2>
+                <div id="pref-rows"></div>
+            </div>
+            <div class="panel">
+                <h2>API Keys</h2>
+                <div id="cred-rows"></div>
+                <div class="row"><span class="hint">Keys are write-only here and stored in
+                    ~/.yumii/auth.json with owner-only permissions. Leave a field blank to keep the current key.</span></div>
+            </div>
+            <div id="save-bar">
+                <button class="btn" id="save-btn">Save settings</button>
+                <span id="save-note"></span>
+            </div>
+        </section>
+
+        <!-- ── Chats ────────────────────────────────────────────────── -->
+        <section id="view-chats" class="view">
+            <div class="panel">
+                <h2>Conversations</h2>
+                <div id="chat-list"><div class="empty">Loading…</div></div>
+            </div>
+        </section>
+
+        <!-- ── Memory ───────────────────────────────────────────────── -->
+        <section id="view-memory" class="view">
+            <div class="panel">
+                <h2>What Yumii knows about you</h2>
+                <div id="fact-list"><div class="empty">Loading…</div></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const API = '';  // same origin
+
+        // ── Tabs ───────────────────────────────────────────────────────
+        document.querySelectorAll('nav button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('view-' + btn.dataset.view).classList.add('active');
+                if (btn.dataset.view === 'chats') loadChats();
+                if (btn.dataset.view === 'memory') loadFacts();
+            });
+        });
+
+        const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+        // ── Settings ───────────────────────────────────────────────────
+        const PREF_LABELS = {
+            LLM_PROVIDER: 'Mind (LLM)',
+            TTS_PROVIDER: 'Voice (TTS)',
+            STT_PROVIDER: 'Ears (STT)',
+            PERSONALITY: 'Personality',
+            WHISPER_MODEL_SIZE: 'Whisper model size',
+            KOKORO_VOICE: 'Kokoro voice',
+            HITL_MODE: 'Tool confirmations',
+        };
+        const CRED_LABELS = {
+            GROQ_API_KEY: 'Groq API key',
+            OPENAI_API_KEY: 'OpenAI API key',
+            ANTHROPIC_API_KEY: 'Anthropic API key',
+            ELEVENLABS_API_KEY: 'ElevenLabs API key',
+            ELEVENLABS_VOICE_ID: 'ElevenLabs voice ID',
+            CAMB_API_KEY: 'CAMB.ai API key',
+            CAMB_VOICE_ID: 'CAMB.ai voice ID',
+        };
+
+        async function loadSettings() {
+            const r = await fetch(API + '/api/settings');
+            const data = await r.json();
+
+            const prefRows = document.getElementById('pref-rows');
+            prefRows.innerHTML = '';
+            for (const [key, label] of Object.entries(PREF_LABELS)) {
+                const opts = (data.choices[key] || []).map(v =>
+                    `<option value="${esc(v)}" ${v === data.preferences[key] ? 'selected' : ''}>${esc(v)}</option>`).join('');
+                prefRows.insertAdjacentHTML('beforeend',
+                    `<div class="row"><label>${esc(label)}</label><select data-pref="${esc(key)}">${opts}</select></div>`);
+            }
+
+            const credRows = document.getElementById('cred-rows');
+            credRows.innerHTML = '';
+            for (const [key, label] of Object.entries(CRED_LABELS)) {
+                const c = data.credentials[key] || { set: false, masked: '' };
+                const status = c.set ? `<span class="hint">current: ${esc(c.masked)}</span>`
+                                     : '<span class="hint">not set</span>';
+                credRows.insertAdjacentHTML('beforeend',
+                    `<div class="row"><label>${esc(label)}</label>
+                     <input type="password" data-cred="${esc(key)}" placeholder="${c.set ? 'enter new to replace' : 'enter key'}">
+                     ${status}</div>`);
+            }
+        }
+
+        document.getElementById('save-btn').addEventListener('click', async () => {
+            const preferences = {};
+            document.querySelectorAll('[data-pref]').forEach(el => preferences[el.dataset.pref] = el.value);
+            const credentials = {};
+            document.querySelectorAll('[data-cred]').forEach(el => { if (el.value.trim()) credentials[el.dataset.cred] = el.value.trim(); });
+
+            const note = document.getElementById('save-note');
+            note.className = ''; note.textContent = 'Saving…';
+            const r = await fetch(API + '/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ preferences, credentials }),
+            });
+            if (!r.ok) { note.textContent = 'Save failed: ' + (await r.text()); return; }
+            const res = await r.json();
+            document.querySelectorAll('[data-cred]').forEach(el => el.value = '');
+            await loadSettings();
+            if (res.restart_required) {
+                note.className = 'warn';
+                note.textContent = 'Saved. Quit Yumii from the tray and reopen it to apply provider/key changes.';
+            } else {
+                note.textContent = 'Saved — applies from the next reply.';
+            }
+        });
+
+        // ── Chats ──────────────────────────────────────────────────────
+        async function loadChats() {
+            const list = document.getElementById('chat-list');
+            const rows = await (await fetch(API + '/api/sessions')).json();
+            if (!rows.length) { list.innerHTML = '<div class="empty">No conversations yet — go talk to her!</div>'; return; }
+            list.innerHTML = '';
+            for (const s of rows) {
+                const date = (s.last_active_at || s.created_at || '').slice(0, 16);
+                list.insertAdjacentHTML('beforeend', `
+                    <div class="list-item" data-id="${esc(s.id)}">
+                        <span class="title">${esc(s.name)}</span>
+                        <span class="meta">${esc(date)} · ${s.message_count} msg</span>
+                        <button class="btn sm ghost" data-act="view">View</button>
+                        <button class="btn sm" data-act="resume">Resume</button>
+                        <button class="btn sm ghost" data-act="rename">Rename</button>
+                        <button class="btn sm danger" data-act="delete">Delete</button>
+                    </div>
+                    <div class="transcript" id="tr-${esc(s.id)}" style="display:none"></div>`);
+            }
+        }
+
+        document.getElementById('chat-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-act]');
+            if (!btn) return;
+            const item = btn.closest('.list-item');
+            const id = item.dataset.id;
+            const act = btn.dataset.act;
+
+            if (act === 'view') {
+                const box = document.getElementById('tr-' + id);
+                if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+                box.style.display = 'block';
+                box.innerHTML = '<div class="empty">Loading transcript…</div>';
+                const r = await fetch(`${API}/api/sessions/${id}/messages`);
+                if (!r.ok) { box.innerHTML = '<div class="empty">Could not load transcript.</div>'; return; }
+                const msgs = await r.json();
+                box.innerHTML = msgs.length
+                    ? msgs.map(m => m.role === 'event'
+                        ? `<p class="msg event">⚙ ${esc(m.text)}</p>`
+                        : `<p class="msg ${m.role}"><span class="who">${m.role === 'user' ? 'You' : 'Yumii'}</span>${esc(m.text)}</p>`).join('')
+                    : '<div class="empty">No messages recorded for this session.</div>';
+            }
+
+            if (act === 'resume') {
+                await fetch(`${API}/api/sessions/${id}/resume`, { method: 'POST' });
+                btn.textContent = 'Resumed ✓';
+                setTimeout(() => { btn.textContent = 'Resume'; }, 2000);
+                loadChats();
+            }
+
+            if (act === 'rename') {
+                const current = item.querySelector('.title').textContent;
+                const name = prompt('Rename conversation:', current);
+                if (name && name.trim() && name.trim() !== current) {
+                    await fetch(`${API}/api/sessions/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name.trim() }),
+                    });
+                    loadChats();
+                }
+            }
+
+            if (act === 'delete') {
+                if (!confirm('Delete this conversation permanently?')) return;
+                await fetch(`${API}/api/sessions/${id}`, { method: 'DELETE' });
+                loadChats();
+            }
+        });
+
+        // ── Memory ─────────────────────────────────────────────────────
+        async function loadFacts() {
+            const list = document.getElementById('fact-list');
+            const facts = await (await fetch(API + '/api/facts')).json();
+            if (!facts.length) { list.innerHTML = '<div class="empty">Nothing remembered yet.</div>'; return; }
+            list.innerHTML = '';
+            for (const f of facts) {
+                list.insertAdjacentHTML('beforeend', `
+                    <div class="list-item" data-id="${esc(f.id)}">
+                        <span class="title"><span class="fact-cat">${esc(f.category)}</span>${esc(f.fact)}</span>
+                        <button class="btn sm ghost" data-act="edit">Edit</button>
+                        <button class="btn sm danger" data-act="forget">Forget</button>
+                    </div>`);
+            }
+        }
+
+        document.getElementById('fact-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-act]');
+            if (!btn) return;
+            const item = btn.closest('.list-item');
+            const id = item.dataset.id;
+
+            if (btn.dataset.act === 'edit') {
+                const current = item.querySelector('.title').textContent.replace(/^[a-z]+/, '').trim();
+                const text = prompt('Edit memory:', current);
+                if (text && text.trim()) {
+                    await fetch(`${API}/api/facts/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fact: text.trim() }),
+                    });
+                    loadFacts();
+                }
+            }
+            if (btn.dataset.act === 'forget') {
+                if (!confirm('Yumii will no longer know this. Forget it?')) return;
+                await fetch(`${API}/api/facts/${id}`, { method: 'DELETE' });
+                loadFacts();
+            }
+        });
+
+        loadSettings();
+    </script>
+</body>
+
+</html>
