@@ -59,9 +59,13 @@ class YumiiSpeaker(BaseSpeaker):
             # bytes. We base64-encode each chunk so the WebSocket
             # payload stays JSON-safe (the engine's broadcast_payload
             # uses json.dumps).
+            # pcm_22050 = raw signed 16-bit LE samples. The frontend's
+            # streaming decoder reinterprets chunks as PCM16, so the
+            # format must stay PCM (MP3 here plays as static) and the
+            # rate must match the metadata yield above.
             audio_stream = self.client.text_to_speech.stream(
                 voice_id=self.voice_id,
-                output_format="mp3_22050_32",
+                output_format="pcm_22050",
                 text=text,
                 model_id=self.model_id,
                 voice_settings=VoiceSettings(

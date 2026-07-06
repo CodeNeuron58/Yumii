@@ -31,9 +31,15 @@ class BaseSpeaker(ABC):
 
 
 class BaseSTTProvider(ABC):
-    """Abstract Base Class for Yumii's STT (Speech-to-Text) providers."""
+    """Abstract Base Class for Yumii's STT (Speech-to-Text) providers.
+
+    ``transcribe`` is synchronous by contract — the engine runs it in a
+    worker thread (``asyncio.to_thread``) so implementations may block.
+    Streaming providers may additionally expose ``process_chunk`` /
+    ``get_final``; the pipeline detects those via ``hasattr``.
+    """
 
     @abstractmethod
-    async def transcribe(self, audio_data: Any) -> str | None:
-        """Convert raw audio data to text."""
+    def transcribe(self, audio_data: Any) -> str | None:
+        """Convert raw audio data to text. May block; runs off the event loop."""
         pass

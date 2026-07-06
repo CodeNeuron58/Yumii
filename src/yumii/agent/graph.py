@@ -70,6 +70,7 @@ def _build_state_class() -> type:
         # ``messages`` is inherited from MessagesState with the
         # ``add_messages`` reducer.
         input: str
+        turn_id: str
         response: str
         expression: str
         motion: str
@@ -136,11 +137,14 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
             f"Use this information if the user asks about the time."
         )
     )
-    # Use a deterministic ID for the HumanMessage so the add_messages
-    # reducer deduplicates it across multiple agent passes within the
-    # same turn (agent -> tools -> agent). Without this, the second
-    # pass would see a HumanMessage in its history AND add a new one.
-    human_id = f"hum_{session_id}_{hash(user_input)}"
+    # The HumanMessage ID must be stable across multiple agent passes
+    # within the same turn (agent -> tools -> agent) so the
+    # add_messages reducer dedupes the re-added message — but unique
+    # across turns, or repeating the same phrase later would overwrite
+    # the earlier history entry instead of appending. The engine mints
+    # a per-turn UUID; the hash fallback covers direct invocations.
+    turn_id: str = state.get("turn_id") or f"{session_id}_{hash(user_input)}"
+    human_id = f"hum_{turn_id}"
     new_human = HumanMessage(content=user_input, id=human_id)
     messages: list = [time_msg] + list(history) + [new_human]
 
@@ -151,12 +155,13 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
     # to derive the YumiiResponse shape the engine expects.
     if not getattr(response, "tool_calls", None):
         yumii_resp = synthesize(response.content or "")
-        # Tag the AIMessage with a stable id so add_messages dedupes
-        # across passes within a turn.
+        # Each pass appends exactly one new AIMessage, so its ID only
+        # needs to be unique — providers usually set one; this is the
+        # fallback.
         if not response.id:
             response = AIMessage(
                 content=response.content,
-                id=f"ai_{session_id}_{hash(user_input)}_{hash(response.content or '')}",
+                id=f"ai_{uuid.uuid4().hex}",
             )
         return {
             "messages": [new_human, response],
@@ -172,7 +177,7 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
         response = AIMessage(
             content=response.content,
             tool_calls=response.tool_calls,
-            id=f"ai_{session_id}_{hash(user_input)}_tools",
+            id=f"ai_{uuid.uuid4().hex}",
         )
     return {
         "messages": [new_human, response],

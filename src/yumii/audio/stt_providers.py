@@ -113,14 +113,16 @@ class GroqSTT(BaseSTTProvider):
             avg_logprob = float(_seg_field(seg, "avg_logprob", 0.0))
             comp_ratio = float(_seg_field(seg, "compression_ratio", 1.0))
 
+            # Logged at info so a user watching the console can tell a
+            # discarded utterance apart from a slow one.
             if no_speech > NO_SPEECH_THRESHOLD:
-                log.debug("stt_dropped", reason="no_speech", no_speech=round(no_speech, 2), text=text[:40])
+                log.info("stt_dropped", reason="no_speech", no_speech=round(no_speech, 2), text=text[:40])
                 continue
             if avg_logprob < MIN_AVG_LOGPROB:
-                log.debug("stt_dropped", reason="low_confidence", avg_logprob=round(avg_logprob, 2), text=text[:40])
+                log.info("stt_dropped", reason="low_confidence", avg_logprob=round(avg_logprob, 2), text=text[:40])
                 continue
             if comp_ratio > MAX_COMPRESSION_RATIO:
-                log.debug("stt_dropped", reason="repetitive", compression_ratio=round(comp_ratio, 2), text=text[:40])
+                log.info("stt_dropped", reason="repetitive", compression_ratio=round(comp_ratio, 2), text=text[:40])
                 continue
             kept.append(text)
 

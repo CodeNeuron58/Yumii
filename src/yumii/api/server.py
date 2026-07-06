@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.websockets import WebSocketState
@@ -45,10 +45,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
 
 app = FastAPI(lifespan=lifespan)
 
+# Only our own frontends may call this API from a browser context:
+# the served orb page (localhost:8000) and the Tauri webview. A
+# wildcard here would let any website the user visits read their
+# facts and sessions off 127.0.0.1 — this API holds personal memory.
+_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "tauri://localhost",
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -140,7 +152,7 @@ async def update_fact_endpoint(fact_id: str, body: dict[str, Any]) -> dict[str, 
     """Update the text of an existing fact."""
     new_text = body.get("fact", "").strip()
     if not new_text:
-        return {"error": "Missing 'fact' field"}, 400
+        raise HTTPException(status_code=400, detail="Missing 'fact' field")
     await memory_manager.update_fact(fact_id, new_text)
     return {"updated": True, "fact_id": fact_id}
 
@@ -195,29 +207,65 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
            ``{"type": "session_select", "action": "new|resume", ...}``).
         3. After session negotiation, normal audio flow begins.
     """
+    # Browsers always send an Origin header; reject pages that aren't
+    # ours so a malicious website can't stream audio or commands into
+    # the engine. Non-browser clients (no Origin) are local tools
+    # already running with the user's privileges — allowed.
+    origin = websocket.headers.get("origin")
+    if origin is not None and origin not in _ALLOWED_ORIGINS:
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
 
     # --- Phase 1: Session negotiation ---
-    # Try to read the client's first message.  If it's a session_select
-    # JSON payload we honour it; otherwise default to a new session.
-    try:
-        first_msg = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
-        data = json.loads(first_msg)
-    except Exception:
-        data = {}
+    # The frontend sends a session_select frame as its very first
+    # message (ordered before any mic audio). Legacy clients may lead
+    # with binary audio instead — stash those frames and fall through
+    # to the default after a short deadline.
+    data: dict[str, Any] = {}
+    stashed_audio: list[bytes] = []
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + 3.0
+    while True:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            break
+        try:
+            message = await asyncio.wait_for(websocket.receive(), timeout=remaining)
+        except asyncio.TimeoutError:
+            break
+        if message.get("type") == "websocket.disconnect":
+            return
+        if message.get("text") is not None:
+            try:
+                data = json.loads(message["text"])
+            except json.JSONDecodeError:
+                data = {}
+            break
+        if message.get("bytes") is not None:
+            stashed_audio.append(message["bytes"])
 
-    if data.get("type") == "session_select":
-        action = data.get("action", "new")
-        if action == "new":
-            await engine.create_new_session()
-        elif action == "resume":
-            sid = data.get("session_id", "")
-            await engine.resume_session(sid)
-        else:
-            await engine.create_new_session()
-    else:
-        # Default: brand new session
+    action = (
+        data.get("action", "auto")
+        if data.get("type") == "session_select"
+        else "auto"
+    )
+    if action == "new":
         await engine.create_new_session()
+    elif action == "resume":
+        # Falls back to a new session if the ID is unknown.
+        await engine.resume_session(data.get("session_id", ""))
+    elif engine.active_session_id is None:
+        # "auto" on a fresh boot — nothing to keep, start a new one.
+        await engine.create_new_session()
+    # "auto" with an active session: keep it. Reconnects (the frontend
+    # retries every 3s) must NOT mint a new session each time.
+
+    # Any audio that raced ahead of the negotiation belongs to this
+    # session — feed it through now.
+    for chunk in stashed_audio:
+        await engine.audio_input_queue.put(chunk)
 
     # Take-over: if another connection is active, politely evict it.
     for conn in engine.active_connections:
@@ -232,6 +280,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     try:
         while True:
             message = await websocket.receive()
+
+            # Starlette *returns* the disconnect message rather than
+            # raising; calling receive() again after it is a
+            # RuntimeError, so break out here.
+            if message.get("type") == "websocket.disconnect":
+                break
 
             # JSON text commands from the frontend
             if "text" in message:
@@ -262,6 +316,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 await engine.audio_input_queue.put(message["bytes"])
 
     except WebSocketDisconnect:
+        pass
+    finally:
+        # Every exit path — clean disconnect, eviction, error — must
+        # drop the connection from the broadcast list.
         if websocket in engine.active_connections:
             engine.active_connections.remove(websocket)
 

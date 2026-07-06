@@ -301,6 +301,7 @@
         let micProcessor = null;
         let audioByteRemainder = new Uint8Array(0); // Buffer for odd-sized chunks
         let started = false;
+        let sessionNegotiated = false; // first connect may deep-link a session
 
         // ── Orb state machine ──────────────────────────────────────────
         const stage = document.getElementById('stage');
@@ -419,6 +420,18 @@
 
             socket.onopen = () => {
                 console.log("Connected to Yumii backend.");
+                // Negotiate the session before any audio flows. The first
+                // connect honours a ?session=<id> deep link (used by the
+                // CLI's resume commands); reconnects send "auto" so the
+                // backend keeps the active session instead of minting a
+                // new one on every 3s retry.
+                const resumeId = !sessionNegotiated
+                    && new URLSearchParams(window.location.search).get('session');
+                socket.send(JSON.stringify(resumeId
+                    ? { type: 'session_select', action: 'resume', session_id: resumeId }
+                    : { type: 'session_select', action: 'auto' }));
+                sessionNegotiated = true;
+                if (!micStream) initMicrophone();
                 hintEl.textContent = "Listening… just talk";
                 setOrbState('idle');
             };
@@ -693,7 +706,8 @@
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 512;
             hintEl.textContent = "Connecting…";
-            await initMicrophone();
+            // The socket connects first; the mic starts from onopen so the
+            // session_select frame is guaranteed to precede any audio.
             initWebSocket();
         }
 

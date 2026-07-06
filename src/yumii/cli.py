@@ -628,8 +628,14 @@ def run_models_wizard() -> None:
 
 # ─── Individual Command Implementations ───────────────────────────────────────
 
-def _cmd_wake() -> None:
-    """Wake Yumii up and start the web server."""
+def _cmd_wake(session_id: str | None = None) -> None:
+    """Wake Yumii up and start the web server.
+
+    Args:
+        session_id: If given, the browser opens with ``?session=<id>``
+            and the frontend resumes that session instead of starting
+            a new one.
+    """
     config      = load_global_config()
     llm_prov    = config.get("LLM_PROVIDER", "Groq")
     llm_key     = get_credential(f"{llm_prov.upper()}_API_KEY")
@@ -652,9 +658,13 @@ def _cmd_wake() -> None:
     clear_screen()
     render_banner()
 
+    url = "http://localhost:8000/"
+    if session_id:
+        url += f"?session={session_id}"
+
     def _open_browser() -> None:
         time.sleep(2)
-        webbrowser.open("http://localhost:8000/")
+        webbrowser.open(url)
 
     threading.Thread(target=_open_browser, daemon=True).start()
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -817,7 +827,7 @@ def _cmd_resume() -> None:
             f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Resuming [bold]{last.name}[/bold] "
             f"({last.id[:8]}…)[/]\n"
         )
-    _cmd_wake()
+    _cmd_wake(session_id=last.id if last else None)
 
 
 def _cmd_rename(raw: str) -> None:
@@ -943,7 +953,7 @@ def _cmd_resume_with_id(session_id: str) -> None:
             f"\n  [bold {_C_SUCCESS}]✓[/]  [{_C_TEXT}]Resuming [bold]{session.name}[/bold] "
             f"({session.id[:8]}…)[/]\n"
         )
-    _cmd_wake()
+    _cmd_wake(session_id=session.id if session else None)
 
 
 # ── /memory — Fact manager ───────────────────────────────────────────────────

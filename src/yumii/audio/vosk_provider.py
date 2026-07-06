@@ -78,8 +78,7 @@ class VoskSTT(BaseSTTProvider):
         """
         return (result.get("text", "") or "").strip() or None
 
-    async def transcribe(self, audio_data: Any) -> str | None:
+    def transcribe(self, audio_data: Any) -> str | None:
         """Fallback for non-streaming usage."""
-        if self.rec.AcceptWaveform(audio_data.tobytes()):
-            return self.get_final()
+        self.rec.AcceptWaveform(audio_data.tobytes())
         return self.get_final()

@@ -8,6 +8,8 @@ been replaced by the graph's built-in ``agent`` + ``tools`` nodes
 
 from __future__ import annotations
 
+import re
+
 from yumii.agent.personality_manager import personality_manager
 from yumii.core.logging import get_logger
 
@@ -26,7 +28,10 @@ def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
         A tuple of ``(True, new_personality)`` if a switch was
         requested, else ``(False, None)``.
     """
-    lowered = user_input.lower().strip()
+    # STT output carries punctuation and stray casing ("Switch to
+    # tsundere.") — normalise to bare lowercase words before matching.
+    lowered = re.sub(r"[^a-z0-9\s]", "", user_input.lower())
+    lowered = re.sub(r"\s+", " ", lowered).strip()
     for personality in personality_manager.list_personalities():
         if lowered in (
             f"switch to {personality}",

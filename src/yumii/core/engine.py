@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from typing import Any, Dict, List
 
 import aiosqlite
@@ -327,7 +328,12 @@ class YumiiEngine:
                     if audio_segment is not None and len(audio_segment) > 0:
                         processed_audio = self.pipeline.process_audio(audio_segment)
                         if len(processed_audio) > 0:
-                            transcribed_text = self.pipeline.transcribe(processed_audio)
+                            # Whisper inference / the Groq HTTP call can take
+                            # seconds — run it off the event loop so the WS,
+                            # TTS streaming, and interrupts stay responsive.
+                            transcribed_text = await asyncio.to_thread(
+                                self.pipeline.transcribe, processed_audio
+                            )
                             if transcribed_text and transcribed_text.strip():
                                 log.info("transcription_complete", text=transcribed_text)
                                 await self.transcription_queue.put(transcribed_text)
@@ -379,9 +385,14 @@ class YumiiEngine:
                 # Notify frontend that reasoning has begun.
                 await self.broadcast_payload({"type": "thinking_start"})
 
-                # Initial state for the graph.
+                # Initial state for the graph. turn_id scopes message
+                # IDs: stable across agent passes within this turn (so
+                # add_messages dedupes the re-added HumanMessage) but
+                # unique across turns (so repeating the same phrase
+                # later doesn't overwrite the earlier message).
                 initial_state = {
                     "input": user_text,
+                    "turn_id": uuid.uuid4().hex,
                     "session_id": self.active_session_id,
                     "session_name": self.active_session_name,
                     "user_facts": facts,
