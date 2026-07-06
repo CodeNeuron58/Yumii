@@ -17,6 +17,16 @@ import sys
 import structlog
 def configure_logging() -> None:
     """Configure structlog + stdlib logging. Call once at process startup."""
+    # Windows consoles / redirected output default to a legacy codepage
+    # (cp1252); a log line containing Unicode (…, emoji) then raises
+    # UnicodeEncodeError inside the handler. Force UTF-8 and replace
+    # anything unencodable rather than crashing the log line.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass  # detached/closed stream (e.g. pythonw) — nothing to fix
     log_level_name = os.environ.get("YUMII_LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, log_level_name, logging.INFO)
     # ── stdlib root logger ────────────────────────────────────────────────────

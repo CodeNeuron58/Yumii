@@ -28,7 +28,10 @@ fn spawn_backend() -> Option<Child> {
     let mut cmd = Command::new(&python);
     cmd.args(["-m", "yumii", "server"])
         .current_dir(&repo)
-        .env("KMP_DUPLICATE_LIB_OK", "TRUE");
+        .env("KMP_DUPLICATE_LIB_OK", "TRUE")
+        // Sidecar output is captured/redirected, which on Windows would
+        // otherwise use a legacy codepage and crash Unicode log lines.
+        .env("PYTHONIOENCODING", "utf-8");
 
     match cmd.spawn() {
         Ok(child) => {
