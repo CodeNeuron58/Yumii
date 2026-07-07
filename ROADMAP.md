@@ -23,6 +23,22 @@ brain is unchanged — the desktop app wraps it and launches it for you.
 
 ---
 
+## ✅ Shipped — 0.8.0 (July 2026)
+
+The tools release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
+
+- **Composio tool integration**: connect real apps (Gmail, Calendar,
+  Notion, GitHub, Slack, any toolkit slug) from the Dashboard's new
+  **Tools** tab — paste a free Composio API key, click an app,
+  authenticate in the browser; every tool is permission-gated (HITL)
+  by default
+- OAuth links open via the system browser (Tauri webviews suppress
+  popups) with a clickable fallback
+- Fixed a boot crash on any structured config.json value, and broken
+  logging in two modules
+- MCP support prototyped and parked on `feat/mcp-wiring`
+- **101 tests** total
+
 ## ✅ Shipped — 0.7.0 (July 2026)
 
 The dashboard release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.

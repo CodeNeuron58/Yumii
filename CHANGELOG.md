@@ -5,6 +5,54 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-07-07
+
+The tools release. Yumii gets hands: connect your real apps (Gmail,
+Calendar, Notion, GitHub, Slack, …) through Composio and ask her to use
+them — with her asking permission before every action. The full flow
+runs inside the app: paste a free Composio API key, click an app,
+authenticate in the browser, restart, talk.
+
+### Added
+- **Composio tool integration.** A new **Tools** tab in the Dashboard:
+  quick-connect buttons for popular apps plus any toolkit slug, a
+  connected-apps list with disable, and key status. Connecting an app
+  mints Composio's OAuth link (`auth_configs.create` +
+  `connected_accounts.link` — the post-`initiate`-retirement flow) and
+  opens it in the system browser; Composio holds the tokens.
+- `composio_loader.py`: on startup, tools for every enabled toolkit are
+  fetched and registered **EXTERNAL + confirmation-gated** — every
+  Composio tool triggers the HITL prompt until the user relaxes
+  `HITL_MODE`. SDK calls run off the event loop with timeouts; a bad
+  key or dead network logs a warning and never blocks boot.
+- `COMPOSIO_API_KEY` as a first-class credential (Settings → API Keys,
+  stored in `auth.json`), read fresh so paste-key → connect-app works
+  without a restart. Enabled toolkits live under `COMPOSIO_TOOLKITS`
+  in `config.json`.
+- REST: `GET /api/composio/status`, `POST /api/composio/connect`,
+  `DELETE /api/composio/toolkits/{slug}`.
+- Dependencies pinned to the battle-tested line (`composio>=0.13,<0.14`)
+  — the 1.0 series changes the call shapes this integration relies on.
+
+### Fixed
+- **Configuring any structured value in config.json crashed the app at
+  boot** — every config value was pushed into `os.environ`, which
+  rejects non-strings. Present since 0.3.0; only scalar strings are
+  exported now.
+- Two modules (`mcp_config`, tool `registry`) logged structlog-style
+  keyword args through stdlib loggers, raising `TypeError` on their
+  first real log line.
+- OAuth links opened via `window.open()` never appeared — popups are
+  silently suppressed inside the Tauri webview. The backend now opens
+  the system browser itself, with a clickable fallback link in the
+  dashboard.
+
+### Notes
+- Test suite is 101 tests. The in-app connect flow (key → Gmail →
+  browser OAuth → success) is user-verified end to end; MCP support
+  was prototyped and parked on the `feat/mcp-wiring` branch in favour
+  of Composio.
+
 ## [0.7.0] — 2026-07-07
 
 The dashboard release. The orb stays a pure ambient presence; managing
