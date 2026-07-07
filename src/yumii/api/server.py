@@ -394,6 +394,18 @@ async def composio_connect(body: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Composio error: {e}")
 
+    # Open the OAuth page in the user's real default browser from the
+    # backend: window.open() is silently suppressed inside the Tauri
+    # webview, and the system browser is where the user is actually
+    # signed in to Google anyway. The dashboard also shows the link as
+    # a clickable fallback.
+    import webbrowser
+
+    try:
+        webbrowser.open(redirect_url)
+    except Exception:
+        pass
+
     # Enable the toolkit so the next boot loads its tools.
     from yumii.core.global_config import load_global_config, save_global_config
 

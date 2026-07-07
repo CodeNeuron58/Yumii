@@ -403,9 +403,11 @@
             });
             const res = await r.json();
             if (!r.ok) { note.textContent = `Could not connect: ${res.detail || r.status}`; return; }
-            window.open(res.redirect_url, '_blank');
-            note.textContent = `Sign in to ${res.toolkit} in the browser tab that just opened, ` +
-                `then quit Yumii from the tray and reopen it — her new tools load at startup.`;
+            // The backend opens the system browser; window.open is a
+            // no-op inside the Tauri webview, so also show the link.
+            note.innerHTML = `A ${esc(res.toolkit)} sign-in page opened in your browser ` +
+                `(<a href="${esc(res.redirect_url)}" target="_blank" style="color:var(--c-primary)">or click here</a>). ` +
+                `After signing in, quit Yumii from the tray and reopen it — her new tools load at startup.`;
             loadTools();
         }
 
