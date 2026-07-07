@@ -59,22 +59,31 @@ fn toggle_window(app: &tauri::AppHandle) {
 
 /// Open (or focus) the dashboard as a normal decorated window served
 /// by the Python backend.
+///
+/// The actual creation runs on a spawned thread: both callers (the IPC
+/// command and the tray menu handler) execute on the main event loop,
+/// and `WebviewWindowBuilder::build()` from there deadlocks on Windows
+/// — build() waits for a creation event the busy loop can never
+/// process, freezing the whole app (blank window, close/quit dead).
 fn show_dashboard(app: &tauri::AppHandle) {
-    if let Some(win) = app.get_webview_window("dashboard") {
-        let _ = win.show();
-        let _ = win.set_focus();
-        return;
-    }
-    if let Ok(url) = "http://127.0.0.1:8000/dashboard.html".parse() {
-        let _ = tauri::WebviewWindowBuilder::new(
-            app,
-            "dashboard",
-            tauri::WebviewUrl::External(url),
-        )
-        .title("Yumii — Dashboard")
-        .inner_size(840.0, 640.0)
-        .build();
-    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        if let Some(win) = app.get_webview_window("dashboard") {
+            let _ = win.show();
+            let _ = win.set_focus();
+            return;
+        }
+        if let Ok(url) = "http://127.0.0.1:8000/dashboard.html".parse() {
+            let _ = tauri::WebviewWindowBuilder::new(
+                &app,
+                "dashboard",
+                tauri::WebviewUrl::External(url),
+            )
+            .title("Yumii — Dashboard")
+            .inner_size(840.0, 640.0)
+            .build();
+        }
+    });
 }
 
 /// The orb page calls this via IPC when the user picks "Dashboard"

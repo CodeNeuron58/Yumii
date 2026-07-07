@@ -197,10 +197,21 @@
         };
 
         async function loadSettings() {
-            const r = await fetch(API + '/api/settings');
-            const data = await r.json();
+            // The dashboard can be opened while the backend is still
+            // booting (model loads take ~20s) — retry instead of
+            // rendering a blank page.
+            let data = null;
+            const prefRowsEl = document.getElementById('pref-rows');
+            for (;;) {
+                try {
+                    const r = await fetch(API + '/api/settings', { cache: 'no-store' });
+                    if (r.ok) { data = await r.json(); break; }
+                } catch (e) { /* backend not up yet */ }
+                prefRowsEl.innerHTML = '<div class="empty">Waking Yumii up… (connecting to the backend)</div>';
+                await new Promise(res => setTimeout(res, 1500));
+            }
 
-            const prefRows = document.getElementById('pref-rows');
+            const prefRows = prefRowsEl;
             prefRows.innerHTML = '';
             for (const [key, label] of Object.entries(PREF_LABELS)) {
                 const opts = (data.choices[key] || []).map(v =>
