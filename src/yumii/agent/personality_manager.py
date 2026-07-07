@@ -36,6 +36,22 @@ class PersonalityManager:
         )
         self._cache: Dict[PERSONALITY_TYPE, str] = {}
 
+    def load_core_prompt(self) -> str:
+        """Load the shared companion core prompt (``_core.txt``).
+
+        The core carries everything common to all personalities —
+        voice-first speaking rules, memory usage, tool etiquette,
+        honesty boundaries — so the personality files stay purely
+        about character.
+        """
+        if "_core" in self._cache:
+            return self._cache["_core"]
+        core_path = os.path.join(self._prompts_dir, "_core.txt")
+        with open(core_path, "r", encoding="utf-8") as f:
+            prompt = f.read()
+        self._cache["_core"] = prompt
+        return prompt
+
     def load_personality(self, personality: PERSONALITY_TYPE) -> str:
         """Load a personality prompt from file, with caching."""
         if personality in self._cache:

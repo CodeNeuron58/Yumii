@@ -32,12 +32,11 @@ to the user / WS layer.
 
 from __future__ import annotations
 
-import datetime
 import uuid
 from pathlib import Path
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -127,16 +126,13 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
         user_facts=facts_text or None,
     )
 
-    # Inject the current time as ephemeral context. The model still has
-    # the ``get_current_time`` tool for timezones, but for the common
-    # case "what time is it?" this saves a round-trip.
-    time_msg = SystemMessage(
-        content=(
-            f"The current time is "
-            f"{datetime.datetime.now().strftime('%I:%M %p on %A, %B %d, %Y')}. "
-            f"Use this information if the user asks about the time."
-        )
-    )
+    # NOTE: no per-turn time message. The old layout injected "The
+    # current time is 11:42 PM..." as the second message — before the
+    # entire history — so the request prefix changed every minute and
+    # provider prefix (KV) caching missed on every turn. Today's DATE
+    # now lives at the tail of the system prompt (one cache break per
+    # day); precise time is a ``get_current_time`` tool call away.
+
     # The HumanMessage ID must be stable across multiple agent passes
     # within the same turn (agent -> tools -> agent) so the
     # add_messages reducer dedupes the re-added message — but unique
@@ -146,7 +142,7 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
     turn_id: str = state.get("turn_id") or f"{session_id}_{hash(user_input)}"
     human_id = f"hum_{turn_id}"
     new_human = HumanMessage(content=user_input, id=human_id)
-    messages: list = [time_msg] + list(history) + [new_human]
+    messages: list = list(history) + [new_human]
 
     # ``BoundLLM.ainvoke`` prepends the cached system prompt itself.
     response: AIMessage = await bound.ainvoke(messages)

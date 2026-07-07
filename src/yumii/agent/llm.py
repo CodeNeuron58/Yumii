@@ -88,19 +88,8 @@ else:
 
 
 # ----------------------------------------------------------------------
-# System prompt + per-personality/per-fact LLM binding
+# System prompt + tool-bound LLM
 # ----------------------------------------------------------------------
-
-# Tools-only hint appended to every personality prompt. The agent
-# still has ``bind_tools``, so it can call get_current_time, etc.;
-# the hint steers it to a conversational style.
-_TOOL_HINT = (
-    "\n\nYou have access to tools. Use them when the user asks for "
-    "live information (e.g. current time, timezone lookups). For "
-    "ordinary conversation, just respond directly.\n"
-    "Keep your spoken response short and punchy: UNDER 3 sentences and "
-    "strictly LESS THAN 400 characters."
-)
 
 
 @dataclass(frozen=True)
@@ -127,21 +116,47 @@ class BoundLLM:
         return await self.llm.ainvoke([SystemMessage(content=self.system_prompt), *messages])
 
 
-# Lazy cache: (personality_name, facts_hash) -> BoundLLM.
-# We cache the bound LLM because ``bind_tools`` is cheap but not free
-# (it copies the tool schemas into the LLM's request format).
-_llm_cache: dict[tuple[str, int], BoundLLM] = {}
+# The tool-bound LLM is built once and shared: tool schemas don't
+# change after startup, and binding fresh per turn would defeat the
+# point. The system prompt, by contrast, is rebuilt every call — it's
+# a cheap string concat, and it must reflect facts/date changes.
+_bound_llm: Any | None = None
+
+
+def _get_bound_llm() -> Any:
+    global _bound_llm
+    if _bound_llm is None:
+        _bound_llm = bind_to_llm(base_llm)
+    return _bound_llm
 
 
 def _build_system_prompt(personality_name: str, user_facts: str | None = None) -> str:
-    """Return the full system prompt for a personality (prompt file + tool hint + facts)."""
+    """Assemble the system prompt in provider-cache-friendly order.
+
+    Prefix (KV) caching on Groq/OpenAI/Anthropic matches the request
+    byte-for-byte from the start and dies at the first difference, so
+    the layout is strictly ordered by mutation frequency:
+
+      1. core + personality  — static forever            → always cached
+      2. today's date        — changes once per day
+      3. user facts          — changes when a fact lands
+      (conversation history and the new message follow, append-only)
+
+    The date deliberately has no clock time (that would break the
+    cache every minute — the old layout's mistake); the agent has the
+    ``get_current_time`` tool for precise time.
+    """
+    import datetime
+
     # Import here to avoid a circular import at module load time
     from yumii.agent.personality_manager import personality_manager
 
-    base = personality_manager.load_personality(personality_name)
-    prompt = base + _TOOL_HINT
+    core = personality_manager.load_core_prompt()
+    persona = personality_manager.load_personality(personality_name)
+    prompt = f"{core}\n\n{persona}"
+    prompt += f"\n\nToday is {datetime.datetime.now().strftime('%A, %B %d, %Y')}."
     if user_facts:
-        prompt += f"\n\nKnown facts about the user:\n{user_facts}"
+        prompt += f"\n\nWhat you know about the user:\n{user_facts}"
     return prompt
 
 
@@ -153,41 +168,34 @@ def get_agent_llm(
     """Return a :class:`BoundLLM` for the current personality + fact set.
 
     The returned object exposes ``ainvoke(messages)`` which prepends
-    the cached system prompt. The graph wraps it in an agent node.
+    the freshly-assembled system prompt. The graph wraps it in an
+    agent node.
 
     Args:
         session_id: The active session ID. Currently unused but kept
             on the signature for future per-session prompt tuning.
         session_name: Human-readable session label. Currently unused.
         user_facts: Pre-formatted facts string to append to the
-            personality prompt. ``None`` or empty means no facts.
+            system prompt. ``None`` or empty means no facts.
 
     Returns:
-        A :class:`BoundLLM` carrying the tool-bound LLM and the
+        A :class:`BoundLLM` carrying the shared tool-bound LLM and the
         system prompt the agent must inject.
     """
     from yumii.agent.personality_manager import personality_manager
 
     personality = personality_manager.get_current_personality()
-    cache_key = (personality, hash(user_facts or ""))
-    if cache_key in _llm_cache:
-        return _llm_cache[cache_key]
-
-    system_prompt = _build_system_prompt(personality, user_facts)
-    bound = bind_to_llm(base_llm)
-
-    entry = BoundLLM(
-        llm=bound,
-        system_prompt=system_prompt,
+    return BoundLLM(
+        llm=_get_bound_llm(),
+        system_prompt=_build_system_prompt(personality, user_facts),
         personality=personality,
     )
-    _llm_cache[cache_key] = entry
-    return entry
 
 
 def clear_llm_cache() -> None:
-    """Invalidate all cached (personality, facts) bindings."""
-    _llm_cache.clear()
+    """Reset the shared tool binding (used after registry changes in tests)."""
+    global _bound_llm
+    _bound_llm = None
 
 
 # Backwards-compat alias for code/tests that referenced the old name.

@@ -34,10 +34,20 @@ def test_manager_loads_known_personality():
     prompt = personality_manager.load_personality("caring")
     assert isinstance(prompt, str)
     assert len(prompt) > 100
-    # The prompt must instruct the LLM to use a structured response,
-    # because the engine depends on it for emotion/motion data.
+
+
+def test_assembled_prompt_carries_the_synthesizer_contract():
+    """The engine derives emotion/motion from plain text, so the prompt
+    the model actually receives must state the plain-text rule. Since
+    the core rewrite, that contract lives once in ``_core.txt`` instead
+    of being repeated in every personality file — assert it at the
+    assembly level, where it matters."""
+    from yumii.agent.llm import _build_system_prompt
+
+    prompt = _build_system_prompt("caring", None)
     assert "expression" in prompt.lower()
     assert "motion" in prompt.lower()
+    assert "plain conversational text" in prompt.lower()
 
 
 def test_manager_caches_loaded_prompts():
