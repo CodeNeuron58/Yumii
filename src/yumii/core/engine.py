@@ -80,6 +80,16 @@ class YumiiEngine:
         log.info("engine_initializing")
         await init_db()
 
+        # Connect any user-configured MCP servers and register their
+        # tools BEFORE the graph is built, so bind_tools sees them.
+        # Every MCP tool is HITL-gated by default. Failures are logged
+        # and skipped inside the loader — a dead server never blocks boot.
+        from yumii.tools.mcp_loader import load_and_register_mcp_tools
+
+        mcp_tools = await load_and_register_mcp_tools()
+        if mcp_tools:
+            log.info("mcp_tools_registered", count=len(mcp_tools), tools=mcp_tools)
+
         # Open the SQLite connection directly and keep it alive for the
         # engine lifetime.  AsyncSqliteSaver.from_conn_string() is a
         # short-lived context manager; using it here would GC-close the
