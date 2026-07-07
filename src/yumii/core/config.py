@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     kokoro_model_size: str = Field(default="fp32", alias="KOKORO_MODEL_SIZE")
     llm_provider: str = Field(default="Groq", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
+    # Composio (tool integrations): the API key is the only secret; the
+    # enabled toolkit list lives as structured data in config.json.
+    composio_api_key: str | None = Field(default=None, alias="COMPOSIO_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     personality: str = Field(default="caring", alias="PERSONALITY")

@@ -80,6 +80,16 @@ class YumiiEngine:
         log.info("engine_initializing")
         await init_db()
 
+        # Load Composio tools for the user's connected apps BEFORE the
+        # graph is built, so bind_tools sees them. Every Composio tool
+        # is HITL-gated by default; failures are logged inside the
+        # loader and never block boot.
+        from yumii.tools.composio_loader import load_and_register_composio_tools
+
+        composio_tools = await load_and_register_composio_tools()
+        if composio_tools:
+            log.info("composio_ready", count=len(composio_tools))
+
         # Open the SQLite connection directly and keep it alive for the
         # engine lifetime.  AsyncSqliteSaver.from_conn_string() is a
         # short-lived context manager; using it here would GC-close the

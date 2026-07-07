@@ -45,6 +45,7 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
         "GROQ_API_KEY",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
+        "COMPOSIO_API_KEY",
     }
 )
 

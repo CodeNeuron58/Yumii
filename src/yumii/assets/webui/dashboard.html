@@ -120,6 +120,7 @@
 
         <nav>
             <button data-view="settings" class="active">Settings</button>
+            <button data-view="tools">Tools</button>
             <button data-view="chats">Chats</button>
             <button data-view="memory">Memory</button>
         </nav>
@@ -139,6 +140,39 @@
             <div id="save-bar">
                 <button class="btn" id="save-btn">Save settings</button>
                 <span id="save-note"></span>
+            </div>
+        </section>
+
+        <!-- ── Tools (Composio) ─────────────────────────────────────── -->
+        <section id="view-tools" class="view">
+            <div class="panel">
+                <h2>Tool access via Composio</h2>
+                <div id="composio-status" class="empty">Loading…</div>
+                <div class="row"><span class="hint">
+                    Yumii uses <b>Composio</b> to act on your apps (Gmail, Calendar, Notion, …).
+                    One-time setup: create a free account at app.composio.dev, generate an API key,
+                    paste it in Settings → API Keys. Then connect apps below — each opens a browser
+                    sign-in; Yumii always asks permission before using a tool.
+                </span></div>
+            </div>
+            <div class="panel">
+                <h2>Connected apps</h2>
+                <div id="toolkit-list"><div class="empty">Loading…</div></div>
+            </div>
+            <div class="panel">
+                <h2>Connect an app</h2>
+                <div class="row" id="quick-apps">
+                    <button class="btn sm" data-app="GMAIL">Gmail</button>
+                    <button class="btn sm" data-app="GOOGLECALENDAR">Google Calendar</button>
+                    <button class="btn sm" data-app="NOTION">Notion</button>
+                    <button class="btn sm" data-app="GITHUB">GitHub</button>
+                    <button class="btn sm" data-app="SLACK">Slack</button>
+                </div>
+                <div class="row">
+                    <input type="text" id="custom-app" placeholder="or any toolkit slug, e.g. SPOTIFY">
+                    <button class="btn sm" id="connect-custom">Connect</button>
+                </div>
+                <div class="row"><span class="hint" id="connect-note"></span></div>
             </div>
         </section>
 
@@ -171,6 +205,7 @@
                 document.getElementById('view-' + btn.dataset.view).classList.add('active');
                 if (btn.dataset.view === 'chats') loadChats();
                 if (btn.dataset.view === 'memory') loadFacts();
+                if (btn.dataset.view === 'tools') loadTools();
             });
         });
 
@@ -188,6 +223,7 @@
         };
         const CRED_LABELS = {
             GROQ_API_KEY: 'Groq API key',
+            COMPOSIO_API_KEY: 'Composio API key (tools)',
             OPENAI_API_KEY: 'OpenAI API key',
             ANTHROPIC_API_KEY: 'Anthropic API key',
             ELEVENLABS_API_KEY: 'ElevenLabs API key',
@@ -326,6 +362,67 @@
                 await fetch(`${API}/api/sessions/${id}`, { method: 'DELETE' });
                 loadChats();
             }
+        });
+
+        // ── Tools (Composio) ───────────────────────────────────────────
+        async function loadTools() {
+            const status = document.getElementById('composio-status');
+            const list = document.getElementById('toolkit-list');
+            try {
+                const s = await (await fetch(API + '/api/composio/status')).json();
+                status.className = 'row';
+                status.innerHTML = s.key_set
+                    ? '<span class="hint">✅ Composio API key configured — connect apps below.</span>'
+                    : '<span class="hint">⚠️ No Composio API key yet. Add it in <b>Settings → API Keys</b> first (free at app.composio.dev).</span>';
+                if (!s.toolkits.length) {
+                    list.innerHTML = '<div class="empty">No apps connected yet.</div>';
+                } else {
+                    list.innerHTML = '';
+                    for (const t of s.toolkits) {
+                        list.insertAdjacentHTML('beforeend', `
+                            <div class="list-item" data-toolkit="${esc(t)}">
+                                <span class="title">${esc(t)}</span>
+                                <button class="btn sm danger" data-act="disable">Disable</button>
+                            </div>`);
+                    }
+                }
+            } catch (e) {
+                status.className = 'empty';
+                status.textContent = 'Could not reach the backend.';
+            }
+        }
+
+        async function connectApp(slug) {
+            const note = document.getElementById('connect-note');
+            if (!slug) return;
+            note.textContent = `Requesting ${slug} sign-in link…`;
+            const r = await fetch(API + '/api/composio/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toolkit: slug }),
+            });
+            const res = await r.json();
+            if (!r.ok) { note.textContent = `Could not connect: ${res.detail || r.status}`; return; }
+            window.open(res.redirect_url, '_blank');
+            note.textContent = `Sign in to ${res.toolkit} in the browser tab that just opened, ` +
+                `then quit Yumii from the tray and reopen it — her new tools load at startup.`;
+            loadTools();
+        }
+
+        document.getElementById('quick-apps').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-app]');
+            if (btn) connectApp(btn.dataset.app);
+        });
+        document.getElementById('connect-custom').addEventListener('click', () => {
+            connectApp(document.getElementById('custom-app').value.trim().toUpperCase());
+        });
+        document.getElementById('toolkit-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('button[data-act="disable"]');
+            if (!btn) return;
+            const slug = btn.closest('.list-item').dataset.toolkit;
+            if (!confirm(`Disable ${slug}? Yumii loses these tools on next restart.`)) return;
+            await fetch(`${API}/api/composio/toolkits/${slug}`, { method: 'DELETE' });
+            loadTools();
         });
 
         // ── Memory ─────────────────────────────────────────────────────

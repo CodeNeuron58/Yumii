@@ -331,6 +331,105 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# REST API: Composio tool integrations (dashboard Tools panel)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/composio/status")
+async def composio_status() -> dict[str, Any]:
+    """Whether a Composio key is configured, and which toolkits are enabled."""
+    from yumii.tools.composio_loader import composio_api_key, enabled_toolkits
+
+    return {
+        "key_set": bool(composio_api_key()),
+        "toolkits": enabled_toolkits(),
+    }
+
+
+@app.post("/api/composio/connect")
+async def composio_connect(body: dict[str, Any]) -> dict[str, Any]:
+    """Mint an OAuth link for a toolkit and enable it.
+
+    Uses the composio 0.13.x flow that survived the retired
+    ``connected_accounts.initiate`` endpoint (journey doc §7):
+    ``auth_configs.create(...)`` then ``connected_accounts.link(...)``.
+    The dashboard opens the returned ``redirect_url``; the user
+    authenticates in the browser and Composio holds the tokens.
+    """
+    from yumii.tools.composio_loader import (
+        USER_ID,
+        composio_api_key,
+        get_composio_client,
+    )
+
+    toolkit = str(body.get("toolkit", "")).strip()
+    if not toolkit or not toolkit.replace("_", "").isalnum():
+        raise HTTPException(status_code=400, detail="Missing or invalid 'toolkit'")
+    if not composio_api_key():
+        raise HTTPException(
+            status_code=400,
+            detail="No Composio API key — add it in Settings first",
+        )
+
+    def _mint_link() -> str:
+        client = get_composio_client()
+        auth_config = client.auth_configs.create(
+            toolkit=toolkit.lower(),
+            options={
+                "type": "use_composio_managed_auth",
+                "tool_access_config": {"tools_for_connected_account_creation": []},
+            },
+        )
+        link = client.connected_accounts.link(
+            user_id=USER_ID, auth_config_id=auth_config.id
+        )
+        return link.redirect_url
+
+    try:
+        redirect_url = await asyncio.wait_for(
+            asyncio.to_thread(_mint_link), timeout=45.0
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Composio did not respond in time")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Composio error: {e}")
+
+    # Enable the toolkit so the next boot loads its tools.
+    from yumii.core.global_config import load_global_config, save_global_config
+
+    config = load_global_config()
+    toolkits = config.get("COMPOSIO_TOOLKITS", [])
+    if not isinstance(toolkits, list):
+        toolkits = []
+    if toolkit.upper() not in [str(t).upper() for t in toolkits]:
+        toolkits.append(toolkit.upper())
+        config["COMPOSIO_TOOLKITS"] = toolkits
+        save_global_config(config)
+
+    log.info("composio_connect_link_minted", toolkit=toolkit.upper())
+    return {
+        "toolkit": toolkit.upper(),
+        "redirect_url": redirect_url,
+        "restart_required": True,
+    }
+
+
+@app.delete("/api/composio/toolkits/{toolkit}")
+async def composio_disable_toolkit(toolkit: str) -> dict[str, Any]:
+    """Disable a toolkit (its tools are no longer loaded at boot)."""
+    from yumii.core.global_config import load_global_config, save_global_config
+
+    config = load_global_config()
+    toolkits = config.get("COMPOSIO_TOOLKITS", [])
+    if not isinstance(toolkits, list):
+        toolkits = []
+    remaining = [t for t in toolkits if str(t).upper() != toolkit.upper()]
+    config["COMPOSIO_TOOLKITS"] = remaining
+    save_global_config(config)
+    return {"disabled": toolkit.upper(), "toolkits": remaining, "restart_required": True}
+
+
+# ---------------------------------------------------------------------------
 # REST API: Config
 # ---------------------------------------------------------------------------
 
