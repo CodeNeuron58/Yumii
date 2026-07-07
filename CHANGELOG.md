@@ -5,6 +5,48 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-07-07
+
+The dashboard release. The orb stays a pure ambient presence; managing
+Yumii — settings, conversations, memory — moves into a proper second
+window instead of terminal wizards. Conversations finally become
+recognisable: sessions title themselves and message counts are real.
+
+### Added
+- **Dashboard window** (`dashboard.html`) with three tabs, opened from the
+  orb's gear menu, the system tray, or `/dashboard.html` in browser mode:
+  - **Settings** — LLM / TTS / STT provider, personality, Whisper model
+    size, Kokoro voice, and tool-confirmation (HITL) mode. API keys are
+    entered write-only with a masked "current" display and stored in
+    `auth.json`. The UI distinguishes live changes (personality applies on
+    the next reply) from ones needing a restart (providers, keys).
+  - **Chats** — every conversation with its real name, date, and message
+    count; readable transcript (tool usage shown as small events); Resume
+    (switches the live engine — the next thing you say continues that
+    conversation), Rename, and Delete.
+  - **Memory** — browse, edit, or forget every fact Yumii has extracted.
+- **Sessions auto-title** from your first utterance, and `message_count`
+  is finally incremented (every session used to be "New Chat · 0 msg").
+- **New REST endpoints:** `GET /api/sessions/{id}/messages` (transcript
+  read from the LangGraph checkpoint), `PUT /api/sessions/{id}` (rename —
+  previously impossible anywhere), and `GET/PUT /api/settings` (validated
+  against an allowlist of keys and choices; unknown keys rejected).
+- Tray menu gains a **Dashboard** entry.
+
+### Fixed
+- Opening the dashboard **deadlocked the entire app on Windows** (blank
+  window, dead close button, Quit unresponsive): the gear/tray handlers
+  run on the main event loop, and creating a webview window from there
+  blocks on an event the busy loop can never process. Window creation now
+  runs off the event loop.
+- The dashboard shows a "waking up" notice and retries while the backend
+  is still booting, instead of rendering a blank page.
+
+### Notes
+- Test suite is 94 tests; endpoints and the auto-naming flow were
+  verified against a live server (a real voice turn titled its own
+  session and its transcript read back correctly).
+
 ## [0.6.0] — 2026-07-07
 
 Configuration rework. API keys move out of the OS keychain into a plain,

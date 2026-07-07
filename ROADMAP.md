@@ -23,6 +23,19 @@ brain is unchanged — the desktop app wraps it and launches it for you.
 
 ---
 
+## ✅ Shipped — 0.7.0 (July 2026)
+
+The dashboard release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
+
+- **Dashboard window** (gear menu / tray / `/dashboard.html`): Settings
+  (providers, personality, voice, HITL, write-only API keys), Chats
+  (named sessions with readable transcripts, resume / rename / delete),
+  Memory (browse / edit / forget facts)
+- Sessions auto-title from the first utterance; real message counts
+- New REST: session transcript, session rename, validated settings API
+- Fixed a Windows event-loop deadlock when opening secondary windows
+- **94 tests** total
+
 ## ✅ Shipped — 0.6.0 (July 2026)
 
 Configuration rework. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
