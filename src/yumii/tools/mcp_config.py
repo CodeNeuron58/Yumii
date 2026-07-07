@@ -32,14 +32,14 @@ forwarded as subprocess env vars).
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from yumii.core.global_config import CONFIG_FILE, load_global_config
+from yumii.core.logging import get_logger
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 @dataclass(frozen=True)

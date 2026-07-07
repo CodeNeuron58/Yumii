@@ -14,7 +14,11 @@ from yumii.core.global_config import load_global_config
 
 _prefs = load_global_config()
 for key, value in _prefs.items():
-    os.environ[key] = value
+    # Only scalar preferences belong in the environment. Structured
+    # config (e.g. the MCP_SERVERS list) is read directly from the
+    # file by its consumers — and os.environ rejects non-strings.
+    if isinstance(value, str):
+        os.environ[key] = value
 
 # Credentials — secrets from ~/.yumii/auth.json (always take priority)
 # These overwrite any preference-level env vars so auth.json is

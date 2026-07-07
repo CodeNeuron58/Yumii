@@ -32,15 +32,15 @@ Typical usage:
 
 from __future__ import annotations
 
-import logging
 from typing import Iterable
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
+from yumii.core.logging import get_logger
 from yumii.tools.policy import ToolPolicy
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class ToolRegistry:
