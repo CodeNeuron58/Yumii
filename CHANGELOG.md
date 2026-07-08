@@ -5,6 +5,59 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-07-08
+
+The companion release. Yumii's entire prompt stack is rewritten to
+companion grade — a shared core (voice-first speaking rules, natural
+memory use, tool etiquette, honesty boundaries) plus six personalities
+written in real depth — and the agent now survives free-tier reality:
+requests stay under provider ceilings, sloppy third-party tool schemas
+are sanitized, and a malformed tool call degrades to a spoken apology
+instead of a crashed turn. The Gmail voice flow (ask → permission
+popup → fetch → read aloud) is user-verified end to end.
+
+### Added
+- **Companion core prompt** (`assets/prompts/_core.txt`): identity,
+  strict spoken-voice rules (no markdown/lists/symbols — everything is
+  TTS'd; numbers and emails read naturally; short by default), memory
+  woven like a friend instead of recited, HITL tool etiquette, honesty
+  and care boundaries. Stated once for all personalities.
+- **Six personalities rewritten in depth**: essence, speech patterns
+  with example lines, emotional range mapped to the synthesizer's
+  expression set, and per-moment guidance (greetings, user sadness,
+  successes, permission denials, not knowing). Yandere gets explicit
+  safety rails — theatrical devotion, never controlling.
+- **`GROQ_MODEL` setting** (config.json / env). Default is
+  `qwen/qwen3.6-27b` after live testing: cleaner tool calls than
+  llama-3.3-70b and a separate free-tier quota bucket. One config line
+  switches back.
+- **Bind-time tool schema sanitizer**: null-defaulted fields become
+  nullable, booleans also accept strings — absorbing both llama's
+  explicit-null habit and qwen's Python-cased XML booleans, which
+  Groq's strict server-side validation otherwise rejects as
+  `tool_use_failed` even when the call is semantically perfect.
+
+### Changed
+- **Prompt assembly is prefix-cache friendly**: ordered [static core +
+  personality] → [date] → [facts] → [history] → [new message]. The old
+  per-turn "current time is 11:42 PM" message sat before the entire
+  history and broke provider KV caching every minute; the date now
+  changes once a day and precise time is a tool call. ~1.8k tokens of
+  always-cacheable static prefix.
+- **Request-size guards** (free tiers cap single requests at 8–12k
+  tokens): Composio toolkits load curated tool subsets (Gmail: fetch +
+  send — a full toolkit is ~10k tokens of schema per request,
+  measured); tool results truncate at 3k chars before entering the
+  checkpointed history; the LLM request carries the last 12 messages
+  (the checkpoint keeps everything).
+- A `tool_use_failed` generation retries once, then degrades to a
+  spoken apology instead of surfacing an error.
+
+### Notes
+- Test suite is 126 tests. Free-tier budgets are deliberately tight;
+  on a paid tier the three constants (curation width, result cap,
+  history window) can simply be raised.
+
 ## [0.8.0] — 2026-07-07
 
 The tools release. Yumii gets hands: connect your real apps (Gmail,

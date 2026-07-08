@@ -23,6 +23,22 @@ brain is unchanged — the desktop app wraps it and launches it for you.
 
 ---
 
+## ✅ Shipped — 0.9.0 (July 2026)
+
+The companion release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
+
+- **Companion-grade prompts**: shared voice-first core + six
+  personalities written in depth (speech patterns, emotional range,
+  per-moment guidance)
+- **Prefix-cache-friendly prompt assembly** (static → date → facts →
+  history); the per-minute time message that broke KV caching is gone
+- **Free-tier survival**: curated tool subsets, tool-result truncation,
+  history windowing — requests fit 8–12k ceilings; schema sanitizer
+  absorbs llama/qwen tool-calling quirks; `GROQ_MODEL` is configurable
+  (default qwen3.6-27b)
+- Gmail voice flow user-verified end to end (ask → approve → read aloud)
+- **126 tests** total
+
 ## ✅ Shipped — 0.8.0 (July 2026)
 
 The tools release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
