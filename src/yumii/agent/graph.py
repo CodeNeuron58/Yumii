@@ -53,6 +53,46 @@ log = get_logger(__name__)
 # LangGraph checkpoints live in their own SQLite file.
 _CHECKPOINT_DB = Path.home() / ".yumii" / "memory" / "checkpoints.db"
 
+# Request-size guards. Free-tier Groq rejects any single request over
+# 12k tokens (413), and tool results (a fetched inbox!) persist into
+# the checkpointed history, poisoning every later turn of the session.
+_MAX_TOOL_RESULT_CHARS = 6000  # ≈1.5k tokens per tool result
+_HISTORY_WINDOW = 20  # messages sent to the LLM (full history stays in the checkpoint)
+
+
+def _truncate_tool_results(result: Any) -> Any:
+    """Cap oversized ToolMessage contents before they enter the state."""
+    messages = result.get("messages", []) if isinstance(result, dict) else []
+    for m in messages:
+        if not isinstance(m, ToolMessage):
+            continue
+        content = m.content if isinstance(m.content, str) else str(m.content)
+        if len(content) > _MAX_TOOL_RESULT_CHARS:
+            m.content = (
+                content[:_MAX_TOOL_RESULT_CHARS]
+                + "\n... [result truncated — too long for the conversation context]"
+            )
+            log.info(
+                "tool_result_truncated", tool=m.name, original_chars=len(content)
+            )
+    return result
+
+
+def _window_history(history: list) -> list:
+    """Return the most recent slice of history for the LLM request.
+
+    The checkpoint keeps everything; this only bounds what each request
+    carries. The window never starts on an orphaned ToolMessage (a
+    ToolMessage without its preceding tool-calling AIMessage is an API
+    error on strict providers). Trade-off: when the window slides,
+    the request prefix changes and provider caching misses once —
+    fitting under the request cap beats a cache hit.
+    """
+    windowed = history[-_HISTORY_WINDOW:]
+    while windowed and isinstance(windowed[0], ToolMessage):
+        windowed = windowed[1:]
+    return windowed
+
 
 def _build_state_class() -> type:
     """Combine :class:`MessagesState` with Yumii's MainState fields.
@@ -142,7 +182,7 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
     turn_id: str = state.get("turn_id") or f"{session_id}_{hash(user_input)}"
     human_id = f"hum_{turn_id}"
     new_human = HumanMessage(content=user_input, id=human_id)
-    messages: list = list(history) + [new_human]
+    messages: list = _window_history(list(history)) + [new_human]
 
     # ``BoundLLM.ainvoke`` prepends the cached system prompt itself.
     response: AIMessage = await bound.ainvoke(messages)
@@ -233,7 +273,7 @@ def _build_gated_tools_node(tools: list) -> Any:
                 last_ai = m
                 break
         if last_ai is None:
-            return await inner.ainvoke(state)
+            return _truncate_tool_results(await inner.ainvoke(state))
 
         hook = _gated_tools_hook.get("fn")
         denied_messages: list[ToolMessage] = []
@@ -280,7 +320,7 @@ def _build_gated_tools_node(tools: list) -> Any:
 
         if not denied_messages:
             # No denials — let the inner node dispatch everything.
-            return await inner.ainvoke(state)
+            return _truncate_tool_results(await inner.ainvoke(state))
 
         if not approved_calls:
             # All gated calls were denied.
@@ -295,7 +335,7 @@ def _build_gated_tools_node(tools: list) -> Any:
             id=last_ai.id,
         )
         sub_state = {**state, "messages": messages[:-1] + [trimmed_ai]}
-        inner_result = await inner.ainvoke(sub_state)
+        inner_result = _truncate_tool_results(await inner.ainvoke(sub_state))
         inner_messages = (
             inner_result.get("messages", [])
             if isinstance(inner_result, dict)

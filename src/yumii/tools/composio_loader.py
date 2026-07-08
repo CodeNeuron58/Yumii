@@ -44,6 +44,45 @@ _COMPOSIO_POLICY = ToolPolicy(
     requires_confirmation=True,
 )
 
+# Curated per-toolkit tool subsets. Loading a whole toolkit ships every
+# tool's JSON schema with EVERY LLM request — measured: the full GMAIL
+# toolkit is ~10k tokens of schema, which alone blows a free-tier Groq
+# request (12k TPM cap) before the user says a word. Users can override
+# per toolkit via COMPOSIO_TOOLS in config.json:
+#   "COMPOSIO_TOOLS": {"GMAIL": ["GMAIL_FETCH_EMAILS", ...]}
+_CURATED_TOOLS: dict[str, list[str]] = {
+    "GMAIL": [
+        "GMAIL_FETCH_EMAILS",
+        "GMAIL_SEND_EMAIL",
+        "GMAIL_REPLY_TO_THREAD",
+        "GMAIL_GET_CONTACTS",
+    ],
+}
+
+# Toolkits we have no curation for still get a bound, not a firehose.
+_UNCURATED_LIMIT = 8
+
+
+def _resolve_tool_selection(
+    toolkits: list[str], overrides: dict | None
+) -> tuple[list[str], list[str]]:
+    """Split enabled toolkits into (explicit tool slugs, uncurated toolkits).
+
+    Order of precedence per toolkit: user override from config.json,
+    then the curated default, else the toolkit goes in the uncurated
+    bucket and is fetched with a size limit.
+    """
+    overrides = overrides if isinstance(overrides, dict) else {}
+    slugs: list[str] = []
+    uncurated: list[str] = []
+    for tk in toolkits:
+        chosen = overrides.get(tk) or _CURATED_TOOLS.get(tk)
+        if isinstance(chosen, list) and chosen:
+            slugs.extend(str(s).upper() for s in chosen)
+        else:
+            uncurated.append(tk)
+    return slugs, uncurated
+
 
 def composio_api_key() -> str | None:
     """The Composio key, read fresh from auth.json.
@@ -96,10 +135,21 @@ async def load_and_register_composio_tools(
         return []
 
     factory = client_factory or get_composio_client
+    overrides = load_global_config().get("COMPOSIO_TOOLS")
+    slugs, uncurated = _resolve_tool_selection(toolkits, overrides)
 
     def _load() -> list[Any]:
         client = factory()
-        return client.tools.get(user_id=USER_ID, toolkits=toolkits)
+        loaded: list[Any] = []
+        if slugs:
+            loaded.extend(client.tools.get(user_id=USER_ID, tools=slugs))
+        for tk in uncurated:
+            loaded.extend(
+                client.tools.get(
+                    user_id=USER_ID, toolkits=[tk], limit=_UNCURATED_LIMIT
+                )
+            )
+        return loaded
 
     try:
         tools = await asyncio.wait_for(

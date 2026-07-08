@@ -43,7 +43,7 @@ class FakeTools:
     def __init__(self, tools=None, exc=None):
         self._tools, self._exc = tools or [], exc
 
-    def get(self, user_id, toolkits):
+    def get(self, user_id, tools=None, toolkits=None, limit=None):
         if self._exc:
             raise self._exc
         return self._tools
