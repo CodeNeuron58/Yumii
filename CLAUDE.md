@@ -29,7 +29,7 @@ unchanged by the pivot; the desktop app wraps it.
   transparent, always-on-top orb window; system tray + global hotkey; launches
   the Python backend (`python -m yumii server`) as a managed subprocess.
 - **AI framework:** LangChain + LangGraph (`langgraph>=1.2`)
-- **LLM providers:** Groq (default, llama-3.3-70b), OpenAI (gpt-4o), Anthropic (claude-3-5-sonnet)
+- **LLM providers:** Groq (default; model configurable via `GROQ_MODEL`, default qwen3.6-27b), OpenAI (gpt-4o), Anthropic (claude-3-5-sonnet)
 - **STT:** faster-whisper (local, CPU, int8) OR Groq Whisper (cloud) OR Vosk (local, streaming partials)
 - **VAD:** Silero VAD (snakers4/silero-vad via torch.hub) — always local
 - **TTS:** Kokoro-82M (local ONNX, recommended default) OR ElevenLabs OR CAMB.ai (all streaming)

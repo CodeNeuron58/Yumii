@@ -81,7 +81,7 @@ elif provider == "anthropic":
     )
 else:
     base_llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
+        model=settings.groq_model,
         temperature=0.7,
         api_key=settings.groq_api_key,
     )

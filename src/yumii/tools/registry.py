@@ -259,6 +259,15 @@ def _make_null_defaults_nullable(node: dict) -> None:
                 for o in prop["anyOf"]
             ):
                 prop["anyOf"].append({"type": "null"})
+        # Qwen-family models write tool calls in an XML dialect with
+        # Python-cased booleans ("True"); Groq's parser forwards those
+        # as strings and its validator then rejects the call. Accept
+        # the string form — pydantic lax-coerces "True"/"false" back to
+        # real booleans at execution time.
+        if prop.get("type") == "boolean":
+            prop["type"] = ["boolean", "string"]
+        elif isinstance(prop.get("type"), list) and "boolean" in prop["type"] and "string" not in prop["type"]:
+            prop["type"] = [*prop["type"], "string"]
         # Recurse into nested object schemas wherever they may hide.
         if isinstance(prop.get("properties"), dict):
             _make_null_defaults_nullable(prop)

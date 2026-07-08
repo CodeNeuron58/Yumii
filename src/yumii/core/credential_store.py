@@ -53,6 +53,7 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
 PREFERENCE_KEYS: frozenset[str] = frozenset(
     {
         "LLM_PROVIDER",
+        "GROQ_MODEL",
         "PERSONALITY",
         "TTS_PROVIDER",
         "STT_PROVIDER",

@@ -56,8 +56,8 @@ _CHECKPOINT_DB = Path.home() / ".yumii" / "memory" / "checkpoints.db"
 # Request-size guards. Free-tier Groq rejects any single request over
 # 12k tokens (413), and tool results (a fetched inbox!) persist into
 # the checkpointed history, poisoning every later turn of the session.
-_MAX_TOOL_RESULT_CHARS = 6000  # ≈1.5k tokens per tool result
-_HISTORY_WINDOW = 20  # messages sent to the LLM (full history stays in the checkpoint)
+_MAX_TOOL_RESULT_CHARS = 3000  # ≈750 tokens per tool result
+_HISTORY_WINDOW = 12  # messages sent to the LLM (full history stays in the checkpoint)
 
 
 def _truncate_tool_results(result: Any) -> Any:

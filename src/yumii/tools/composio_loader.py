@@ -51,11 +51,13 @@ _COMPOSIO_POLICY = ToolPolicy(
 # per toolkit via COMPOSIO_TOOLS in config.json:
 #   "COMPOSIO_TOOLS": {"GMAIL": ["GMAIL_FETCH_EMAILS", ...]}
 _CURATED_TOOLS: dict[str, list[str]] = {
+    # Two tools, not four: free-tier request ceilings are tiny (qwen:
+    # 8k tokens TOTAL per request; llama: 12k) and each Gmail schema
+    # costs ~1k tokens on every single turn. Reply/contacts can return
+    # once the user is on a paid tier or a bigger request budget.
     "GMAIL": [
         "GMAIL_FETCH_EMAILS",
         "GMAIL_SEND_EMAIL",
-        "GMAIL_REPLY_TO_THREAD",
-        "GMAIL_GET_CONTACTS",
     ],
 }
 

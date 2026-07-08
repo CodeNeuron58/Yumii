@@ -20,12 +20,19 @@ def test_non_null_default_untouched():
     params = {
         "properties": {
             "max_results": {"type": "integer", "default": 1},
-            "verbose": {"type": "boolean", "default": True},
         }
     }
     _make_null_defaults_nullable(params)
     assert params["properties"]["max_results"]["type"] == "integer"
-    assert params["properties"]["verbose"]["type"] == "boolean"
+
+
+def test_booleans_also_accept_strings():
+    """Qwen writes Python-cased booleans in its XML tool syntax; Groq
+    forwards them as strings. The schema must tolerate it — pydantic
+    coerces the string back to a real boolean at execution time."""
+    params = {"properties": {"verbose": {"type": "boolean", "default": True}}}
+    _make_null_defaults_nullable(params)
+    assert params["properties"]["verbose"]["type"] == ["boolean", "string"]
 
 
 def test_no_default_untouched():

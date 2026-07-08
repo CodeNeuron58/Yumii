@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     kokoro_model_size: str = Field(default="fp32", alias="KOKORO_MODEL_SIZE")
     llm_provider: str = Field(default="Groq", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
+    # Which Groq-hosted model runs the agent. qwen3.6-27b is the
+    # default after live testing: cleaner tool calls than llama-3.3
+    # (no explicit-null habit) and its own free-tier quota bucket.
+    groq_model: str = Field(default="qwen/qwen3.6-27b", alias="GROQ_MODEL")
     # Composio (tool integrations): the API key is the only secret; the
     # enabled toolkit list lives as structured data in config.json.
     composio_api_key: str | None = Field(default=None, alias="COMPOSIO_API_KEY")
