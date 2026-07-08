@@ -184,8 +184,29 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
     new_human = HumanMessage(content=user_input, id=human_id)
     messages: list = _window_history(list(history)) + [new_human]
 
-    # ``BoundLLM.ainvoke`` prepends the cached system prompt itself.
-    response: AIMessage = await bound.ainvoke(messages)
+    # ``BoundLLM.ainvoke`` prepends the system prompt itself.
+    # Llama on Groq occasionally emits a malformed tool call and the
+    # whole request 400s with ``tool_use_failed`` — retry once (usually
+    # transient at temperature 0.7), then degrade to a spoken apology
+    # instead of crashing the turn.
+    try:
+        response: AIMessage = await bound.ainvoke(messages)
+    except Exception as e:
+        if "tool_use_failed" not in str(e):
+            raise
+        log.warning("tool_call_generation_failed_retrying", error=str(e)[:300])
+        try:
+            response = await bound.ainvoke(messages)
+        except Exception as e2:
+            if "tool_use_failed" not in str(e2):
+                raise
+            log.error("tool_call_generation_failed_twice", error=str(e2)[:300])
+            response = AIMessage(
+                content=(
+                    "Mm, I fumbled the controls trying to do that for you — "
+                    "my tool call didn't go through. Ask me one more time?"
+                )
+            )
 
     # If the agent finished without calling a tool, run the synthesizer
     # to derive the YumiiResponse shape the engine expects.

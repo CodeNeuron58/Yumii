@@ -236,14 +236,64 @@ def tools_requiring_confirmation() -> list[str]:
     return registry.tools_requiring_confirmation()
 
 
+def _make_null_defaults_nullable(node: dict) -> None:
+    """In-place: let every null-defaulted property actually accept null.
+
+    Composio (and other third-party) schemas declare optional fields as
+    bare ``{"type": "string", "default": null}`` — not nullable. Llama
+    models fill optionals with explicit ``null``, and Groq validates
+    tool calls against the schema server-side, so the combination
+    rejects semantically perfect calls with ``tool_use_failed``
+    ("/query: expected string, but got null"). Widening the type to
+    ``["string", "null"]`` makes the model's behaviour legal.
+    """
+    for prop in node.get("properties", {}).values():
+        if not isinstance(prop, dict):
+            continue
+        if "default" in prop and prop["default"] is None:
+            t = prop.get("type")
+            if isinstance(t, str) and t != "null":
+                prop["type"] = [t, "null"]
+            elif isinstance(prop.get("anyOf"), list) and not any(
+                isinstance(o, dict) and o.get("type") == "null"
+                for o in prop["anyOf"]
+            ):
+                prop["anyOf"].append({"type": "null"})
+        # Recurse into nested object schemas wherever they may hide.
+        if isinstance(prop.get("properties"), dict):
+            _make_null_defaults_nullable(prop)
+        items = prop.get("items")
+        if isinstance(items, dict) and isinstance(items.get("properties"), dict):
+            _make_null_defaults_nullable(items)
+        for branch in prop.get("anyOf", []) if isinstance(prop.get("anyOf"), list) else []:
+            if isinstance(branch, dict):
+                if isinstance(branch.get("properties"), dict):
+                    _make_null_defaults_nullable(branch)
+                nested_items = branch.get("items")
+                if isinstance(nested_items, dict) and isinstance(
+                    nested_items.get("properties"), dict
+                ):
+                    _make_null_defaults_nullable(nested_items)
+
+
 def bind_to_llm(llm: BaseChatModel) -> BaseChatModel:
     """Bind the global registry's tools to an LLM via ``bind_tools``.
 
-    This is the only integration point between the registry and the
-    LangChain ecosystem. The agent graph calls this once at startup
-    and stores the result.
+    Tools are bound as sanitized OpenAI-format schema dicts (see
+    :func:`_make_null_defaults_nullable`) rather than raw ``BaseTool``
+    objects — the LLM only needs names and schemas; the ``ToolNode``
+    still dispatches to the registered tool objects by name.
     """
-    return llm.bind_tools(list_tools())
+    from langchain_core.utils.function_calling import convert_to_openai_tool
+
+    schemas = []
+    for tool in list_tools():
+        schema = convert_to_openai_tool(tool)
+        _make_null_defaults_nullable(
+            schema.get("function", {}).get("parameters", {})
+        )
+        schemas.append(schema)
+    return llm.bind_tools(schemas)
 
 
 __all__ = [
