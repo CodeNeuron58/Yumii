@@ -10,8 +10,8 @@ import collections
 from typing import Any, Callable
 
 import numpy as np
-import torch
 
+from yumii.audio.silero_vad import SileroVAD
 from yumii.audio.stt_factory import get_stt_provider
 
 from yumii.core.logging import get_logger
@@ -66,27 +66,16 @@ class AudioPipeline:
         groq_api_key: str | None = None,
     ) -> None:
         """Initialize the audio pipeline, loading VAD and STT models."""
-        # VAD is always loaded locally
+        # VAD is always local — bundled ONNX model, no torch, no download.
         log.info("silero_vad_loading")
-        self._silero_model, _ = torch.hub.load(
-            repo_or_dir="snakers4/silero-vad",
-            model="silero_vad",
-            force_reload=False,
-            onnx=False,
-            verbose=False,
-            trust_repo=True,
-        )
-        self._silero_model.reset_states()
-        log.info("silero_vad_ready")
+        self._silero_model = SileroVAD()
 
         # Transcription provider is pluggable
         self.transcriber = get_stt_provider()
         log.info("audio_pipeline_ready")
 
     def _is_speech_silero(self, audio_float32_frame: np.ndarray) -> bool:
-        tensor = torch.FloatTensor(audio_float32_frame)
-        with torch.no_grad():
-            prob = self._silero_model(tensor, RATE).item()
+        prob = self._silero_model(audio_float32_frame, RATE)
         return prob >= SILERO_THRESHOLD
 
     def _reset_vad(self) -> None:

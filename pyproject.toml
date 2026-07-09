@@ -41,8 +41,6 @@ dependencies = [
     "prompt_toolkit>=3.0.36",
     "rich>=15.0.0",
     "structlog>=24.1.0",
-    "torch>=2.0.0",
-    "torchaudio>=2.0.0",
     "typer>=0.25.1",
     "uvicorn>=0.41.0",
     "websockets>=16.0",
@@ -88,17 +86,3 @@ exclude = ["Experiments", "Trash", ".git", ".venv", "__pycache__"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 
-# ---------------------------------------------------------------------------
-# uv configuration
-# ---------------------------------------------------------------------------
-# Tell uv to pull torch from the CPU-only wheel index (no CUDA, ~220 MB
-# instead of ~2 GB). Any contributor running `uv sync` gets the right build
-# automatically without extra flags.
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }
-torchaudio = { index = "pytorch-cpu" }
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
