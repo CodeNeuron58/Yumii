@@ -24,6 +24,7 @@ from typing import Any
 
 from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
@@ -65,6 +66,27 @@ class YumiiResponse(BaseModel):
 # Base LLM
 # ----------------------------------------------------------------------
 
+def build_ollama_llm(model: str, temperature: float = 0.7) -> ChatOllama:
+    """Build a ChatOllama for Ollama Cloud (or a custom base_url).
+
+    Cloud auth: point ``base_url`` at ollama.com and pass the API key as
+    a Bearer header through ``client_kwargs`` — langchain-ollama forwards
+    those to the underlying ollama httpx client. A local Ollama (no key)
+    works too; the header is simply omitted.
+    """
+    client_kwargs: dict = {}
+    if settings.ollama_api_key:
+        client_kwargs["headers"] = {
+            "Authorization": f"Bearer {settings.ollama_api_key}"
+        }
+    return ChatOllama(
+        model=model,
+        temperature=temperature,
+        base_url=settings.ollama_base_url,
+        client_kwargs=client_kwargs,
+    )
+
+
 provider = settings.llm_provider.lower()
 
 if provider == "openai":
@@ -79,6 +101,8 @@ elif provider == "anthropic":
         temperature=0.7,
         api_key=settings.anthropic_api_key,
     )
+elif provider == "ollama":
+    base_llm = build_ollama_llm(settings.ollama_model)
 else:
     base_llm = ChatGroq(
         model=settings.groq_model,

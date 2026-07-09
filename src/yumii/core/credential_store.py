@@ -45,6 +45,7 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
         "GROQ_API_KEY",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
+        "OLLAMA_API_KEY",
         "COMPOSIO_API_KEY",
     }
 )
@@ -54,6 +55,8 @@ PREFERENCE_KEYS: frozenset[str] = frozenset(
     {
         "LLM_PROVIDER",
         "GROQ_MODEL",
+        "OLLAMA_MODEL",
+        "OLLAMA_BASE_URL",
         "PERSONALITY",
         "TTS_PROVIDER",
         "STT_PROVIDER",

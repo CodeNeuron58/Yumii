@@ -76,6 +76,13 @@ def _get_extractor_llm() -> Any:
             api_key=settings.anthropic_api_key,
         )
 
+    if provider == "ollama":
+        # No separate cheap tier on Ollama Cloud — reuse the configured
+        # model at temperature 0 for the extraction pass.
+        from yumii.agent.llm import build_ollama_llm
+
+        return build_ollama_llm(settings.ollama_model, temperature=0.0)
+
     # Default — Groq (cheapest, fastest)
     from langchain_groq import ChatGroq
 

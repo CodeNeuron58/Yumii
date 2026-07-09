@@ -221,8 +221,13 @@
             KOKORO_VOICE: 'Kokoro voice',
             HITL_MODE: 'Tool confirmations',
         };
+        const TEXT_LABELS = {
+            GROQ_MODEL: 'Groq model',
+            OLLAMA_MODEL: 'Ollama cloud model',
+        };
         const CRED_LABELS = {
             GROQ_API_KEY: 'Groq API key',
+            OLLAMA_API_KEY: 'Ollama API key (cloud)',
             COMPOSIO_API_KEY: 'Composio API key (tools)',
             OPENAI_API_KEY: 'OpenAI API key',
             ANTHROPIC_API_KEY: 'Anthropic API key',
@@ -256,6 +261,15 @@
                     `<div class="row"><label>${esc(label)}</label><select data-pref="${esc(key)}">${opts}</select></div>`);
             }
 
+            // Free-text model names (Groq / Ollama).
+            const textData = data.text_settings || {};
+            for (const [key, label] of Object.entries(TEXT_LABELS)) {
+                prefRows.insertAdjacentHTML('beforeend',
+                    `<div class="row"><label>${esc(label)}</label>
+                     <input type="text" data-text="${esc(key)}" value="${esc(textData[key] || '')}"
+                        placeholder="model name"></div>`);
+            }
+
             const credRows = document.getElementById('cred-rows');
             credRows.innerHTML = '';
             for (const [key, label] of Object.entries(CRED_LABELS)) {
@@ -272,6 +286,8 @@
         document.getElementById('save-btn').addEventListener('click', async () => {
             const preferences = {};
             document.querySelectorAll('[data-pref]').forEach(el => preferences[el.dataset.pref] = el.value);
+            const text_settings = {};
+            document.querySelectorAll('[data-text]').forEach(el => { if (el.value.trim()) text_settings[el.dataset.text] = el.value.trim(); });
             const credentials = {};
             document.querySelectorAll('[data-cred]').forEach(el => { if (el.value.trim()) credentials[el.dataset.cred] = el.value.trim(); });
 
@@ -280,7 +296,7 @@
             const r = await fetch(API + '/api/settings', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ preferences, credentials }),
+                body: JSON.stringify({ preferences, text_settings, credentials }),
             });
             if (!r.ok) { note.textContent = 'Save failed: ' + (await r.text()); return; }
             const res = await r.json();

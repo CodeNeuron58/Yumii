@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     composio_api_key: str | None = Field(default=None, alias="COMPOSIO_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    # Ollama Cloud: an API key from ollama.com plus a cloud model name
+    # (e.g. "gpt-oss:120b", "qwen3-coder:480b"). base_url defaults to
+    # the cloud endpoint but can point at a local Ollama for offline use.
+    ollama_api_key: str | None = Field(default=None, alias="OLLAMA_API_KEY")
+    ollama_model: str = Field(default="gpt-oss:120b", alias="OLLAMA_MODEL")
+    ollama_base_url: str = Field(default="https://ollama.com", alias="OLLAMA_BASE_URL")
     personality: str = Field(default="caring", alias="PERSONALITY")
     # STT configuration
     stt_provider: str = Field(default="local", alias="STT_PROVIDER")

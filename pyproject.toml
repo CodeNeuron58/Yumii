@@ -55,6 +55,7 @@ dependencies = [
     "kokoro-onnx>=0.5.0",
     "composio>=0.13,<0.14",
     "composio-langchain>=0.13,<0.14",
+    "langchain-ollama>=1.1.0",
 ]
 
 [project.optional-dependencies]

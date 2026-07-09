@@ -248,7 +248,7 @@ async def delete_fact_endpoint(fact_id: str) -> dict[str, Any]:
 # What the dashboard may read/write. Everything else is rejected so a
 # compromised page can't write arbitrary preference keys.
 _SETTING_CHOICES: dict[str, list[str]] = {
-    "LLM_PROVIDER": ["Groq", "OpenAI", "Anthropic"],
+    "LLM_PROVIDER": ["Groq", "OpenAI", "Anthropic", "Ollama"],
     "TTS_PROVIDER": ["Kokoro", "ElevenLabs", "CAMB.ai"],
     "STT_PROVIDER": ["local", "groq", "vosk"],
     "PERSONALITY": ["caring", "tsundere", "genki", "kuudere", "yandere", "dandere"],
@@ -259,11 +259,18 @@ _SETTING_CHOICES: dict[str, list[str]] = {
     ],
     "HITL_MODE": ["external", "always", "never"],
 }
-# Provider/key changes need a backend restart (settings load once at
-# import). Personality applies live (read from config.json every turn).
+# Free-text preferences (model names) — validated as non-empty strings
+# rather than against a fixed list.
+_TEXT_SETTINGS: dict[str, str] = {
+    "GROQ_MODEL": "qwen/qwen3.6-27b",
+    "OLLAMA_MODEL": "gpt-oss:120b",
+}
+# Provider/key/model changes need a backend restart (settings load once
+# at import). Personality applies live (read from config.json every turn).
 _RESTART_KEYS = {
     "LLM_PROVIDER", "TTS_PROVIDER", "STT_PROVIDER",
     "WHISPER_MODEL_SIZE", "KOKORO_VOICE", "HITL_MODE",
+    "GROQ_MODEL", "OLLAMA_MODEL",
 }
 
 
@@ -283,6 +290,9 @@ async def get_settings() -> dict[str, Any]:
         key: config.get(key, choices[0])
         for key, choices in _SETTING_CHOICES.items()
     }
+    text_settings = {
+        key: config.get(key, default) for key, default in _TEXT_SETTINGS.items()
+    }
     credentials = {}
     for key in sorted(CREDENTIAL_KEYS):
         value = get_credential(key)
@@ -290,6 +300,7 @@ async def get_settings() -> dict[str, Any]:
     return {
         "preferences": preferences,
         "choices": _SETTING_CHOICES,
+        "text_settings": text_settings,
         "credentials": credentials,
     }
 
@@ -314,6 +325,18 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
             raise HTTPException(status_code=400, detail=f"Invalid value for {key}: {value}")
         current = load_global_config().get(key)
         if current != value:
+            update_global_config(key, value)
+            if key in _RESTART_KEYS:
+                restart_required = True
+
+    text = body.get("text_settings", {}) or {}
+    for key, value in text.items():
+        if key not in _TEXT_SETTINGS:
+            raise HTTPException(status_code=400, detail=f"Unknown setting: {key}")
+        value = str(value).strip()
+        if not value:
+            continue  # blank = keep current
+        if load_global_config().get(key) != value:
             update_global_config(key, value)
             if key in _RESTART_KEYS:
                 restart_required = True
