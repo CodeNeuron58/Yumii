@@ -37,3 +37,31 @@ jobs:
 
     - name: Test with pytest
       run: uv run pytest tests/
+
+  versions:
+    name: Version consistency
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Versions must match across pyproject / tauri.conf / Cargo
+      run: python .github/scripts/check_versions.py
+
+  desktop:
+    name: Desktop shell build (Windows)
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: desktop/src-tauri
+
+    - name: Build the Tauri shell
+      run: cargo build --manifest-path desktop/src-tauri/Cargo.toml

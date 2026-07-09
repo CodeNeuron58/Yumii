@@ -1,6 +1,6 @@
 [package]
 name = "yumii-desktop"
-version = "0.1.0"
+version = "0.9.0"
 description = "Yumii — always-on desktop companion shell"
 authors = ["Biprayan"]
 edition = "2021"
