@@ -86,3 +86,8 @@ exclude = ["Experiments", "Trash", ".git", ".venv", "__pycache__"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.21.0",
+]
+
