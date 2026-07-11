@@ -16,22 +16,59 @@ use tauri_plugin_global_shortcut::{
 /// Holds the spawned Python backend so we can kill it on exit.
 struct Backend(Mutex<Option<Child>>);
 
-/// Launch the Yumii Python brain (`python -m yumii server`).
+/// Launch the Yumii Python backend.
 ///
-/// Paths default to the dev virtualenv and repo root, and are overridable
-/// with the `YUMII_PYTHON` / `YUMII_REPO` env vars (used by packaged builds).
-fn spawn_backend() -> Option<Child> {
-    let python = std::env::var("YUMII_PYTHON")
-        .unwrap_or_else(|_| r"..\..\.venv\Scripts\python.exe".to_string());
-    let repo = std::env::var("YUMII_REPO").unwrap_or_else(|_| r"..\..".to_string());
+/// Packaged build: the PyInstaller onedir bundle is shipped as a Tauri
+/// resource at `<resources>/yumii-server/yumii-server.exe`; we run that
+/// directly — no Python needed on the user's machine.
+///
+/// Dev build: there's no such resource, so we fall back to
+/// `python -m yumii server` from the project venv (overridable with
+/// `YUMII_PYTHON` / `YUMII_REPO`) so `cargo tauri dev` keeps working.
+fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {
+    // Release only: use the bundled frozen backend. In dev we always run
+    // live Python source — Tauri copies the resource into the dev target
+    // dir too, and without this gate `cargo tauri dev` would silently run
+    // the last frozen build instead of your current code.
+    #[cfg(not(debug_assertions))]
+    let sidecar = app
+        .path()
+        .resource_dir()
+        .ok()
+        .map(|d| d.join("yumii-server").join("yumii-server.exe"))
+        .filter(|p| p.exists());
+    #[cfg(debug_assertions)]
+    let sidecar: Option<std::path::PathBuf> = {
+        let _ = app; // silence unused warning in dev
+        None
+    };
 
-    let mut cmd = Command::new(&python);
-    cmd.args(["-m", "yumii", "server"])
-        .current_dir(&repo)
-        .env("KMP_DUPLICATE_LIB_OK", "TRUE")
-        // Sidecar output is captured/redirected, which on Windows would
-        // otherwise use a legacy codepage and crash Unicode log lines.
+    let mut cmd = if let Some(exe) = sidecar {
+        println!("[yumii] launching bundled backend: {}", exe.display());
+        Command::new(exe)
+    } else {
+        let python = std::env::var("YUMII_PYTHON")
+            .unwrap_or_else(|_| r"..\..\.venv\Scripts\python.exe".to_string());
+        let repo = std::env::var("YUMII_REPO").unwrap_or_else(|_| r"..\..".to_string());
+        println!("[yumii] dev fallback: {python} -m yumii server");
+        let mut c = Command::new(python);
+        c.args(["-m", "yumii", "server"]).current_dir(repo);
+        c
+    };
+
+    cmd.env("KMP_DUPLICATE_LIB_OK", "TRUE")
+        // Output is captured/redirected, which on Windows would otherwise
+        // use a legacy codepage and crash Unicode log lines.
         .env("PYTHONIOENCODING", "utf-8");
+
+    // Release on Windows: don't flash a console window for the backend.
+    // Dev keeps the console so the backend's logs stay visible.
+    #[cfg(all(windows, not(debug_assertions)))]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
 
     match cmd.spawn() {
         Ok(child) => {
@@ -39,7 +76,7 @@ fn spawn_backend() -> Option<Child> {
             Some(child)
         }
         Err(e) => {
-            eprintln!("[yumii] failed to spawn backend ({python}): {e}");
+            eprintln!("[yumii] failed to spawn backend: {e}");
             None
         }
     }
@@ -114,7 +151,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![open_dashboard])
         .setup(move |app| {
             // 1. Launch the Python brain in the background.
-            let child = spawn_backend();
+            let child = spawn_backend(app.handle());
             *app.state::<Backend>().0.lock().unwrap() = child;
 
             // 2. System tray: Show/Hide + Dashboard + Quit.
