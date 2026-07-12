@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "resources": {
+      "../../dist/yumii-server": "yumii-server",
+      "../../packaging/build-models": "models"
+    }
+  }
+}

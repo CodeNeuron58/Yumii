@@ -61,6 +61,14 @@ fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {
         // use a legacy codepage and crash Unicode log lines.
         .env("PYTHONIOENCODING", "utf-8");
 
+    // Point the backend at the models bundled in the installer
+    // (<resources>/models) so a fresh install needs no download. Harmless
+    // in dev — the path won't exist there, and the backend falls back to
+    // downloading, as before.
+    if let Ok(res) = app.path().resource_dir() {
+        cmd.env("YUMII_MODELS_DIR", res.join("models"));
+    }
+
     // Release on Windows: don't flash a console window for the backend.
     // Dev keeps the console so the backend's logs stay visible.
     #[cfg(all(windows, not(debug_assertions)))]

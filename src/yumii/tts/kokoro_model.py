@@ -37,11 +37,37 @@ def _download(url: str, target: Path) -> None:
     os.replace(str(part), str(target))
 
 
+def _bundled_paths(model_size: str) -> tuple[str, str] | None:
+    """Return bundled model paths if the installer shipped them.
+
+    The desktop installer bundles the Kokoro files and the Tauri shell
+    points ``YUMII_MODELS_DIR`` at ``<resources>/models`` — so a fresh
+    install needs no download or setup. Returns ``None`` when unset or
+    incomplete (dev / source runs), which falls through to the
+    download path below.
+    """
+    root = os.environ.get("YUMII_MODELS_DIR")
+    if not root:
+        return None
+    kdir = Path(root) / "kokoro"
+    model = kdir / KOKORO_MODELS[model_size]
+    voices = kdir / _VOICES_FILE
+    if model.exists() and voices.exists():
+        log.info("kokoro_model_bundled", model=str(model))
+        return str(model), str(voices)
+    return None
+
+
 def get_kokoro_model_paths(model_size: str = "int8") -> tuple[str, str]:
-    """Return ``(model_path, voices_path)``, downloading files if needed."""
+    """Return ``(model_path, voices_path)``, using bundled files or
+    downloading if needed."""
     if model_size not in KOKORO_MODELS:
         log.warning("invalid_kokoro_model_size_fallback", size=model_size)
         model_size = "fp32"
+
+    bundled = _bundled_paths(model_size)
+    if bundled is not None:
+        return bundled
 
     models_dir = Path.home() / ".yumii" / "models" / "kokoro"
     models_dir.mkdir(parents=True, exist_ok=True)

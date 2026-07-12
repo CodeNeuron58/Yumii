@@ -32,3 +32,6 @@ assets/avatar/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Staged model files for the installer (fetched at build time)
+packaging/build-models/
