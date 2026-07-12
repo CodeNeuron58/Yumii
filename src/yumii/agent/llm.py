@@ -87,24 +87,31 @@ def build_ollama_llm(model: str, temperature: float = 0.7) -> ChatOllama:
     )
 
 
-provider = settings.llm_provider.lower()
+def _build_base_llm() -> Any:
+    """Construct the configured provider's chat model.
 
-if provider == "openai":
-    base_llm = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0.7,
-        api_key=settings.openai_api_key,
-    )
-elif provider == "anthropic":
-    base_llm = ChatAnthropic(
-        model="claude-3-5-sonnet-latest",
-        temperature=0.7,
-        api_key=settings.anthropic_api_key,
-    )
-elif provider == "ollama":
-    base_llm = build_ollama_llm(settings.ollama_model)
-else:
-    base_llm = ChatGroq(
+    Built lazily (not at import time): provider SDKs like ChatGroq
+    validate the API key in their constructor, so eager construction
+    crashed on import wherever no key is set — CI, fresh clones, and any
+    test that merely imports this module. Nothing here runs until the
+    agent actually needs the LLM, by which point a key exists.
+    """
+    provider = settings.llm_provider.lower()
+    if provider == "openai":
+        return ChatOpenAI(
+            model="gpt-4o",
+            temperature=0.7,
+            api_key=settings.openai_api_key,
+        )
+    if provider == "anthropic":
+        return ChatAnthropic(
+            model="claude-3-5-sonnet-latest",
+            temperature=0.7,
+            api_key=settings.anthropic_api_key,
+        )
+    if provider == "ollama":
+        return build_ollama_llm(settings.ollama_model)
+    return ChatGroq(
         model=settings.groq_model,
         temperature=0.7,
         api_key=settings.groq_api_key,
@@ -150,7 +157,7 @@ _bound_llm: Any | None = None
 def _get_bound_llm() -> Any:
     global _bound_llm
     if _bound_llm is None:
-        _bound_llm = bind_to_llm(base_llm)
+        _bound_llm = bind_to_llm(_build_base_llm())
     return _bound_llm
 
 
@@ -231,7 +238,6 @@ def clear_agent_cache() -> None:
 __all__ = [
     "YumiiResponse",
     "BoundLLM",
-    "base_llm",
     "get_agent_llm",
     "clear_llm_cache",
     "clear_agent_cache",
