@@ -1,0 +1,73 @@
+name: Release
+
+# Build the Windows installers and publish them to a DRAFT GitHub Release
+# whenever a version tag is pushed. Draft = nothing is public until you
+# review the build and click Publish.
+#
+#   git tag v0.10.0 && git push origin v0.10.0
+#
+# Reproduces the local recipe verified in packaging:
+#   fetch_models.py -> pyinstaller (freeze backend) -> tauri build (bundle)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write  # create the release + upload assets
+
+jobs:
+  windows-installer:
+    name: Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install Python deps (incl. PyInstaller)
+        run: uv sync --extra dev
+
+      - name: Stage Kokoro models (bundled for offline first-run)
+        run: uv run python packaging/fetch_models.py
+
+      - name: Freeze the backend
+        run: uv run pyinstaller --noconfirm packaging/yumii-server.spec
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Build installer (backend + models bundled)
+        working-directory: desktop
+        run: npx @tauri-apps/cli@latest build --config src-tauri/tauri.bundle.conf.json
+
+      - name: Publish draft release with installers
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: true
+          name: Yumii ${{ github.ref_name }}
+          body: |
+            Windows installer for Yumii ${{ github.ref_name }}. See CHANGELOG.md for what's new.
+
+            **Install:** download `Yumii_..._x64-setup.exe` below and run it. Yumii isn't
+            code-signed yet, so Windows may show *"Windows protected your PC"* — that's
+            expected for any unsigned installer; click **More info → Run anyway**. The
+            installer bundles the voice model and backend, so the first run works offline.
+          files: |
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            desktop/src-tauri/target/release/bundle/msi/*.msi
