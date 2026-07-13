@@ -25,38 +25,58 @@ expensive GPU required.
 
 ---
 
-## ⚡ Install (One Line)
+## ⚡ Install
 
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.ps1 | iex
-```
+### 🪟 Windows — one-click installer *(recommended)*
 
-**macOS / Linux:**
-```bash
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.sh | sh
-```
+The easiest way to run Yumii. **No Python, no setup — works offline on first launch.**
 
-**From source (developers):**
+1. **Download** the latest **`Yumii_…_x64-setup.exe`** from the
+   [**Releases**](https://github.com/CodeNeuron58/Yumii/releases) page.
+2. **Run it.** Yumii is a new open-source app and isn't code-signed yet, so
+   Windows may show a blue **"Windows protected your PC"** screen. This is
+   expected for *any* unsigned installer — click **More info → Run anyway**.
+3. **Launch Yumii** from the Start menu. A floating orb appears — open the
+   ⚙️ dashboard, paste one API key (a free [Groq](https://console.groq.com)
+   key is plenty), and start talking.
+
+The installer bundles the voice model, the speech engine, and the whole
+backend (~450 MB), so the first run needs **no download and no configuration**
+beyond that one API key. An `.msi` is also attached to each release for
+managed/enterprise installs.
+
+### 🛠 From source — developers · macOS · Linux
+
+Yumii runs from source on any platform with **Python 3.12+** and
+[`uv`](https://docs.astral.sh/uv/):
+
 ```bash
 git clone https://github.com/CodeNeuron58/Yumii.git
 cd Yumii
 uv sync
+uv run yumii            # CLI + browser orb
 ```
-Then either activate the virtual environment:
-```bash
-# Windows
-.venv\Scripts\activate
-yumii
 
-# macOS / Linux
-source .venv/bin/activate
-yumii
+Prefer just the `yumii` command without cloning?
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.ps1 | iex
 ```
-Or skip activation and use:
 ```bash
-uv run yumii
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.sh | sh
 ```
+
+Run the **desktop app** from source (needs Rust + the MSVC C++ Build Tools on
+Windows; WebView2 ships with Win 10/11):
+
+```bash
+cd desktop && npx @tauri-apps/cli dev
+```
+
+> ⚠️ Use `uv`, **not** `pip` — `torch` is pinned to a CPU-only wheel index that
+> `pip` doesn't understand (it would pull the 2 GB CUDA build or fail).
 
 ---
 
@@ -74,6 +94,10 @@ uv run yumii
 ---
 
 ## 🚀 Quick Start
+
+> **Used the Windows installer?** You're already set up — launch Yumii from the
+> Start menu, open the ⚙️ dashboard, add one API key, and skip to talking. The
+> steps below are for **running from source**.
 
 ### 1. Prerequisites
 
