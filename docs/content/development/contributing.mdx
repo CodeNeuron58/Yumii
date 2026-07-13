@@ -1,0 +1,61 @@
+---
+title: "Contributing"
+description: "Where help is genuinely wanted, and how to land a first PR."
+sidebarTitle: "Working on Yumii"
+---
+
+Yumii is one person's project opened to the world — contributions are
+genuinely welcome, and the codebase is small enough to actually understand
+(the Python brain is ~40 files).
+
+## Getting set up
+
+[Running from Source](/development/from-source) is the whole setup. Before
+opening a PR:
+
+```bash
+uv run ruff check .
+uv run pytest tests/
+```
+
+Both run in CI on Ubuntu and Windows; the suite needs **no API keys**. Keep
+it that way — construct provider clients lazily, never at import time.
+
+## Good first contributions
+
+* **A new personality.** Two plain-text files of character writing, no code:
+  study `src/yumii/assets/prompts/_core.txt` (the shared rules) and one
+  existing persona, write your own, register its name in
+  `personality_manager.py`. See [Personalities](/guide/personalities) for the
+  constraints that matter (voice-first, no stage directions).
+* **A new tool.** Tools are LangChain `@tool` functions registered with a
+  policy (read-only vs. external/gated) in `src/yumii/tools/`. The registry +
+  permission gate do the rest — a weather tool is an afternoon.
+* **Kokoro voice presets, docs fixes, troubleshooting entries** — small and
+  real.
+
+## Meatier territory
+
+* **macOS/Linux packaging** — the backend and shell both run there; what's
+  missing is the installer pipeline (the Windows one in `packaging/` is the
+  template).
+* **The Live2D companion mode** — the planned animated avatar. The old
+  browser implementation is preserved as a reference file in
+  `src/yumii/assets/webui/`.
+* **Engine test coverage** — the conversation loop (graph, HITL gate,
+  streaming) currently relies on integration testing; mocked unit coverage
+  would be a prized PR.
+
+## House rules (short version)
+
+* `uv`, never `pip`. CPU-only pins are load-bearing.
+* Secrets go through `credential_store.py` (auth.json) — never a `.env`, never
+  config.json.
+* Don't commit build outputs (`dist/`, `build/`, `target/`, staged models) —
+  the gitignore already covers them.
+* Conventional-commit style messages (`fix:`, `feat:`, `docs:` …) — the git
+  history is the changelog's source material.
+
+Then open a PR against `master`. See
+[`CONTRIBUTING.md`](https://github.com/CodeNeuron58/Yumii/blob/master/CONTRIBUTING.md)
+in the repo for the canonical version of all of this.

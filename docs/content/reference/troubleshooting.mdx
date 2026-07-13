@@ -1,0 +1,103 @@
+---
+title: "Troubleshooting"
+description: "The problems people actually hit, and what fixes them."
+sidebarTitle: "Help"
+---
+
+## Installing
+
+### "Windows protected your PC" when running the installer
+
+Expected. Yumii isn't code-signed yet (certificates cost hundreds of dollars a
+year), and Windows shows this for *every* unsigned installer. Click
+**More info → Run anyway**. The source and the build workflow are public if
+you want to verify what you're running.
+
+### Antivirus flags the app
+
+Unsigned new executables occasionally trip heuristic scanners
+(a false positive common to all young open-source apps). Add an exception, or
+run from source if you prefer.
+
+## Starting up
+
+### The orb says "Waking Yumii up…" forever
+
+The backend didn't come up. In order:
+
+1. **Give it 20–30 seconds** on first launch — models are loading.
+2. **Is port 8000 taken?** Another app (or a leftover Yumii backend) may hold
+   it. Quit from the tray, check nothing is listening on 8000, relaunch.
+3. **Source installs:** run `uv run yumii server` in a terminal and read the
+   error directly — it's usually a missing key or a failed model download.
+
+### First run is slow (source installs)
+
+The voice model (~350 MB) downloads once to `~/.yumii/models/`. The installer
+version skips this entirely — models are bundled.
+
+## Talking
+
+### She thinks for a long time, then apologizes or errors
+
+Almost always the LLM provider's **rate limits** on a free tier:
+
+* **Daily quota exhausted** (`rate_limit_exceeded`, mentions *tokens per
+  day*): you've used the day's free tokens. Wait for the reset window,
+  switch the Groq model name (each model has its own quota bucket), or move
+  up a tier.
+* **Request too large** (mentions *tokens per minute* or *Request too
+  large*): a single request exceeded the free tier's size cap. This usually
+  means too many connected toolkits — each one adds schema weight to every
+  turn. Disable a toolkit in Dashboard → Tools, or see
+  [Tools & Permissions](/guide/tools) for the budget math.
+
+### She mishears me / cuts me off
+
+* Mishears → switch STT to **Groq Whisper** (Dashboard → Settings → Ears) —
+  markedly more accurate — or raise the local Whisper size to `small`.
+* Cuts you off mid-thought → she ends your turn after a brief silence; keep
+  the sentence flowing. Background voices (TV) can also steal turns — that's
+  the mic, not a setting.
+
+### Her voice never plays
+
+* Check the output device — she plays through the system default.
+* If you switched TTS providers, restart from the tray (provider changes
+  load at startup) and confirm the provider's key/voice-ID are set.
+
+### A tool call failed with "adjust your prompt" / tool errors
+
+Free-tier models occasionally emit malformed tool calls. Yumii retries once
+automatically and then apologizes out loud. Just ask again — and if it's
+constant on an exotic model, switch back to a default model name.
+
+## Tools
+
+### I connected Gmail but she says she can't access it
+
+1. Finish the browser sign-in completely (until Composio's success page).
+2. Wait ~10 seconds — the connection propagates on Composio's side.
+3. **Restart Yumii** — tools load at startup.
+4. Confirm the toolkit is listed in Dashboard → Tools.
+
+### The permission prompt never appeared
+
+It shows on the **orb window**. If the orb is hidden (`Ctrl+Shift+Space`),
+bring it back. An unanswered prompt times out as a denial, so just ask again.
+
+## Settings
+
+### I changed a setting and nothing happened
+
+Provider, model, and key changes apply **at startup** — quit from the tray
+and reopen. Only personality switches apply live. The dashboard's save
+message tells you which kind you just made.
+
+## When you're stuck
+
+Source installs: run `uv run yumii server` and read the structured log —
+errors name their cause (`rate_limit_exceeded`, `stt_dropped`,
+`composio_load_failed`…). Then
+[open an issue](https://github.com/CodeNeuron58/Yumii/issues) with the log
+tail — it's an alpha, reports genuinely help.

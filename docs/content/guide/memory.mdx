@@ -1,0 +1,72 @@
+---
+title: "Memory & Sessions"
+description: "What Yumii remembers, how, where it's stored, and how to make her forget."
+sidebarTitle: "Your Data"
+---
+
+Yumii has two kinds of remembering, and it helps to keep them straight:
+
+* **Sessions** — the conversations themselves. Word-for-word history, one
+  thread per chat, resumable.
+* **Facts** — distilled long-term memory about *you*, shared across every
+  session and personality.
+
+Both live entirely in local SQLite files under `~/.yumii/memory/`. Nothing is
+synced anywhere.
+
+## How facts happen
+
+After every conversation turn, a lightweight background pass reads the
+exchange and extracts atomic facts about you — *"has a cat named Mochi"*,
+*"prefers short answers in the morning"*, *"interviewing at a startup next
+Tuesday"*. Each fact gets a category (identity, preference, habit,
+relationship, goal) and a confidence score, and is deduplicated against what
+she already knows.
+
+On every turn, her current fact list is included in her context — which is
+why she can say "wasn't your interview today?" three days later without you
+re-explaining anything.
+
+Two properties worth knowing:
+
+* **Extraction is judgment, not transcription.** She stores things that seem
+  durable about you, not a log of everything said. The conversation log
+  itself is the session, not the fact store.
+* **It's fully inspectable.** Dashboard → **Memory** shows every stored fact.
+  If it's not on that list, she doesn't know it.
+
+## Correcting and forgetting
+
+* **Edit a fact** — Dashboard → Memory → Edit. Useful when she misheard
+  ("cat named Moshi").
+* **Forget one fact** — Dashboard → Memory → Forget.
+* **Forget everything** — the CLI command `yumii forget` wipes all facts
+  (sessions stay). For a total wipe of *everything* — conversations, facts,
+  keys, settings — delete the `~/.yumii` folder while Yumii is closed.
+
+## Sessions in practice
+
+* A new conversation starts when you launch fresh; reconnects and restarts
+  keep the same session going rather than fragmenting your history.
+* Sessions title themselves from your first sentence and count their
+  messages.
+* From **Dashboard → Chats** you can read transcripts, resume any past
+  session (the orb conversation continues that thread), rename, or delete.
+
+## What's in the files
+
+| File | Contents |
+|---|---|
+| `~/.yumii/memory/yumii.db` | Session list — titles, timestamps, message counts |
+| `~/.yumii/memory/checkpoints.db` | Full conversation history per session (the agent's state) |
+| `~/.yumii/memory/store.db` | The fact store |
+
+They're ordinary SQLite files — you can open them with any SQLite browser.
+Back up the `memory/` folder and you've backed up your entire relationship
+with her; move it to a new machine and she remembers you there.
+
+<Callout type="info" title="Privacy note">
+Facts are included in the context sent to your configured LLM provider during
+conversation — that's how she uses them. They are never sent anywhere else,
+and no other component reads them.
+</Callout>

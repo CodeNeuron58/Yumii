@@ -1,0 +1,65 @@
+---
+title: "The Dashboard"
+description: "Settings, conversations, tools, and memory — the control room behind the orb."
+sidebarTitle: "Your Data"
+---
+
+The orb is for *talking*; the **dashboard** is for everything else. Open it
+from the ⚙ gear on the orb window, or right-click the tray icon →
+**Dashboard**. It opens as a normal window with four tabs.
+
+## Settings
+
+Everything the first-run wizard configures, editable any time:
+
+* **Mind / Voice / Ears** — pick the LLM, TTS, and STT providers, the
+  personality, Whisper model size, Kokoro voice, and the tool-confirmation
+  mode. Free-text fields let you set the exact Groq or Ollama model name.
+* **API Keys** — paste keys for Groq, OpenAI, Anthropic, Ollama, ElevenLabs,
+  CAMB.ai, and Composio. Fields are **write-only**: you see a masked
+  `gsk_···6K5Q` for what's stored, and typing a new value replaces it. Keys
+  are saved to `~/.yumii/auth.json`, an owner-only local file.
+
+<Callout type="info" title="Live vs. restart">
+Personality changes apply from the next reply. Provider, model, and key
+changes need a restart (quit from the tray, reopen) — the dashboard tells you
+which is which after every save.
+</Callout>
+
+## Tools
+
+Connect real apps through [Composio](https://composio.dev) — paste your
+Composio key in Settings first, then this tab lets you connect Gmail (and
+other apps) with a browser sign-in, see what's connected, and disable
+toolkits. The full walkthrough lives in [Tools & Permissions](/guide/tools).
+
+## Chats
+
+Every conversation you've ever had, newest first, titled from your opening
+words:
+
+* **View** — read the full transcript. Tool usage appears as small events
+  ("used tool: web search") between the spoken turns.
+* **Resume** — switches the live conversation to that session; your next
+  spoken words continue that thread.
+* **Rename / Delete** — housekeeping. Delete is permanent and removes the
+  conversation history.
+
+## Memory
+
+The complete list of facts Yumii has learned about you, each with its
+category (identity, preference, habit, relationship, goal):
+
+* **Edit** any fact she got slightly wrong.
+* **Forget** removes a single fact permanently.
+
+This tab is the transparency guarantee: *everything* she knows about you is
+on this list — there is no hidden profile. The mechanics of how facts get
+here are on the [Memory](/guide/memory) page.
+
+## Browser access
+
+The dashboard is served by the local backend, so it also works in a plain
+browser at `http://127.0.0.1:8000/dashboard.html` while Yumii is running —
+handy for reading transcripts on a bigger screen. It's bound to localhost and
+protected by an origin allowlist; other devices and websites can't reach it.

@@ -1,0 +1,75 @@
+---
+title: "Running from Source"
+description: "The development setup: uv, the backend, the desktop shell, and the checks."
+sidebarTitle: "Working on Yumii"
+---
+
+## Prerequisites
+
+* **Python 3.12+** and [`uv`](https://docs.astral.sh/uv/) — the only package
+  manager the project supports (dependencies are pinned to CPU-only builds
+  that plain `pip` mangles).
+* For the **desktop shell** only: Rust (stable) and, on Windows, the MSVC C++
+  Build Tools. The orb also runs in a plain browser without any of this.
+
+## Backend + browser orb (the quick loop)
+
+```bash
+git clone https://github.com/CodeNeuron58/Yumii.git
+cd Yumii
+uv sync                # installs everything, ~a minute
+uv run yumii           # interactive CLI → "Wake Yumii Up" opens the browser orb
+```
+
+Or headless:
+
+```bash
+uv run yumii server    # backend on 127.0.0.1:8000
+# orb:       http://127.0.0.1:8000/
+# dashboard: http://127.0.0.1:8000/dashboard.html
+```
+
+First run downloads the Kokoro voice model (~350 MB) to `~/.yumii/models/`.
+Configuration is the same as the packaged app — same `~/.yumii` files, same
+dashboard.
+
+## The desktop shell
+
+```bash
+cd desktop
+npx @tauri-apps/cli dev
+```
+
+`tauri dev` compiles the Rust shell and launches the orb window; the shell
+spawns the backend for you **from your live Python source** — edit Python,
+relaunch, see changes. (Release builds instead run a frozen backend bundled
+as a resource; dev deliberately never uses it.)
+
+## Checks
+
+```bash
+uv run ruff check .                          # lint
+uv run pytest tests/                         # test suite — runs keyless, no API needed
+python .github/scripts/check_versions.py     # the 4 version strings must agree
+cargo build --manifest-path desktop/src-tauri/Cargo.toml   # shell compiles
+```
+
+CI runs all of these on every push (Ubuntu + Windows). The suite is designed
+to pass with **no API keys present** — if you add a module that constructs a
+provider client at import time, collection will crash in CI; build clients
+lazily.
+
+## Things that will save you an afternoon
+
+* **`uv sync`, never `pip install`.** Repeated because it's the #1 setup
+  failure.
+* **Your data is shared.** Source runs use the same `~/.yumii` as an
+  installed copy — convenient, but a data wipe affects both.
+* **Port 8000 is the contract.** One backend at a time; a forgotten
+  `yumii server` in another terminal is the classic "why is my code not
+  running" (you're talking to the old process).
+* **Config loads at startup.** Changing providers/keys means restarting the
+  backend, in dev exactly as in production.
+* **Structured logs are the debugger.** `YUMII_LOG_LEVEL=DEBUG uv run yumii
+  server` — events are named (`stt_dropped`, `composio_load_failed`,
+  `tool_result_truncated`) and usually point straight at the cause.

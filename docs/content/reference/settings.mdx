@@ -1,0 +1,71 @@
+---
+title: "Settings Reference"
+description: "Every key in config.json and auth.json, with defaults and accepted values."
+sidebarTitle: "Configuration"
+---
+
+All settings live in `~/.yumii/config.json` (preferences) and
+`~/.yumii/auth.json` (secrets). The [dashboard](/guide/dashboard) edits both;
+this page documents every key for hand-editing and scripting. Changes apply
+at the next launch unless noted.
+
+## config.json — core choices
+
+| Key | Default | Values / notes |
+|---|---|---|
+| `LLM_PROVIDER` | `"Groq"` | `Groq` · `OpenAI` · `Anthropic` · `Ollama` |
+| `GROQ_MODEL` | `"qwen/qwen3.6-27b"` | Any Groq-hosted model id |
+| `OLLAMA_MODEL` | `"gpt-oss:120b"` | Any model on your Ollama account/server |
+| `OLLAMA_BASE_URL` | `"https://ollama.com"` | Point at `http://127.0.0.1:11434` for a local Ollama |
+| `TTS_PROVIDER` | `"Kokoro"` | `Kokoro` · `ElevenLabs` · `CAMB.ai` |
+| `STT_PROVIDER` | `"local"` | `local` (Whisper) · `groq` · `vosk` |
+| `PERSONALITY` | `"caring"` | `caring` · `tsundere` · `genki` · `kuudere` · `yandere` · `dandere` — applies live, no restart |
+| `HITL_MODE` | `"external"` | `external` · `always` · `never` — tool confirmation behavior, see [Tools](/guide/tools) |
+
+## config.json — model tuning
+
+| Key | Default | Values / notes |
+|---|---|---|
+| `WHISPER_MODEL_SIZE` | `"base"` | `tiny` · `base` · `small` (local Whisper only) |
+| `VOSK_MODEL_SIZE` | `"small"` | `small` (~40 MB) · `medium` (~128 MB) |
+| `KOKORO_VOICE` | `"af_heart"` | Any of Kokoro's 54 voice names |
+| `KOKORO_MODEL_SIZE` | `"fp32"` | `fp32` · `int8` — int8 is usually *slower* on x86; keep fp32 |
+
+## config.json — tools
+
+| Key | Default | Values / notes |
+|---|---|---|
+| `COMPOSIO_TOOLKITS` | `[]` | Toolkit slugs to load at startup, e.g. `["GMAIL"]`. Managed by the dashboard's Tools tab |
+| `COMPOSIO_TOOLS` | — | Optional per-toolkit override of *which* tools load, e.g. `{"GMAIL": ["GMAIL_FETCH_EMAILS"]}` — useful for tightening free-tier budgets |
+
+## auth.json — keys
+
+Write-only via the dashboard (shown masked); each key is used only for its
+own provider.
+
+| Key | Used for |
+|---|---|
+| `GROQ_API_KEY` | Groq LLM — and Groq Whisper STT if selected |
+| `OPENAI_API_KEY` | OpenAI LLM |
+| `ANTHROPIC_API_KEY` | Anthropic LLM |
+| `OLLAMA_API_KEY` | Ollama Cloud (leave empty for a local Ollama) |
+| `COMPOSIO_API_KEY` | Tool integrations |
+| `ELEVENLABS_API_KEY` / `ELEVENLABS_VOICE_ID` | ElevenLabs TTS |
+| `CAMB_API_KEY` / `CAMB_VOICE_ID` | CAMB.ai TTS |
+
+## Environment variables (advanced)
+
+Set on the process that launches the backend; these are for unusual setups.
+
+| Variable | Purpose |
+|---|---|
+| `YUMII_MODELS_DIR` | Directory of pre-provisioned models — the installer sets this to its bundled copies; you can point it at your own |
+| `YUMII_ALLOWED_ORIGINS` | Comma-separated extra origins allowed to reach the local API (e.g. a custom dev port) |
+| `YUMII_PYTHON` / `YUMII_REPO` | Desktop-shell dev overrides: which Python and repo the dev fallback uses |
+| `YUMII_LOG_LEVEL` | Backend log level, e.g. `DEBUG` |
+
+<Callout type="warning" title="A note on precedence">
+Values in the two JSON files are loaded into the environment at startup, so
+they win over shell-set variables of the same name. If a setting seems stuck,
+check the file first.
+</Callout>

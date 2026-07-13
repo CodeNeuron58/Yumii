@@ -1,68 +1,78 @@
 ---
 title: "Your First Conversation"
-description: "Launch Yumii's interface, connect your audio context, and start speaking."
-layout: "cards"
-icon: "message-circle"
+description: "How talking to Yumii actually works — the orb, interruption, and what happens to your words."
+sidebarTitle: "First Steps"
 ---
 
-<ContentCard>
-Once the Attunement Wizard is completed, you are ready to wake Yumii up and start your first conversation.
-</ContentCard>
+This page walks through one real conversation and explains what's happening at
+each moment, so the orb stops being a mystery.
 
-<ContentCard>
-## 1. Wake Yumii Up
+## Reading the orb
 
-From your terminal, select **"🌸 Wake Yumii Up"** from the main dashboard or run the dedicated command:
+The orb is Yumii's face. Its state tells you exactly where the conversation is:
 
-```bash
-uv run yumii wake-up
-```
+| Orb | Meaning |
+|---|---|
+| Dim, slow pulse | Booting — the backend is loading her models |
+| Gentle breathing | Idle — she's ready and listening for you |
+| Expanding rings | Hearing you speak |
+| Spinning shimmer | Thinking — your words are with the LLM |
+| Pulsing with sound, tinted | Speaking — the color reflects her emotion |
 
-This starts the Uvicorn server in the background and automatically opens your web browser to:
-```
-http://localhost:8000/
-```
+Her emotional tint is real: a classifier reads the tone of her reply (warm,
+teasing, sad, surprised…) and colors the orb to match.
 
----
-</ContentCard>
+## A first exchange, annotated
 
-<ContentCard>
-## 2. Activate Audio Context
+**You:** "Hey Yumii, how are you?"
 
-To comply with browser security rules (which prevent sites from auto-playing audio or capturing the mic without user interaction), you must click the large pink button:
+The moment you stop talking (about a third of a second of silence), local
+voice-activity detection closes your utterance and sends it to
+speech-to-text. Your transcribed words go to the LLM along with her
+personality, today's date, and everything she remembers about you. Her reply
+streams into the local voice engine sentence-by-sentence — which is why she
+starts speaking in about a second instead of waiting to compose the whole
+answer.
 
-```
-[ Connect & Start Audio Context ]
-```
+**You (while she's mid-sentence):** "Actually — wait."
 
-1.  **Microphone Permissions**: Your browser will ask for microphone access. **Allow it**.
-2.  **WebSocket Handshake**: The client establishes a binary WebSocket connection with `ws://localhost:8000/ws`.
-3.  **Avatar Render**: Yumii's Live2D avatar compiles and centers on your screen.
+She stops immediately. This is **barge-in**: the microphone stays live while
+she speaks, and your voice interrupts hers, exactly like a human conversation.
+You never need to wait for her to finish.
 
----
-</ContentCard>
+**You:** "Remember that my sister's birthday is next month."
 
-<ContentCard>
-## 3. Say Hello!
+After the turn ends, a background pass extracts *"user's sister has a birthday
+next month"* into her local memory. It's deduplicated against what she already
+knows and will surface naturally in future conversations. You can see and edit
+every stored fact in the [dashboard](/guide/dashboard).
 
-Start speaking naturally. You do not need to click any push-to-talk button!
+**You:** "What's on the web about the weather tomorrow?"
 
-1.  Speak a simple greeting: *"Hello Yumii! Nice to meet you."*
-2.  Watch your terminal window. You will see `[Voice Activity Detected]` when you begin speaking, and `[Transcription: Hello Yumii...]` when you finish.
-3.  Yumii's avatar will instantly react:
-    *   She will **nod** or **smile** based on the emotional assessment.
-    *   She will begin speaking her response, and her lips will open and close in **perfect synchrony** with the sound waves!
+She decides to use her web-search tool — and a small prompt appears on
+screen: *"Allow Yumii to search the web?"* Nothing external happens until you
+click **Approve**. This gate is the core of how Yumii handles
+[tools](/guide/tools).
 
----
-</ContentCard>
+## Mic etiquette (what works best)
 
-<ContentCard>
-## 4. Test Her Senses
+* **Speak naturally.** No wake word, no push-to-talk — if the orb is idle or
+  ringing, she's listening.
+* **Pauses end your turn.** If you pause mid-thought for more than a moment,
+  she'll treat it as your turn ending. Keep the thought flowing, or just
+  continue — interrupting her reply works fine.
+* **Quiet-ish room helps.** Speech detection filters hums and fans, but a loud
+  TV with voices in it can trigger her. Headphones eliminate the echo of her
+  own voice entirely (though echo cancellation handles speakers well).
 
-To see the depth of Yumii's capabilities, try these interactive verbal tests during your conversation:
+## When something looks stuck
 
-*   **Switch Personalities**: Speak clearly: *"Switch to tsundere"* or *"become kuudere"*. Yumii will acknowledge the switch instantly and adjust her language, expressions, and tone!
-*   **Barge-In**: While she is in the middle of a sentence, speak loudly: *"Wait, hold on!"*. Watch how her voice instantly cuts off, and she immediately closes her mouth and begins listening to your next thought.
+* Orb stays on "Waking Yumii up…" for over a minute → the backend didn't
+  start; see [Troubleshooting](/reference/troubleshooting).
+* She thinks forever and gives up → almost always the LLM provider's rate
+  limit (free tiers have daily caps). Also in
+  [Troubleshooting](/reference/troubleshooting).
+* She heard you wrong repeatedly → consider switching speech-to-text to Groq
+  Whisper (faster, more accurate, cloud) in [Providers → STT](/providers/stt).
 
-Now that you have had your first conversation, learn more about how to set her up across different operating systems in our [Installation section](/installation/windows)!
-</ContentCard>
+**Next:** [Personalities](/guide/personalities) — meet the other five.

@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AudioLines,
   BookOpenText,
   Bot,
-  Brush,
+  Code2,
   Command,
-  Download,
   Github,
   PlugZap,
   Search,
@@ -27,12 +25,10 @@ type NavSection = {
 
 const NAV_SECTIONS: NavSection[] = [
   { label: "Get Started", href: "/introduction", match: ["introduction", "quickstart", "get-started"], icon: BookOpenText },
-  { label: "Installation", href: "/installation/windows", match: ["installation"], icon: Download },
-  { label: "Core Senses", href: "/senses/vad", match: ["senses"], icon: AudioLines },
-  { label: "Customization", href: "/customization/adding-avatars", match: ["customization"], icon: Brush },
-  { label: "Capabilities", href: "/capabilities/system-tools", match: ["capabilities"], icon: Bot },
-  { label: "Integration", href: "/integration/websocket-protocol", match: ["integration"], icon: PlugZap },
-  { label: "Ops & Reference", href: "/ops/troubleshooting", match: ["ops"], icon: Server },
+  { label: "Using Yumii", href: "/guide/talking", match: ["guide"], icon: Bot },
+  { label: "Providers", href: "/providers/llm", match: ["providers"], icon: PlugZap },
+  { label: "Reference", href: "/reference/files", match: ["reference"], icon: Server },
+  { label: "Development", href: "/development/architecture", match: ["development"], icon: Code2 },
 ];
 
 export default function TopNav() {

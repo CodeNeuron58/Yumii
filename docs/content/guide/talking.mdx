@@ -1,0 +1,67 @@
+---
+title: "Talking to Yumii"
+description: "The conversation model: continuous listening, barge-in, sessions, and the window itself."
+sidebarTitle: "Daily Use"
+---
+
+## The conversation model
+
+Yumii listens **continuously** while the orb is active — there's no wake word
+and no button to hold. The pipeline runs in a loop:
+
+1. **You speak.** Local voice-activity detection (Silero, running on your CPU)
+   watches the mic and detects when speech starts and ends.
+2. **She transcribes.** Your finished utterance goes to speech-to-text — local
+   Whisper by default in source installs, Groq's cloud Whisper if configured
+   (faster and more accurate).
+3. **She thinks.** The transcription, her personality, today's date, and her
+   memory of you go to the LLM. If the request needs a tool, the
+   [permission gate](/guide/tools) may appear.
+4. **She speaks.** Her reply is synthesized locally, sentence-by-sentence, so
+   the first words arrive in about a second and the rest streams while she
+   talks.
+
+## Interrupting her (please do)
+
+Barge-in is a core feature: **start talking while she's speaking and she
+stops.** Mid-sentence, mid-word, doesn't matter. There's no penalty and
+nothing breaks — her unspoken words are simply dropped and she listens to the
+new thing you're saying. Conversations flow much better once you stop treating
+her turns as sacred.
+
+## The window
+
+* The orb window is frameless, always-on-top, and **draggable anywhere** on
+  screen. It skips the taskbar — it's a presence, not an app window.
+* **`Ctrl+Shift+Space`** toggles it from anywhere, even when another app has
+  focus.
+* The **tray icon** (bottom-right on Windows) has Show/Hide, Dashboard, and
+  Quit. Quitting from the tray also shuts down the backend cleanly.
+* The **⚙ gear** on the orb opens the mode menu — Dashboard lives there too.
+
+## Sessions: conversations that persist
+
+Every conversation is a **session**, stored locally and titled automatically
+from your first words ("Help me plan a trip to Japan…"). Reconnections and
+app restarts don't scatter your history:
+
+* The current session survives reconnects — a network blip won't split your
+  conversation in two.
+* Old sessions are browsable in the **dashboard → Chats**: read the full
+  transcript, resume any of them (your next spoken words continue that
+  thread), rename, or delete.
+* Long-term memory (facts about you) is **shared across all sessions** — a new
+  chat doesn't mean she forgot you. See [Memory](/guide/memory).
+
+## Speaking her language(s)
+
+Yumii speaks the language you speak to her, defaulting to English. Her local
+voice (Kokoro) is English-first; other languages work best with a cloud TTS
+provider — see [Providers → TTS](/providers/tts).
+
+## Browser mode
+
+The desktop orb is the primary experience, but the same UI runs in a plain
+browser: start the backend (`uv run yumii` → *Wake Yumii Up* from a source
+install) and open `http://127.0.0.1:8000/`. Same voice loop, same dashboard at
+`/dashboard.html` — useful on machines where you can't install the app.

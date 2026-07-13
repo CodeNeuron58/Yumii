@@ -32,11 +32,6 @@
       "name": "GitHub",
       "icon": "github",
       "url": "https://github.com/CodeNeuron58/Yumii"
-    },
-    {
-      "name": "Discord",
-      "icon": "discord",
-      "url": "https://discord.gg/YOUR_DISCORD_INVITE"
     }
   ],
   "navigation": {
@@ -49,143 +44,111 @@
             "group": "Overview",
             "pages": [
               "introduction",
-              "get-started/what-is-yumii",
-              "get-started/showcase",
-              "get-started/key-features"
+              "get-started/what-is-yumii"
             ]
           },
           {
             "group": "First Steps",
             "pages": [
+              "get-started/installation",
               "quickstart",
-              "get-started/attuning-senses",
               "get-started/first-conversation"
             ]
           }
         ]
       },
       {
-        "id": "installation",
-        "title": "Installation",
+        "id": "guide",
+        "title": "Using Yumii",
         "groups": [
           {
-            "group": "Standard Platforms",
+            "group": "Daily Use",
             "pages": [
-              "installation/windows",
-              "installation/macos",
-              "installation/linux"
+              "guide/talking",
+              "guide/personalities"
             ]
           },
           {
-            "group": "Advanced Environments",
+            "group": "Your Data",
             "pages": [
-              "installation/developer-manual",
-              "installation/wsl2"
+              "guide/dashboard",
+              "guide/memory"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "guide/tools"
             ]
           }
         ]
       },
       {
-        "id": "core-senses",
-        "title": "Core Senses",
+        "id": "providers",
+        "title": "Providers",
         "groups": [
-          {
-            "group": "Hearing (STT)",
-            "pages": [
-              "senses/vad",
-              "senses/local-whisper",
-              "senses/groq-whisper"
-            ]
-          },
           {
             "group": "Thinking (LLM)",
             "pages": [
-              "senses/thinking-providers",
-              "senses/structured-outputs"
+              "providers/llm"
+            ]
+          },
+          {
+            "group": "Hearing (STT)",
+            "pages": [
+              "providers/stt"
             ]
           },
           {
             "group": "Speaking (TTS)",
             "pages": [
-              "senses/voice-synthesis"
+              "providers/tts"
             ]
           }
         ]
       },
       {
-        "id": "customization",
-        "title": "Customization",
+        "id": "reference",
+        "title": "Reference",
         "groups": [
           {
-            "group": "Avatars (Live2D)",
+            "group": "Configuration",
             "pages": [
-              "customization/adding-avatars",
-              "customization/parameter-mapping"
+              "reference/files",
+              "reference/settings"
             ]
           },
           {
-            "group": "Personalities",
+            "group": "Interfaces",
             "pages": [
-              "customization/personality-prompts",
-              "customization/custom-persona"
+              "reference/cli",
+              "reference/api"
+            ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "reference/troubleshooting"
             ]
           }
         ]
       },
       {
-        "id": "capabilities",
-        "title": "Capabilities",
+        "id": "development",
+        "title": "Development",
         "groups": [
           {
-            "group": "Built-in Tools",
+            "group": "Internals",
             "pages": [
-              "capabilities/system-tools",
-              "capabilities/memory-architecture"
+              "development/architecture"
             ]
           },
           {
-            "group": "Developer Extensions",
+            "group": "Working on Yumii",
             "pages": [
-              "capabilities/custom-tools"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "integration",
-        "title": "Integration",
-        "groups": [
-          {
-            "group": "Sockets & REST APIs",
-            "pages": [
-              "integration/websocket-protocol",
-              "integration/rest-api"
-            ]
-          },
-          {
-            "group": "Model Context Protocol",
-            "pages": [
-              "integration/mcp-server"
-            ]
-          }
-        ]
-      },
-      {
-        "id": "ops-reference",
-        "title": "Ops & Reference",
-        "groups": [
-          {
-            "group": "Operations",
-            "pages": [
-              "ops/troubleshooting",
-              "ops/performance-tuning"
-            ]
-          },
-          {
-            "group": "Reference",
-            "pages": [
-              "ops/cli-commands",
-              "ops/configuration-schemas"
+              "development/from-source",
+              "development/packaging",
+              "development/contributing"
             ]
           }
         ]
@@ -193,7 +156,6 @@
     ]
   },
   "footerSocials": {
-    "github": "https://github.com/CodeNeuron58/Yumii",
-    "discord": "https://discord.gg/YOUR_DISCORD_INVITE"
+    "github": "https://github.com/CodeNeuron58/Yumii"
   }
 }

@@ -1,0 +1,103 @@
+---
+title: "Architecture"
+description: "How a spoken sentence becomes a spoken reply — the pipeline, the agent, and the design decisions."
+sidebarTitle: "Internals"
+---
+
+Yumii is two processes: a **Python backend** (the brain — FastAPI + LangGraph)
+and a **Tauri shell** (Rust — the orb window, tray, hotkey) that launches and
+supervises it. They talk over a localhost WebSocket.
+
+## The pipeline
+
+```
+mic (orb window)
+  │  16 kHz PCM16 over WebSocket
+  ▼
+Silero VAD ──── local ONNX, every frame; detects speech start/end
+  ▼
+STT ─────────── faster-whisper (local) | Groq Whisper | Vosk (streaming)
+  ▼
+LangGraph agent  ── personality + date + memory facts + history
+  │   ├─ tool calls → HITL permission gate → registry (search, Gmail, …)
+  │   └─ final text → heuristic synthesizer → expression/motion labels
+  ▼
+TTS ─────────── Kokoro (local ONNX) | ElevenLabs | CAMB — sentence-streamed
+  │  base64 PCM chunks over WebSocket
+  ▼
+orb ─────────── plays audio, pulses, tints with emotion
+```
+
+Three asyncio tasks run this as a loop — `audio_listener`,
+`reasoning_engine`, `tts_speaker` — connected by queues, with one
+`interrupt_event` shared across them. **Barge-in** is that event: new speech
+during playback clears the queues and stops the speaker.
+
+## The agent
+
+The core is a deliberately small LangGraph state machine:
+`agent → tools → agent`, looping until the model answers without a tool call.
+
+* **Tools** live in a registry with a policy each (read-only vs. external).
+  External tools route through the **human-in-the-loop gate**: the graph
+  pauses, the orb shows Approve/Deny, and the tool runs only on approval —
+  a denial is fed back to the model as a normal message so she responds
+  gracefully.
+* **Emotion is not model output.** The LLM speaks plain text; a fast
+  regex-based classifier derives her expression and motion from the reply's
+  tone. This keeps prompts clean and never leaks labels into speech.
+* **Memory is a side-channel**: after each turn a cheap LLM pass extracts
+  facts into SQLite; facts are injected into the system prompt on later
+  turns.
+
+## Design decisions worth knowing
+
+* **Prompt layout is cache-ordered.** Static content first (personality,
+  rules), then the date, then facts, then history — so provider prefix
+  caching hits on nearly every turn. The old layout put a per-minute
+  timestamp before the history and got 0% cache hits; this is why the order
+  looks pedantic.
+* **Request budgets are enforced in code.** Free LLM tiers cap request sizes,
+  so toolkits load curated tool subsets, tool results are truncated before
+  entering history, and the model sees a bounded history window (the full
+  history stays in checkpoints).
+* **Tool schemas are sanitized at bind time.** Different models make
+  different tool-calling mistakes (explicit nulls, string booleans);
+  a schema-widening pass plus one retry absorbs them instead of crashing
+  the turn.
+* **TTS is pacing-aware.** Replies split at sentence/clause boundaries with a
+  growing size budget — a small first chunk so she starts fast, larger later
+  chunks so synthesis stays ahead of playback.
+* **No torch.** Silero VAD runs on onnxruntime from a ~2 MB bundled model —
+  that single decision cut hundreds of MB from the install and removed a
+  first-run network dependency.
+
+## Persistence
+
+Everything is SQLite under `~/.yumii/memory/`: session metadata
+(`yumii.db`), per-session conversation checkpoints via LangGraph's
+`AsyncSqliteSaver` (`checkpoints.db`), and the fact store (`store.db`).
+Every session is its own checkpoint thread; restarts lose nothing.
+
+## Security posture
+
+The backend binds to `127.0.0.1` only. Browser access is held to an origin
+allowlist (the orb, the dashboard, the Tauri webview), and WebSocket
+handshakes from foreign origins are rejected — a malicious webpage can't
+read your memory off localhost. Keys live in an owner-only `auth.json`;
+nothing is logged or transmitted beyond the providers you configure.
+
+## Code map
+
+```
+src/yumii/
+  api/        FastAPI server, WebSocket, REST (sessions, facts, settings, composio)
+  audio/      VAD + STT pipeline and providers
+  agent/      LangGraph graph, LLM factory, prompts, synthesizer, fact extractor
+  tts/        Kokoro / ElevenLabs / CAMB speakers (+ model fetcher)
+  tools/      tool registry, policies, Composio loader
+  core/       engine orchestrator, config, credential store, memory/session managers
+  assets/     personality prompts, orb + dashboard HTML, bundled VAD model
+desktop/
+  src-tauri/  the Rust shell: window, tray, hotkey, backend sidecar
+```

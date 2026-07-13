@@ -1,0 +1,77 @@
+---
+title: "Language Models"
+description: "Yumii's brain is pluggable: Groq (default), OpenAI, Anthropic, or Ollama Cloud / local."
+sidebarTitle: "Thinking"
+---
+
+The LLM is the one part of Yumii that is (by default) a cloud call — her ears
+and voice can run entirely on your machine, but the thinking uses a provider
+you choose. Pick it in **Dashboard → Settings → Mind (LLM)**, paste the
+matching key under API Keys, save, and restart.
+
+## The four providers
+
+| Provider | Model | Why pick it |
+|---|---|---|
+| **Groq** *(default)* | configurable — `qwen/qwen3.6-27b` by default | Extremely fast inference (matters for voice!), generous free tier, no card required |
+| **OpenAI** | `gpt-4o` | Strongest general capability and tool-calling reliability |
+| **Anthropic** | `claude-3-5-sonnet` | Most nuanced conversational quality |
+| **Ollama** | configurable — `gpt-oss:120b` by default | Ollama Cloud with one key — or point it at a local Ollama for fully-local thinking |
+
+For a voice companion, **latency is quality** — a brilliant reply that takes
+six seconds feels worse than a good one in one second. That's why Groq is the
+default: its inference speed keeps the conversation loop tight, and the free
+tier is enough for real daily use.
+
+## Choosing the exact model
+
+Two providers take a free-text model name in the dashboard:
+
+* **Groq model** — any model Groq hosts (`qwen/qwen3.6-27b`,
+  `llama-3.3-70b-versatile`, `openai/gpt-oss-120b`, …). Different models have
+  separate free-tier quotas, so switching models also switches quota buckets.
+* **Ollama cloud model** — any model on your Ollama account
+  (`gpt-oss:120b`, `qwen3-coder:480b`, …).
+
+## Ollama: cloud or fully local
+
+The Ollama provider covers two very different setups with one switch:
+
+* **Ollama Cloud** (default): create a key at
+  [ollama.com](https://ollama.com), paste it as the Ollama API key, set your
+  cloud model name. Done.
+* **Local Ollama**: if you run Ollama on your own hardware, set
+  `OLLAMA_BASE_URL` in `~/.yumii/config.json` to your server (e.g.
+  `http://127.0.0.1:11434`) and leave the API key empty. This is the path to
+  a *fully* offline Yumii — voice, ears, and brain all local — if your
+  machine can carry a capable model.
+
+## Free tiers: what to expect (honest section)
+
+Free LLM tiers have two kinds of limits, and Yumii users hit both eventually:
+
+* **Daily token quotas.** A long day of conversation (or a testing spree)
+  can exhaust them; she'll start failing politely until the window resets.
+* **Per-request size caps.** Groq's free tier caps a single request at
+  roughly 8–12k tokens depending on the model. Yumii budgets carefully —
+  compact tool loading, truncated tool results, a bounded history window — so
+  normal use fits. Connecting several toolkits at once is what breaks the
+  budget first (see [Tools](/guide/tools)).
+
+If Yumii becomes part of your day, a paid tier on any provider removes both
+ceilings — Groq's is notably cheap for the speed.
+
+## Behind the scenes
+
+A few implementation details that affect what you experience:
+
+* **Prompt caching.** Yumii orders her context so the large static parts (the
+  personality, tool schemas) form a stable prefix that providers cache —
+  faster first tokens and lower effective cost on every turn.
+* **Tool-call resilience.** Different models make different mistakes when
+  calling tools; Yumii sanitizes tool schemas at bind time and retries once on
+  malformed calls, so a model hiccup degrades to a spoken apology instead of a
+  crashed turn.
+* **A second, cheaper call.** Fact extraction (memory) runs as a background
+  pass after each turn, using a small fast model on your same provider — it's
+  part of your quota budget, not a separate account.

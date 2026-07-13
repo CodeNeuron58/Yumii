@@ -1,0 +1,65 @@
+---
+title: "Text-to-Speech"
+description: "Her voice: local Kokoro by default (bundled, offline), or ElevenLabs / CAMB.ai in the cloud."
+sidebarTitle: "Speaking"
+---
+
+Yumii's voice is where "local-first" is most visible: the default engine runs
+entirely on your CPU, ships inside the Windows installer, and works offline on
+the very first run. Pick the provider in **Dashboard → Settings → Voice
+(TTS)**.
+
+## Kokoro — the local default
+
+[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) is a small,
+remarkably natural neural voice that Yumii runs via ONNX on the CPU:
+
+* **Bundled with the installer** — nothing to download, no key, works offline.
+  (Source installs download it once, ~350 MB, to `~/.yumii/models/`.)
+* **54 voices** — the default is `af_heart`; the dashboard offers a curated
+  picker, and any voice name can be set via `KOKORO_VOICE` in the config.
+* **Fast enough to feel live.** Yumii splits her reply at sentence and clause
+  boundaries and synthesizes incrementally, so the first words reach your
+  ears in about a second while the rest is still being generated.
+* English-first. Other languages exist in the voice bank but the quality
+  varies; for serious multilingual use, a cloud voice is better today.
+
+<Callout type="info" title="fp32 vs int8">
+Kokoro has a smaller int8 variant, and counterintuitively it's about 3–4×
+<em>slower</em> than the full fp32 model on ordinary x86 CPUs (quantized ops
+fall back to slow kernels). Yumii defaults to fp32; leave
+<code>KOKORO_MODEL_SIZE</code> alone unless you've measured otherwise on your
+hardware.
+</Callout>
+
+## ElevenLabs — the cloud premium
+
+The most expressive and lifelike voices available, streamed from the cloud.
+Needs an ElevenLabs API key and a **Voice ID** (pick any voice at
+elevenlabs.io/voice-library and copy its ID — it looks like
+`21m00Tcm4TlvDq8ikWAM`). Costs per character after the free allowance; every
+word she speaks is a network call.
+
+## CAMB.ai — the cloud alternative
+
+A high-quality streaming alternative with strong multilingual coverage. Needs
+a CAMB API key and a numeric Voice ID from client.camb.ai.
+
+## Choosing
+
+| | Kokoro *(default)* | ElevenLabs | CAMB.ai |
+|---|---|---|---|
+| Runs | Locally, offline | Cloud | Cloud |
+| Cost | Free forever | Paid after free tier | Paid after free tier |
+| Latency | ~1s to first word | Network + synth | Network + synth |
+| Expressiveness | Very good | Best-in-class | Very good |
+| Languages | English-first | Broad | Broad |
+| Privacy | Nothing leaves your machine | Text of her replies goes to the provider | Same |
+
+The honest recommendation: **stay on Kokoro** unless you have a specific
+reason not to. It's the only option that keeps her voice private, free, and
+independent of your network — and for a companion you talk to daily, those
+three compound.
+
+Provider and voice changes need a restart (quit from the tray, reopen); the
+dashboard reminds you after saving.

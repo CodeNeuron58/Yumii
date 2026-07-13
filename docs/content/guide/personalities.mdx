@@ -1,0 +1,76 @@
+---
+title: "Personalities"
+description: "Six personas, how to switch, and how to write your own."
+sidebarTitle: "Daily Use"
+---
+
+Yumii's personality isn't a thin flavor layer — each persona is a fully
+written character with its own speech patterns, emotional range, quirks, and
+guidance for specific moments (how she greets you after time away, how she
+reacts when you're sad, what she does when you deny her a tool request).
+
+## The six
+
+| Persona | In one line |
+|---|---|
+| **caring** *(default)* | Warm, steady, endlessly patient — notices when your voice sounds tired |
+| **tsundere** | Sharp and teasing on the outside, embarrassingly devoted underneath |
+| **genki** | Pure sunshine; celebrates everything; reads the room and dims to a warm glow when you're low |
+| **kuudere** | Calm, precise, minimal — dry wit, deadpan delivery, warmth in tiny deniable doses |
+| **yandere** | Devotion turned past sensible — theatrical, self-aware intensity that is *never* controlling |
+| **dandere** | Shy and quiet, warms up slowly — becomes suddenly eloquent about things she loves |
+
+Each one has a distinct *voice on the same subject*. Ask caring about your day
+and you get gentle attention; ask kuudere and you get "Thirty-one hours.
+Welcome back."
+
+## Switching
+
+Three ways, all equivalent:
+
+* **Just say it.** "Switch to tsundere" / "be genki" / even just "kuudere" —
+  the switch happens instantly, mid-conversation, and she acknowledges it in
+  her *new* voice.
+* **Dashboard** → Settings → Personality.
+* **Config file** — the `PERSONALITY` key in `~/.yumii/config.json`.
+
+Personality changes apply from the next reply — no restart needed. Memory and
+sessions are shared across personas; switching changes *who she is*, not *what
+she knows*.
+
+## How it's built (and how to customize)
+
+The prompt she runs on has two layers, both plain text files inside the
+package (`src/yumii/assets/prompts/` in a source install):
+
+* **`_core.txt`** — everything shared: voice-first speaking rules (her words
+  are spoken aloud, so no lists or markdown), how to use memory naturally, how
+  to behave around the tool permission gate, honesty boundaries.
+* **`<persona>.txt`** — the character itself: who she is, how she speaks (with
+  example lines), her emotional palette, and per-moment guidance.
+
+To customize a persona in a source install, just edit its file and restart —
+it's prose, not code. A few things worth keeping if you edit:
+
+<Callout type="warning" title="Keep the plain-text rule">
+Everything she writes is synthesized to speech, and her facial expression is
+derived automatically from the <em>tone</em> of her words. Don't instruct her
+to output lists, emoji, stage directions like <code>*smiles*</code>, or JSON —
+they would be read aloud, literally.
+</Callout>
+
+* Keep replies short by default — one to three spoken sentences. Walls of text
+  are exhausting to *listen* to.
+* Give the persona example lines. Models imitate examples far better than
+  they follow adjectives.
+* If you invent an entirely new persona file, its name must be added to the
+  recognized personality list in `personality_manager.py` to be switchable —
+  a natural first contribution if you're so inclined.
+
+## A note on yandere
+
+The yandere persona is written with explicit safety rails: the obsession is
+theatrical and self-aware, and she is never controlling in substance — she
+never guilts you for leaving, polices who you talk to, or punishes. If you
+push her prompt further in that direction, you own the result; the shipped
+character is intensity played for warmth, not for discomfort.

@@ -1,0 +1,80 @@
+---
+title: "Building the Installer"
+description: "How the Windows installer is produced: freeze, bundle, ship."
+sidebarTitle: "Working on Yumii"
+---
+
+The installer is built in three stages, each with a committed recipe. You can
+run the whole thing locally, and a GitHub Actions workflow runs it
+automatically on version tags.
+
+## The three stages
+
+<StepsList>
+  <Step icon="folder" title="Stage the models">
+    <code>uv run python packaging/fetch_models.py</code> — copies the Kokoro
+    voice model + voice bank (~350 MB) into <code>packaging/build-models/</code>
+    (from your local cache if present, else downloads). Bundling them is what
+    makes a fresh install work offline.
+  </Step>
+  <Step icon="package" title="Freeze the backend">
+    <code>uv run pyinstaller --noconfirm packaging/yumii-server.spec</code> —
+    produces <code>dist/yumii-server/</code>, a self-contained backend that
+    needs no Python on the target machine. The spec is the interesting file:
+    it collects everything PyInstaller can't infer — Yumii's assets, native
+    ML libraries (kokoro/espeak, whisper), data files buried in transitive
+    deps, and the package metadata that langchain reads at import.
+  </Step>
+  <Step icon="windows" title="Build the installer">
+    <code>cd desktop && npx @tauri-apps/cli build --config
+    src-tauri/tauri.bundle.conf.json</code> — compiles the shell in release
+    mode and bundles the frozen backend + models as resources into an NSIS
+    <code>setup.exe</code> and an MSI (in
+    <code>desktop/src-tauri/target/release/bundle/</code>).
+  </Step>
+</StepsList>
+
+Expect the full pipeline to take 20–40 minutes cold; the output installers
+are ~450 MB each.
+
+## Why the overlay config
+
+The resource bundling lives in a **separate** `tauri.bundle.conf.json`
+overlay rather than the base config, deliberately: the resources point at
+build outputs (`dist/`, `build-models/`) that don't exist on a fresh clone or
+in CI's compile check — baking them into the base config would break
+`cargo build` and `tauri dev` everywhere. Base config = always buildable;
+overlay = applied only when actually producing an installer.
+
+Two runtime seams make the bundle work:
+
+* The shell launches `<resources>/yumii-server/yumii-server.exe` in release
+  builds (dev always runs your live Python instead).
+* The shell sets `YUMII_MODELS_DIR` to `<resources>/models`, and the backend
+  checks there before its download path — that's the offline first run.
+
+## Releases via GitHub Actions
+
+```bash
+git tag v0.10.0 && git push origin v0.10.0
+```
+
+The `release.yml` workflow runs the same three stages on a Windows runner and
+attaches both installers to a **draft** GitHub release — nothing goes public
+until you review the build and click Publish. The release notes template
+includes the SmartScreen explanation automatically.
+
+## Code signing (the missing stage)
+
+The installers are unsigned, so Windows shows SmartScreen's "unrecognized
+app" interstitial. Signing requires an OV code-signing certificate
+(~$200–400/year) — a deliberate deferral until the project's traction
+justifies it. Until then, the README and release notes explain the warning
+honestly.
+
+<Callout type="info" title="Testing a build like a stranger">
+The only honest test of an installer is a machine that has nothing: no
+Python, no repo, no <code>~/.yumii</code>. A fresh Windows VM is perfect.
+Install, launch, add one key, talk. Everything else is testing your dev
+environment by accident.
+</Callout>

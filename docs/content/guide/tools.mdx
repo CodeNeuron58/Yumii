@@ -1,0 +1,90 @@
+---
+title: "Tools & Permissions"
+description: "Give Yumii hands — web search out of the box, Gmail and more via Composio — with you approving every action."
+sidebarTitle: "Tools"
+---
+
+Yumii can *do* things, not just talk: search the web, read your inbox, send
+email. Every one of those actions flows through the same rule:
+
+> **Anything that touches the outside world asks you first.**
+
+When she decides to use an external tool, a small prompt appears —
+*"Allow Yumii to fetch emails?"* — and nothing happens until you click
+**Approve**. Deny it and she takes it gracefully, in character, and moves on.
+
+## Built in: web search and time
+
+Out of the box she has two tools: the **current time** (runs freely — it's
+read-only and local) and **web search** via DuckDuckGo (gated — it's an
+external call). No setup needed; ask her to look something up and you'll see
+the permission prompt in action.
+
+## Connecting real apps (Composio)
+
+For real integrations — Gmail today, more toolkits over time — Yumii uses
+[Composio](https://composio.dev) as the connection broker: Composio hosts the
+OAuth flow and holds the account tokens, your Composio API key lives in your
+local `auth.json`, and Yumii talks to your apps through it.
+
+<StepsList>
+  <Step icon="star" title="Get a free Composio key">
+    Create an account at <strong>app.composio.dev</strong> → Settings →
+    API Keys → Create. Copy the key (shown once).
+  </Step>
+  <Step icon="layout-dashboard" title="Paste it in Settings">
+    Dashboard → <strong>Settings → API Keys</strong> →
+    <strong> Composio API key</strong> → Save.
+  </Step>
+  <Step icon="cube" title="Connect an app">
+    Dashboard → <strong>Tools</strong> → click <strong>Gmail</strong> (or type
+    another toolkit slug). Your browser opens a Google sign-in — authenticate,
+    grant the scopes, and give it ~10 seconds to propagate.
+  </Step>
+  <Step icon="play" title="Restart and use it">
+    Quit Yumii from the tray and reopen — her new tools load at startup. Then
+    just ask: <em>"Check my last three emails."</em> Approve the prompt, and
+    she reads them out loud.
+  </Step>
+</StepsList>
+
+## The permission gate, tuned to taste
+
+The confirmation behavior is the `HITL_MODE` setting (Dashboard → Settings →
+"Tool confirmations"):
+
+| Mode | Behavior |
+|---|---|
+| `external` *(default)* | Only tools that touch the outside world ask; read-only local tools run freely |
+| `always` | Every tool call asks, even the clock |
+| `never` | Nothing asks — she acts autonomously. Use deliberately. |
+
+A prompt left unanswered times out and counts as a denial. Interrupting her
+by voice while a prompt is open also cancels it.
+
+## Free-tier budgets (honest section)
+
+Every connected tool has a schema the LLM must read **on every turn** —
+roughly a thousand tokens per tool. Free LLM tiers cap request sizes (Groq's
+free tier caps a single request at 8–12k tokens depending on the model), so
+Yumii deliberately keeps tool loads lean:
+
+* Gmail connects with a **curated set of tools** (fetch, send) rather than the
+  full 20+ toolkit, so conversation still fits the budget.
+* Long tool results (a big inbox fetch) are truncated before entering her
+  context.
+* You can override which tools load per toolkit with the `COMPOSIO_TOOLS` key
+  in `config.json` — see [Settings Reference](/reference/settings).
+
+<Callout type="warning" title="Connecting many apps on a free tier">
+Each additional connected toolkit costs context on every turn. On free LLM
+tiers, two or three connected apps is the practical ceiling before requests
+stop fitting; a paid provider tier removes the squeeze.
+</Callout>
+
+## Managing connections
+
+Dashboard → **Tools** lists connected apps. **Disable** stops loading a
+toolkit's tools at startup (the Composio-side account connection remains — you
+can also revoke that in your Composio dashboard, or revoke Google's grant at
+myaccount.google.com → Security → Third-party access).

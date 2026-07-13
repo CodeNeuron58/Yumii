@@ -1,0 +1,59 @@
+---
+title: "Speech-to-Text"
+description: "Her ears: local Whisper, Groq Whisper, or streaming Vosk — plus the always-local speech detector."
+sidebarTitle: "Hearing"
+---
+
+Two separate things happen when you speak, and only one of them is
+configurable:
+
+1. **Speech detection (VAD)** — noticing that you're talking and when you
+   stopped. This is *always* local: a tiny Silero neural network runs on your
+   CPU for every audio frame. It ships inside the app; no setup, no network,
+   ever.
+2. **Transcription (STT)** — turning your finished utterance into text. This
+   is the pluggable part.
+
+Pick the transcriber in **Dashboard → Settings → Ears (STT)**.
+
+## The three backends
+
+| Backend | Privacy | Speed | Accuracy | Needs |
+|---|---|---|---|---|
+| **Local Whisper** *(default)* | ✅ Fully local | ~1–2s per utterance | Good | Nothing — models download on first use |
+| **Groq Whisper** | ☁️ Cloud | ~0.3s per utterance | Best (whisper-large-v3) | A Groq key (reuses your LLM key) |
+| **Vosk** | ✅ Fully local | Instant, streams as you speak | Weakest — not recommended | Nothing — model downloads on first use |
+
+### Local Whisper
+
+The private default: `faster-whisper` running on your CPU. Choose the model
+size in settings — `tiny` (fastest), `base` (the balanced default), or
+`small` (most accurate, slower). The 1–2 seconds it takes to transcribe is
+the biggest chunk of her response delay on this backend.
+
+### Groq Whisper
+
+The same key that powers her thinking also buys dramatically better ears:
+whisper-large-v3-turbo in the cloud, roughly five to ten times faster than
+local and noticeably more accurate. It also filters non-speech well — humming
+and background noise get discarded instead of hallucinated into words. If
+you're already on Groq for the LLM and are comfortable with audio going to
+the same provider, this is the best experience.
+
+### Vosk
+
+Fully offline *and* streaming — your words appear on screen as you say them,
+which neither Whisper backend does. The trade-off is real: recognition
+quality is clearly below Whisper. It exists for the niche where offline +
+live partial text matters more than accuracy.
+
+## Tuning your environment
+
+* **Echo:** the orb applies echo cancellation, so speakers are fine — but
+  headphones make barge-in crisper since she never hears herself.
+* **Background noise:** an energy gate plus the VAD ignores fans and hums.
+  Distinct voices (TV, roommates) can still trigger listening — that's
+  physics, not configuration.
+* **Getting cut off mid-thought?** She closes your turn after a short
+  silence. Keep the sentence flowing, or just keep talking — interrupting
+  her reply is always allowed.

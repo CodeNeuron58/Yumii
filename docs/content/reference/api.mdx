@@ -1,9 +1,101 @@
 ---
-title: "API Reference"
-layout: "cards"
-icon: "code-2"
+title: "HTTP API & WebSocket"
+description: "The local backend's REST endpoints and the realtime protocol the orb speaks."
+sidebarTitle: "Interfaces"
 ---
 
-<ContentCard>
-Coming soon.
-</ContentCard>
+The backend serves a local API on `http://127.0.0.1:8000`. It's what the orb
+and dashboard use — and it's yours to script against. It binds to localhost
+only, and browsers are held to an origin allowlist (extendable via the
+`YUMII_ALLOWED_ORIGINS` environment variable).
+
+## REST endpoints
+
+### Health
+
+```
+GET /health                    → {"status": "ok"}
+```
+
+### Sessions
+
+```
+GET    /api/sessions                     list (newest first: id, name, timestamps, message_count)
+POST   /api/sessions?name=…              create
+POST   /api/sessions/{id}/resume         make {id} the live conversation
+PUT    /api/sessions/{id}                rename       body: {"name": "…"}
+DELETE /api/sessions/{id}                delete permanently
+GET    /api/sessions/{id}/messages       transcript: [{role: user|assistant|event, text}]
+```
+
+### Memory (facts)
+
+```
+GET    /api/facts                        all stored facts (id, fact, category, confidence)
+PUT    /api/facts/{id}                   edit         body: {"fact": "…"}
+DELETE /api/facts/{id}                   forget one
+```
+
+### Settings
+
+```
+GET /api/settings        current preferences, choices, and masked credentials
+PUT /api/settings        body: {"preferences": {…}, "text_settings": {…}, "credentials": {…}}
+```
+
+Preferences validate against fixed choices; unknown keys are rejected.
+Credentials are write-only (send a value to replace, omit to keep). The reply
+includes `restart_required` so callers know whether changes apply live.
+
+### Tools (Composio)
+
+```
+GET    /api/composio/status              {key_set, toolkits: […]}
+POST   /api/composio/connect             body: {"toolkit": "GMAIL"} → mints an OAuth URL,
+                                         opens the system browser, enables the toolkit
+DELETE /api/composio/toolkits/{slug}     disable a toolkit
+```
+
+## The WebSocket (`ws://127.0.0.1:8000/ws`)
+
+The realtime channel: raw microphone audio up, JSON events down.
+
+**Client → server.** The **first frame** must be a session selection:
+
+```json
+{"type": "session_select", "action": "auto"}      // keep current, or start fresh
+{"type": "session_select", "action": "new"}
+{"type": "session_select", "action": "resume", "session_id": "…"}
+```
+
+Then: **binary frames** of 16 kHz mono PCM16 microphone audio, plus two JSON
+frame types —
+
+```json
+{"type": "command", "command": "…"}                              // inject text as a spoken turn
+{"type": "confirmation_response", "request_id": "…", "approve": true}
+```
+
+**Server → client** events, in the order a turn produces them:
+
+| Event | Meaning |
+|---|---|
+| `partial_transcript` | Live words-as-you-speak (Vosk backend only) |
+| `thinking_start` / `thinking_delta` / `thinking_end` | The LLM is working; deltas carry tokens |
+| `tool_status` | `{tool, status: running}` — she's using a tool |
+| `confirmation_request` | `{request_id, tool, args}` — show Approve/Deny; reply with `confirmation_response` |
+| `confirmation_timeout` | The prompt expired (counts as deny) |
+| `audio_start` | `{text, expression, sampleRate}` — her reply text + emotion; audio follows |
+| `audio_chunk` | `{data}` — base64 PCM16 at `sampleRate`; play back-to-back |
+| `audio_end` | The reply is fully delivered |
+| `interrupt` | You barged in — stop playback immediately |
+| `error` | `{error}` — something failed; she stays alive |
+
+A minimal client is therefore: open WS → send `session_select` → stream mic
+PCM16 → render events. The orb (`src/yumii/assets/webui/index.html`) is the
+reference implementation and is a single readable file.
+
+<Callout type="warning" title="One conversation at a time">
+The backend hosts a single live conversation. A second WebSocket connection
+politely evicts the first — it's a companion, not a multi-user server.
+</Callout>

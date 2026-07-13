@@ -7,26 +7,27 @@ const SEGMENT_TO_SECTION_ID: Record<string, string> = {
   introduction: "get-started",
   quickstart: "get-started",
   "get-started": "get-started",
-  installation: "installation",
-  senses: "core-senses",
-  customization: "customization",
-  capabilities: "capabilities",
-  integration: "integration",
-  ops: "ops-reference",
+  guide: "guide",
+  providers: "providers",
+  reference: "reference",
+  development: "development",
 };
 
 function formatLabel(page: string) {
   const base = page.split("/").pop() || page;
 
   const customMap: Record<string, string> = {
-    vad: "VAD (Silero)",
+    "what-is-yumii": "What is Yumii?",
+    "first-conversation": "First Conversation",
+    llm: "Language Models",
+    stt: "Speech-to-Text",
+    tts: "Text-to-Speech",
+    files: "File Locations",
+    settings: "Settings Reference",
     cli: "CLI Reference",
-    api: "API Reference",
-    "mcp-server": "MCP Server",
-    wsl2: "Windows (WSL2)",
-    macos: "macOS",
-    linux: "Linux",
-    windows: "Windows",
+    api: "HTTP API & WebSocket",
+    "from-source": "Running from Source",
+    packaging: "Building the Installer",
   };
 
   if (customMap[base.toLowerCase()]) {

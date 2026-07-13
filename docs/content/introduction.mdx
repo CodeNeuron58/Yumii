@@ -1,101 +1,87 @@
 ---
 title: "Yumii"
-description: "The open-source AI companion that lives on your desktop. Voice-first, private by design, remembers you. Runs on CPU. Alpha — v0.4.0."
+description: "The open-source AI companion that lives on your desktop. Voice-first, private by design, remembers you — and asks before it acts. Runs on CPU."
 hideHero: true
 ---
 
 <MascotHero
   title="Yumii"
-  subtitle="The open-source AI companion that lives on your desktop. Voice-first, private, remembers you. Runs on CPU. v0.4.0 — alpha."
+  subtitle="The open-source AI companion that lives on your desktop. Voice-first, private, remembers you — and asks before it acts. Runs on a normal CPU."
 />
 
 <FeatureList cols={4}>
   <DocsCard
-    title="Get Started"
+    title="Install & Talk"
     icon="rocket"
-    href="/quickstart"
+    href="/get-started/installation"
   >
-    Install Yumii locally and launch your companion.
+    One installer on Windows. Paste one API key, tap the orb, start talking.
   </DocsCard>
   <DocsCard
-    title="Core Senses"
-    icon="waveform-lines"
-    href="/senses/vad"
-  >
-    Configure Voice Activity Detection, STT, and TTS.
-  </DocsCard>
-  <DocsCard
-    title="Personalities"
+    title="Using Yumii"
     icon="face-smile"
-    href="/customization/personality-prompts"
+    href="/guide/talking"
   >
-    Explore Yumii's personas and emotional tones.
+    Voice conversation, six personalities, the dashboard, and memory.
   </DocsCard>
   <DocsCard
-    title="Capabilities"
+    title="Tools & Permissions"
     icon="cube"
-    href="/capabilities/memory-architecture"
+    href="/guide/tools"
   >
-    Built-in tools, persistent memory, and session management.
+    Connect Gmail and other apps — Yumii always asks before acting.
+  </DocsCard>
+  <DocsCard
+    title="Providers"
+    icon="waveform-lines"
+    href="/providers/llm"
+  >
+    Swap the brain, ears, and voice: Groq, OpenAI, Anthropic, Ollama, Whisper, Kokoro.
   </DocsCard>
 </FeatureList>
 
 ## What is Yumii?
 
-Yumii is an open-source, locally-runnable AI companion. She listens
-through your microphone, thinks using a hosted LLM (Groq, OpenAI, or
-Anthropic), speaks using a hosted TTS provider (ElevenLabs or
-CAMB.ai), and reacts in real time through a Live2D avatar in your
-browser.
+Yumii is an open-source AI companion that runs on your own machine. She
+listens through your microphone, thinks with the LLM provider you choose,
+answers out loud in a fully **local voice**, and shows up on your desktop as a
+small floating orb — always there, never in the way.
 
-She is not a chatbot you query. She is a presence that listens,
-reacts, and remembers you across sessions — every conversation turn
-runs a cheap LLM pass that extracts facts about you and stores them
-in local SQLite, and those facts are injected into the system prompt
-on every new or resumed session.
+She is built around three promises:
 
-## What v0.2.0 ships with
+* **Voice-first.** Real conversation, not a chat box. You can interrupt her
+  mid-sentence and she stops and listens, the way a person would.
+* **Private by design.** Conversations, memory, and API keys live in local
+  files on your disk. The only network traffic is to the AI providers you
+  explicitly configure. Her voice is synthesized locally on your CPU.
+* **She asks before she acts.** Yumii can use tools — read your email, search
+  the web — but every outside action goes through a permission prompt on your
+  screen first. You approve or deny, every time, until you decide otherwise.
 
-* **Real-time voice conversation** — Silero VAD for speech detection,
-  `faster-whisper` (local CPU) or Groq Whisper (cloud) for transcription.
-* **Animated Live2D avatar** — open the browser, allow the microphone,
-  and Yumii reacts with expressions and body motions driven by the
-  LLM's structured output.
-* **Six personalities** — `caring`, `tsundere`, `genki`, `kuudere`,
-  `yandere`, `dandere`. Each is a plain text file in
-  `src/yumii/assets/prompts/`. Add your own.
-* **Barge-in** — speak while Yumii is talking and she stops. This is
-  the Gemini Live–style feel.
-* **Persistent memory** — `~/.yumii/memory/yumii.db` (sessions),
-  `store.db` (user facts), and `checkpoints.db` (LangGraph conversation
-  history). Survives restarts. CLI: `/chat`, `/resume`, `/sessions`,
-  `/memory`, `/forget`, `/name`. See [Memory Architecture](/capabilities/memory-architecture).
-* **OS-keychain credentials** — API keys are stored in Windows
-  Credential Manager, macOS Keychain, or libsecret. Never in `.env`.
-* **Polished CLI** — a Typer + Rich terminal dashboard with a
-  pixel-art banner, gradient vision reader, and a guided setup wizard.
+## What she can do today
 
-## What v0.2.0 does **not** ship with
+* **Real-time voice conversation** with barge-in interruption and roughly a
+  second of reply latency on an ordinary CPU.
+* **Six personalities** — caring, tsundere, genki, kuudere, yandere, dandere —
+  switchable mid-conversation by just asking.
+* **Long-term memory.** She extracts facts about you from conversation and
+  brings them up naturally in later sessions. You can browse, edit, and delete
+  everything she knows from the dashboard.
+* **Tools with a permission gate.** Web search out of the box; Gmail and other
+  real apps via a [Composio](https://composio.dev) account.
+* **A dashboard** for settings, API keys, past conversations (with readable
+  transcripts), and memory.
+* **Local text-to-speech** (Kokoro-82M) bundled in the installer — her voice
+  works offline, on the first run, with nothing to download.
 
-These are on the roadmap and will land in subsequent releases:
+<Callout type="warning" title="Alpha software">
+Yumii is in active development and pre-1.0. The core experience works
+end-to-end, but expect rough edges — and expect things to improve fast.
+Found a bug? <a href="https://github.com/CodeNeuron58/Yumii/issues">Open an issue</a>.
+</Callout>
 
-* **A planning / tool-execution agent loop** — v1.0.
-* **MCP (Model Context Protocol) server** — v1.0 or v2.0.
-* **Multimodal vision input** — post v2.0.
-* **A bundled Live2D model** — you bring your own
-  (`.model3.json` from any Cubism 4 compatible model). Drop it in
-  `~/.yumii/avatar/` and update the `modelUrl` in
-  `src/yumii/assets/webui/index.html`.
+## Where to go next
 
-## Why Yumii?
-
-Because the existing closed-source companions (Replika, Character.AI,
-Ava, etc.) require cloud accounts, lock you out of the personality
-prompts, and ship voice + avatar as an opaque binary. Yumii is the
-opposite: every line of her brain is a text file you can edit, every
-key lives in your OS keychain, every STT / TTS / LLM provider is a
-pluggable factory, and the avatar runs in your browser using standard
-Web tech.
-
-She is not the smartest assistant. She is the one you can actually
-read, modify, and own.
+* **Just want to try her?** → [Installation](/get-started/installation), then the [Quickstart](/quickstart).
+* **Want to understand the philosophy first?** → [What is Yumii?](/get-started/what-is-yumii)
+* **Curious how she works inside?** → [Architecture](/development/architecture)

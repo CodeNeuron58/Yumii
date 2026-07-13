@@ -1,127 +1,67 @@
 ---
 title: "Quickstart"
-description: "Give Yumii her senses and wake her up in under 2 minutes."
-layout: "cards"
+description: "From installed to talking in about two minutes."
+sidebarTitle: "First Steps"
 icon: "rocket"
 ---
 
-<ContentCard>
-Yumii v0.2.0 is the **Memory & Sessions release**. After installation, you will be able to:
-- Hold a real-time voice conversation with a Live2D avatar
-- Switch between six personalities
-- Have Yumii **remember facts about you across sessions** (local SQLite)
-- Manage **multiple chat sessions** with create, resume, rename, and delete
-- Use slash-style commands in the browser (`/new`, `/resume`, `/name`, ...) and in the CLI (`/chat`, `/memory`, `/forget`, ...)
-
----
-
-</ContentCard>
-
-Before meeting Yumii, ensure you have the following installed on your machine:
-
-<FeatureList cols={3}>
-  <DocsCard title="Python 3.12+" icon="rocket">
-    Ensure you have the latest Python version installed on your machine.
-  </DocsCard>
-  <DocsCard title="Modern Browser" icon="layout-dashboard">
-    Chrome, Edge, or Firefox are recommended for WebGL.
-  </DocsCard>
-  <DocsCard title="Microphone" icon="waveform-lines">
-    Required to speak to Yumii. Ensure permissions are enabled.
-  </DocsCard>
-</FeatureList>
-</ContentCard>
-
-<ContentCard>
-## <span style={{ color: 'var(--text-accent)' }}>1. Installation</span>
-
-First, clone the Yumii repository to your local machine and navigate into the directory.
-
-```bash
-git clone https://github.com/CodeNeuron58/Yumii.git
-cd Yumii
-```
-
-Install the dependencies using `uv` (required — do NOT use pip):
-
-```bash
-uv sync
-```
-
-<Callout type="warning" title="Warning: Do not use pip">
-  Do not use `pip install`. Yumii pins `torch` to a CPU-only build to keep the installation light. Using pip will try to download the full 2 GB CUDA version.
-</Callout>
-</ContentCard>
-
-<ContentCard>
-## 2. Attunement (First-Time Setup)
-
-Yumii needs an LLM to think and a Text-to-Speech provider to speak. 
-
-Run the interactive dashboard.
-
-If you activated your virtual environment:
-```bash
-# Windows
-.venv\Scripts\activate
-yumii
-
-# macOS / Linux
-source .venv/bin/activate
-yumii
-```
-
-Or without activating:
-```bash
-uv run yumii
-```
-
-<Callout type="info" title="Global Execution">
-  After activation, you can just type `yumii` for the rest of your terminal session. If you used the one-line installer, `yumii` always works globally without activation.
-</Callout>
-
-Since this is your first time, Yumii will automatically guide you through her **Attunement** process. You will be prompted to provide:
-
-<FeatureList cols={2}>
-  <DocsCard title="LLM API Key" icon="cube">
-    We highly recommend [Groq](https://console.groq.com/) for its blazing fast speed.
-  </DocsCard>
-  <DocsCard title="TTS API Key" icon="face-smile">
-    We recommend [ElevenLabs](https://elevenlabs.io/) for lifelike expression.
-  </DocsCard>
-</FeatureList>
-
-<Callout type="success" title="Local First Security">
-  Keys are stored in your **OS keychain** — Windows Credential Manager,
-  macOS Keychain, or libsecret on Linux. They are **never** written to
-  disk as plaintext, and **never** stored in a `.env` file. They are
-  only transmitted directly to the LLM / TTS / STT provider you
-  configured.
-</Callout>
-</ContentCard>
-
-<ContentCard>
-## 3. Waking Her Up
-
-Once configured, simply select **"🌸 Wake Yumii Up"** from the main dashboard menu (or run `uv run yumii wake-up`).
+You've [installed Yumii](/get-started/installation). Everything about her
+voice and ears already works locally — the one thing she needs from you is an
+API key for her *thinking*. The free [Groq](https://console.groq.com) tier is
+the recommended way to start: no card required, and it's fast enough for
+real-time conversation.
 
 <StepsList>
-  <Step icon="terminal" title="The backend server will initialize and listen on port 8000." />
-  <Step icon="monitor" title="A browser tab will automatically open to http://localhost:8000/." />
-  <Step icon="waveform-lines" title="Allow microphone permissions if prompted by your browser." />
-  <Step icon="face-smile" title="Say hello to Yumii!" />
+  <Step icon="star" title="Get a free Groq API key">
+    Sign up at console.groq.com → <strong>API Keys</strong> →
+    <strong> Create API Key</strong>. Copy it — it's shown only once.
+  </Step>
+  <Step icon="layout-dashboard" title="Open the dashboard and paste the key">
+    Launch Yumii. When the orb appears, click the <strong>⚙ gear</strong> on
+    the orb window (or right-click the tray icon) → <strong>Dashboard</strong>.
+    In <strong>Settings → API Keys</strong>, paste your key into
+    <strong> Groq API key</strong> and hit <strong>Save settings</strong>.
+  </Step>
+  <Step icon="play" title="Restart Yumii">
+    Quit from the tray icon and launch her again — provider changes load at
+    startup. The dashboard tells you whenever a restart is needed.
+  </Step>
+  <Step icon="face-smile" title="Tap the orb and talk">
+    Click the orb, allow microphone access, and say hello. She listens
+    continuously — no push-to-talk. Try interrupting her mid-sentence: she
+    stops and listens. That's not a bug, that's the point.
+  </Step>
 </StepsList>
-</ContentCard>
 
-<ContentCard>
-## Troubleshooting
+## Things to try in your first five minutes
 
-<AccordionGroup>
-  <Accordion title="I get a KMP_DUPLICATE_LIB_OK error">
-    This is common on Windows with `faster-whisper`. The Yumii CLI automatically attempts to patch this by setting the environment variable internally, but if it persists, ensure you don't have conflicting OpenMP libraries installed.
-  </Accordion>
-  <Accordion title="She isn't responding to my voice">
-    Check the terminal output. If you don't see `[Voice Activity Detected]`, your microphone might be muted or not set as the default system input device.
-  </Accordion>
-</AccordionGroup>
-</ContentCard>
+* **"Switch to tsundere."** — her whole personality changes on the spot.
+  There are six: caring (the default), tsundere, genki, kuudere, yandere,
+  dandere.
+* **Tell her something about yourself.** "I've got a job interview on
+  Friday." Then ask her about it tomorrow — she'll remember.
+* **"Search the web for…"** — her first tool. A small permission prompt
+  appears before she actually searches; that gate guards every external
+  action she ever takes.
+* **Press `Ctrl+Shift+Space`** — the global hotkey hides and summons the orb
+  from anywhere.
+
+## Where everything lives
+
+* The **orb** is the conversation. Tap to start, talk naturally, interrupt
+  freely.
+* The **dashboard** (gear icon or tray → Dashboard) is the control room:
+  settings and keys, past conversations with readable transcripts, connected
+  tools, and everything she remembers about you.
+* The **tray icon** is lifecycle: show/hide, dashboard, quit.
+
+<Callout type="info" title="On Groq's free tier">
+The free tier has daily token quotas and per-request size caps. Normal
+conversation fits comfortably; a heavy day of tool use can bump into them —
+she'll fail politely when it happens. See the
+<a href="/reference/troubleshooting">Troubleshooting</a> page for what the
+limits look like and what your options are.
+</Callout>
+
+**Next:** [Talking to Yumii](/guide/talking) for the conversation model, or
+[Tools & Permissions](/guide/tools) to connect Gmail.
