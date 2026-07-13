@@ -1,98 +1,156 @@
 'use client';
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
-  BookOpenText,
-  Bot,
-  Code2,
-  Command,
-  Github,
-  PlugZap,
-  Search,
-  Server,
-  type LucideIcon,
-} from "lucide-react";
-import ThemeToggle from "./ThemeToggle";
-import DiscordLink from "./DiscordLink";
+  GithubLogoIcon,
+  ListIcon,
+  MagnifyingGlassIcon,
+} from "@phosphor-icons/react";
+import { flattenPages, type NavSection } from "./nav";
 
-type NavSection = {
-  label: string;
-  href: string;
-  match: string[];
-  icon: LucideIcon;
-};
+export default function TopNav({ sections }: { sections: NavSection[] }) {
+  const router = useRouter();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
-const NAV_SECTIONS: NavSection[] = [
-  { label: "Get Started", href: "/introduction", match: ["introduction", "quickstart", "get-started"], icon: BookOpenText },
-  { label: "Using Yumii", href: "/guide/talking", match: ["guide"], icon: Bot },
-  { label: "Providers", href: "/providers/llm", match: ["providers"], icon: PlugZap },
-  { label: "Reference", href: "/reference/files", match: ["reference"], icon: Server },
-  { label: "Development", href: "/development/architecture", match: ["development"], icon: Code2 },
-];
+  const allPages = useMemo(() => flattenPages(sections), [sections]);
 
-export default function TopNav() {
-  const pathname = usePathname();
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return allPages
+      .filter(
+        (page) =>
+          page.label.toLowerCase().includes(q) ||
+          page.slug.toLowerCase().includes(q) ||
+          page.section.toLowerCase().includes(q)
+      )
+      .slice(0, 8);
+  }, [allPages, query]);
 
-  const isActive = (section: NavSection) => {
-    const segments = pathname.split("/").filter(Boolean);
-    if (segments.length === 0) return section.match.includes("introduction");
-    return section.match.some((m) => segments[0] === m);
+  // ⌘K / Ctrl+K opens search, Escape closes it
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      if (e.key === "Escape") setSearchOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen && searchRef.current) searchRef.current.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQuery("");
+  };
+
+  const goTo = (slug: string) => {
+    closeSearch();
+    router.push(`/${slug}`);
   };
 
   return (
-    <header className="top-nav">
-      <div className="top-nav-shell">
-        <div className="top-nav-row top-nav-row--primary">
-          <a href="/" className="logo">
-            <img src="/docs/images/orb-logo.png" alt="Yumii" width={28} height={28} />
-            <span>Yumii</span>
-          </a>
-
-          <div className="search-bar">
-            <button className="search-input" aria-label="Search documentation">
-              <Search size={14} className="search-icon" aria-hidden="true" />
-              <span className="search-placeholder">Search docs, commands, or topics...</span>
-              <span className="shortcut">
-                <Command size={12} aria-hidden="true" />
-                K
-              </span>
+    <>
+      <header className="docs-header">
+        <div className="docs-header-inner">
+          <div className="docs-header-left">
+            <button
+              className="mobile-nav-toggle"
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("yumii:toggle-sidebar"))
+              }
+              aria-label="Toggle navigation"
+            >
+              <ListIcon size={20} aria-hidden="true" />
             </button>
+            <Link href="/introduction" className="docs-logo" aria-label="Yumii docs home">
+              <img
+                src="/docs/images/orb-logo.png"
+                alt=""
+                width={24}
+                height={24}
+                className="docs-logo-img"
+              />
+              <span className="docs-logo-text">Yumii</span>
+              <span className="docs-logo-divider" />
+              <span className="docs-logo-label">Docs</span>
+            </Link>
           </div>
 
-          <div className="nav-links">
+          <button className="search-trigger" onClick={() => setSearchOpen(true)}>
+            <MagnifyingGlassIcon size={15} aria-hidden="true" />
+            <span>Search docs…</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+
+          <nav className="docs-header-links">
+            <a href="/" className="docs-header-link">
+              Home
+            </a>
             <a
               href="https://github.com/CodeNeuron58/Yumii"
               target="_blank"
-              rel="noopener noreferrer"
-              className="nav-utility"
+              rel="noreferrer noopener"
+              className="docs-header-link"
+              aria-label="GitHub repository"
             >
-              <Github size={14} aria-hidden="true" />
-              GitHub
+              <GithubLogoIcon size={16} aria-hidden="true" />
             </a>
-            <DiscordLink />
-            <ThemeToggle />
-          </div>
-        </div>
-
-        <div className="top-nav-row top-nav-row--tabs">
-          <nav className="section-tabs" aria-label="Documentation sections">
-            {NAV_SECTIONS.map((section) => {
-              const Icon = section.icon;
-              return (
-                <Link
-                  key={section.href}
-                  href={section.href}
-                  className={`section-tab ${isActive(section) ? "section-tab--active" : ""}`}
-                >
-                  <Icon size={13} className="section-tab-icon" aria-hidden="true" />
-                  <span>{section.label}</span>
-                </Link>
-              );
-            })}
           </nav>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {searchOpen && (
+        <div className="search-overlay" onClick={closeSearch}>
+          <div className="search-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="search-input-wrap">
+              <MagnifyingGlassIcon size={18} aria-hidden="true" />
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search documentation…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && results.length > 0) {
+                    goTo(results[0].slug);
+                  }
+                }}
+                className="search-input"
+              />
+              <kbd className="search-esc">esc</kbd>
+            </div>
+            <div className="search-results">
+              {query.trim().length === 0 ? (
+                <p className="search-hint">Type to search across all documentation…</p>
+              ) : results.length === 0 ? (
+                <p className="search-empty">No results for &ldquo;{query}&rdquo;</p>
+              ) : (
+                results.map((page) => (
+                  <button
+                    key={page.slug}
+                    type="button"
+                    className="search-result"
+                    onClick={() => goTo(page.slug)}
+                  >
+                    <span className="search-result-label">{page.label}</span>
+                    <span className="search-result-section">{page.section}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

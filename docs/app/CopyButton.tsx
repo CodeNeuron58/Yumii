@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { CheckIcon, CopySimpleIcon } from '@phosphor-icons/react';
 
 export default function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -17,12 +17,12 @@ export default function CopyButton({ code }: { code: string }) {
   };
 
   return (
-    <button 
-      className={`command-copy-btn ${copied ? 'copied' : ''}`} 
+    <button
+      className={`command-copy-btn ${copied ? 'copied' : ''}`}
       onClick={handleCopy}
       aria-label="Copy code"
     >
-      {copied ? <Check size={14} /> : <Copy size={14} />}
+      {copied ? <CheckIcon size={14} /> : <CopySimpleIcon size={14} />}
     </button>
   );
 }

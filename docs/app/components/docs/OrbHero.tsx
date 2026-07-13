@@ -1,15 +1,15 @@
 import React from 'react';
 
-interface MascotHeroProps {
+interface OrbHeroProps {
   title: string;
   subtitle?: string;
 }
 
 /**
- * Docs front-page hero — the orb, Yumii's post-pivot form.
- * (Kept the MascotHero name so existing MDX keeps working.)
+ * Docs front-page hero: the orb, rendered live in CSS with the same
+ * recipe as the landing page. She is the brand mark.
  */
-export default function MascotHero({ title, subtitle }: MascotHeroProps) {
+export default function OrbHero({ title, subtitle }: OrbHeroProps) {
   return (
     <div className="orb-hero-docs">
       <div className="orb-hero-glow" aria-hidden="true"></div>

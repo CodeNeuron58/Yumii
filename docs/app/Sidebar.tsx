@@ -1,91 +1,90 @@
 'use client';
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CaretRightIcon } from "@phosphor-icons/react";
+import { formatLabel, type NavSection } from "./nav";
 
-const SEGMENT_TO_SECTION_ID: Record<string, string> = {
-  introduction: "get-started",
-  quickstart: "get-started",
-  "get-started": "get-started",
-  guide: "guide",
-  providers: "providers",
-  reference: "reference",
-  development: "development",
-};
-
-function formatLabel(page: string) {
-  const base = page.split("/").pop() || page;
-
-  const customMap: Record<string, string> = {
-    "what-is-yumii": "What is Yumii?",
-    "first-conversation": "First Conversation",
-    llm: "Language Models",
-    stt: "Speech-to-Text",
-    tts: "Text-to-Speech",
-    files: "File Locations",
-    settings: "Settings Reference",
-    cli: "CLI Reference",
-    api: "HTTP API & WebSocket",
-    "from-source": "Running from Source",
-    packaging: "Building the Installer",
-  };
-
-  if (customMap[base.toLowerCase()]) {
-    return customMap[base.toLowerCase()];
-  }
-
-  return base
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-interface SidebarProps {
-  sections: {
-    id: string;
-    title: string;
-    groups: {
-      group: string;
-      pages: string[];
-    }[];
-  }[];
-}
-
-export default function Sidebar({ sections }: SidebarProps) {
+export default function Sidebar({ sections }: { sections: NavSection[] }) {
   const pathname = usePathname();
-  const segments = pathname.split("/").filter(Boolean);
-  const activeSegment = segments[0] || "introduction";
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    sections.forEach((section) => (initial[section.id] = true));
+    return initial;
+  });
 
-  const sectionId = SEGMENT_TO_SECTION_ID[activeSegment] || "get-started";
-  const activeSection = sections.find((section) => section.id === sectionId);
-  const sectionGroups = activeSection ? activeSection.groups : [];
+  const toggle = (id: string) =>
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  // The header hamburger lives in TopNav (a different tree); it signals us.
+  useEffect(() => {
+    const handler = () => setMobileOpen((open) => !open);
+    window.addEventListener("yumii:toggle-sidebar", handler);
+    return () => window.removeEventListener("yumii:toggle-sidebar", handler);
+  }, []);
+
+  // Close the drawer on navigation
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  const isActive = (page: string) =>
+    pathname === `/${page}` || (pathname === "/" && page === "introduction");
 
   return (
-    <aside className="left-sidebar">
-      <div className="left-sidebar-panel">
-        <nav className="sidebar-nav" aria-label="Documentation navigation">
-          {sectionGroups.map((group, index) => (
-            <div key={`${group.group}-${index}`} className="nav-section">
-              <h4 className="nav-section-title">{group.group}</h4>
-              <ul>
-                {group.pages.map((page, itemIndex) => {
-                  const href = `/${page}`;
-                  const isActive = pathname === href || (pathname === "/" && page === "introduction");
-
-                  return (
-                    <li key={`${page}-${itemIndex}`} className={`sidebar-item ${isActive ? "active" : ""}`}>
-                      <span className="sidebar-item-rail" aria-hidden="true" />
-                      <Link href={href} className="sidebar-link">
-                        <span className="sidebar-item-icon" aria-hidden="true" />
-                        <span className="sidebar-item-label">{formatLabel(page)}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </nav>
-      </div>
-    </aside>
+    <>
+      {mobileOpen && (
+        <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
+      )}
+      <aside className={`sidebar ${mobileOpen ? "sidebar-open" : ""}`}>
+        <div className="sidebar-inner">
+          <nav aria-label="Documentation navigation">
+            {sections.map((section) => (
+              <div key={section.id} className="sidebar-group">
+                <button
+                  className="sidebar-group-label"
+                  onClick={() => toggle(section.id)}
+                  aria-expanded={expanded[section.id]}
+                >
+                  <CaretRightIcon
+                    size={12}
+                    weight="bold"
+                    className={`sidebar-chevron ${
+                      expanded[section.id] ? "sidebar-chevron-open" : ""
+                    }`}
+                    aria-hidden="true"
+                  />
+                  {section.title}
+                </button>
+                {expanded[section.id] &&
+                  section.groups.map((group) => (
+                    <div key={group.group}>
+                      {section.groups.length > 1 && (
+                        <div className="sidebar-subgroup">{group.group}</div>
+                      )}
+                      <ul className="sidebar-links">
+                        {group.pages.map((page) => (
+                          <li key={page}>
+                            <Link
+                              href={`/${page}`}
+                              className={`sidebar-link ${
+                                isActive(page) ? "sidebar-link-active" : ""
+                              }`}
+                            >
+                              {formatLabel(page)}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+              </div>
+            ))}
+          </nav>
+        </div>
+      </aside>
+    </>
   );
 }
