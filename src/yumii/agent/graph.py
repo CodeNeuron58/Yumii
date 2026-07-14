@@ -32,6 +32,7 @@ to the user / WS layer.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import Any
@@ -53,23 +54,43 @@ log = get_logger(__name__)
 # LangGraph checkpoints live in their own SQLite file.
 _CHECKPOINT_DB = Path.home() / ".yumii" / "memory" / "checkpoints.db"
 
-# Request-size guards. Free-tier Groq rejects any single request over
-# 12k tokens (413), and tool results (a fetched inbox!) persist into
-# the checkpointed history, poisoning every later turn of the session.
-_MAX_TOOL_RESULT_CHARS = 3000  # ≈750 tokens per tool result
-_HISTORY_WINDOW = 12  # messages sent to the LLM (full history stays in the checkpoint)
+# Request-size guards, tuned per provider. Free-tier Groq rejects any
+# single request over 8–12k tokens (413), and tool results (a fetched
+# inbox!) persist into the checkpointed history, poisoning every later
+# turn of the session — so Groq gets tight budgets. Every other
+# provider (Ollama Cloud's minimax-m3 has a 1M context) gets room to
+# actually work: full inboxes, longer conversations.
+_GROQ_MAX_TOOL_RESULT_CHARS = 3000  # ≈750 tokens per tool result
+_GROQ_HISTORY_WINDOW = 12
+_MAX_TOOL_RESULT_CHARS = 20000  # ≈5k tokens
+_HISTORY_WINDOW = 40
+
+# A tool run (Composio → provider API → back) with no bound would hang
+# the turn forever if the HTTP call stalls; the conversation dies until
+# an app restart. On timeout the model gets an error ToolMessage and
+# can say so out loud instead.
+_TOOL_EXECUTION_TIMEOUT_SEC = 90.0
 
 
-def _truncate_tool_results(result: Any) -> Any:
+def _request_budgets() -> tuple[int, int]:
+    """Return ``(max_tool_result_chars, history_window)`` for the active provider."""
+    if settings.llm_provider.lower() == "groq":
+        return _GROQ_MAX_TOOL_RESULT_CHARS, _GROQ_HISTORY_WINDOW
+    return _MAX_TOOL_RESULT_CHARS, _HISTORY_WINDOW
+
+
+def _truncate_tool_results(result: Any, max_chars: int | None = None) -> Any:
     """Cap oversized ToolMessage contents before they enter the state."""
+    if max_chars is None:
+        max_chars, _ = _request_budgets()
     messages = result.get("messages", []) if isinstance(result, dict) else []
     for m in messages:
         if not isinstance(m, ToolMessage):
             continue
         content = m.content if isinstance(m.content, str) else str(m.content)
-        if len(content) > _MAX_TOOL_RESULT_CHARS:
+        if len(content) > max_chars:
             m.content = (
-                content[:_MAX_TOOL_RESULT_CHARS]
+                content[:max_chars]
                 + "\n... [result truncated — too long for the conversation context]"
             )
             log.info(
@@ -78,20 +99,55 @@ def _truncate_tool_results(result: Any) -> Any:
     return result
 
 
-def _window_history(history: list) -> list:
+def _repair_dangling_tool_calls(messages: list) -> list:
+    """Answer tool calls that never got a result with a synthetic ToolMessage.
+
+    A barge-in or crash between the model requesting a tool and the
+    result landing leaves an AIMessage with ``tool_calls`` and no
+    matching ToolMessage in the checkpoint. Providers require every
+    tool_call_id to be answered, so without this repair one interrupted
+    turn poisons every later request in the session.
+    """
+    answered = {
+        m.tool_call_id for m in messages if isinstance(m, ToolMessage)
+    }
+    out: list = []
+    for m in messages:
+        out.append(m)
+        if not isinstance(m, AIMessage):
+            continue
+        for call in getattr(m, "tool_calls", None) or []:
+            call_id = call.get("id", "")
+            if call_id and call_id not in answered:
+                log.info("dangling_tool_call_repaired", tool=call.get("name", ""))
+                out.append(
+                    ToolMessage(
+                        content="[interrupted — this tool call produced no result]",
+                        tool_call_id=call_id,
+                        name=call.get("name", ""),
+                    )
+                )
+    return out
+
+
+def _window_history(history: list, window: int | None = None) -> list:
     """Return the most recent slice of history for the LLM request.
 
     The checkpoint keeps everything; this only bounds what each request
     carries. The window never starts on an orphaned ToolMessage (a
     ToolMessage without its preceding tool-calling AIMessage is an API
-    error on strict providers). Trade-off: when the window slides,
-    the request prefix changes and provider caching misses once —
-    fitting under the request cap beats a cache hit.
+    error on strict providers), and dangling tool calls left by
+    interrupted turns are answered with synthetic results. Trade-off:
+    when the window slides, the request prefix changes and provider
+    caching misses once — fitting under the request cap beats a cache
+    hit.
     """
-    windowed = history[-_HISTORY_WINDOW:]
+    if window is None:
+        _, window = _request_budgets()
+    windowed = history[-window:]
     while windowed and isinstance(windowed[0], ToolMessage):
         windowed = windowed[1:]
-    return windowed
+    return _repair_dangling_tool_calls(windowed)
 
 
 def _build_state_class() -> type:
@@ -111,6 +167,10 @@ def _build_state_class() -> type:
         input: str
         turn_id: str
         response: str
+        # turn_id of the turn that produced ``response`` — lets the
+        # engine tell a fresh response apart from a stale one when it
+        # reads the checkpoint after a streaming failure.
+        response_turn_id: str
         expression: str
         motion: str
         session_id: str
@@ -223,6 +283,7 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
         return {
             "messages": [new_human, response],
             "response": yumii_resp.response_text,
+            "response_turn_id": turn_id,
             "expression": yumii_resp.expression,
             "motion": yumii_resp.motion,
         }
@@ -283,6 +344,39 @@ def _build_gated_tools_node(tools: list) -> Any:
     """
     inner = ToolNode(tools)
 
+    async def run_tools(state: dict[str, Any], calls: list[dict]) -> dict[str, Any]:
+        """Dispatch to the inner ToolNode with a hard execution timeout.
+
+        On timeout every pending call gets an error ToolMessage so the
+        history stays valid and the model can tell the user it failed.
+        (The underlying worker thread may still finish in the
+        background; its result is simply discarded.)
+        """
+        try:
+            result = await asyncio.wait_for(
+                inner.ainvoke(state), timeout=_TOOL_EXECUTION_TIMEOUT_SEC
+            )
+        except asyncio.TimeoutError:
+            log.error(
+                "tool_execution_timeout",
+                tools=[c.get("name", "") for c in calls],
+                timeout_sec=_TOOL_EXECUTION_TIMEOUT_SEC,
+            )
+            return {
+                "messages": [
+                    ToolMessage(
+                        content=(
+                            f"Tool call timed out after "
+                            f"{int(_TOOL_EXECUTION_TIMEOUT_SEC)} seconds — no result."
+                        ),
+                        tool_call_id=c.get("id", ""),
+                        name=c.get("name", ""),
+                    )
+                    for c in calls
+                ]
+            }
+        return _truncate_tool_results(result)
+
     async def gated_tools_node(state: dict[str, Any]) -> dict[str, Any]:
         messages = list(state.get("messages") or [])
         # Find the most recent AIMessage with tool_calls. The LangGraph
@@ -341,7 +435,7 @@ def _build_gated_tools_node(tools: list) -> Any:
 
         if not denied_messages:
             # No denials — let the inner node dispatch everything.
-            return _truncate_tool_results(await inner.ainvoke(state))
+            return await run_tools(state, list(last_ai.tool_calls))
 
         if not approved_calls:
             # All gated calls were denied.
@@ -356,7 +450,7 @@ def _build_gated_tools_node(tools: list) -> Any:
             id=last_ai.id,
         )
         sub_state = {**state, "messages": messages[:-1] + [trimmed_ai]}
-        inner_result = _truncate_tool_results(await inner.ainvoke(sub_state))
+        inner_result = await run_tools(sub_state, approved_calls)
         inner_messages = (
             inner_result.get("messages", [])
             if isinstance(inner_result, dict)

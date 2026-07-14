@@ -246,6 +246,14 @@ def _motion_for(text: str) -> MotionLabel:
 
 # Public entry point ----------------------------------------------------
 
+# Reasoning models (minimax-m3, qwen, deepseek-r1, …) normally return
+# their chain-of-thought in a separate field, but some provider/model
+# combos inline it as <think>…</think> in the content. That must never
+# reach TTS — the orb would speak the model's private reasoning aloud.
+_THINK_BLOCK = re.compile(
+    r"<think(?:ing)?>.*?</think(?:ing)?>\s*", re.DOTALL | re.IGNORECASE
+)
+
 
 def synthesize(agent_text: str) -> YumiiResponse:
     """Convert a plain agent response into a YumiiResponse.
@@ -263,7 +271,7 @@ def synthesize(agent_text: str) -> YumiiResponse:
         A :class:`YumiiResponse` with the three fields the engine and
         the frontend both consume.
     """
-    text = (agent_text or "").strip()
+    text = _THINK_BLOCK.sub("", agent_text or "").strip()
     if not text:
         return YumiiResponse(
             response_text="...",

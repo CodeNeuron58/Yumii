@@ -423,7 +423,7 @@
             // no-op inside the Tauri webview, so also show the link.
             note.innerHTML = `A ${esc(res.toolkit)} sign-in page opened in your browser ` +
                 `(<a href="${esc(res.redirect_url)}" target="_blank" style="color:var(--c-primary)">or click here</a>). ` +
-                `After signing in, quit Yumii from the tray and reopen it — her new tools load at startup.`;
+                `Finish signing in there, then just talk — her new tools are already loaded.`;
             loadTools();
         }
 
@@ -438,7 +438,7 @@
             const btn = e.target.closest('button[data-act="disable"]');
             if (!btn) return;
             const slug = btn.closest('.list-item').dataset.toolkit;
-            if (!confirm(`Disable ${slug}? Yumii loses these tools on next restart.`)) return;
+            if (!confirm(`Disable ${slug}? Yumii loses these tools immediately.`)) return;
             await fetch(`${API}/api/composio/toolkits/${slug}`, { method: 'DELETE' });
             loadTools();
         });

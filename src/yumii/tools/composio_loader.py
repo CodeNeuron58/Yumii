@@ -44,46 +44,60 @@ _COMPOSIO_POLICY = ToolPolicy(
     requires_confirmation=True,
 )
 
-# Curated per-toolkit tool subsets. Loading a whole toolkit ships every
-# tool's JSON schema with EVERY LLM request — measured: the full GMAIL
-# toolkit is ~10k tokens of schema, which alone blows a free-tier Groq
-# request (12k TPM cap) before the user says a word. Users can override
-# per toolkit via COMPOSIO_TOOLS in config.json:
+# Curated per-toolkit tool subsets — applied ONLY on free-tier-capped
+# providers (Groq). Loading a whole toolkit ships every tool's JSON
+# schema with EVERY LLM request — measured: the full GMAIL toolkit is
+# ~10k tokens of schema, which alone blows a free-tier Groq request
+# (12k TPM cap) before the user says a word. Providers with real
+# context windows (Ollama Cloud's minimax-m3: 1M) load full toolkits —
+# the curated 2-tool Gmail was why "reply to that email" had no tool
+# to call. Users can override per toolkit via COMPOSIO_TOOLS in
+# config.json:
 #   "COMPOSIO_TOOLS": {"GMAIL": ["GMAIL_FETCH_EMAILS", ...]}
 _CURATED_TOOLS: dict[str, list[str]] = {
     # Two tools, not four: free-tier request ceilings are tiny (qwen:
     # 8k tokens TOTAL per request; llama: 12k) and each Gmail schema
-    # costs ~1k tokens on every single turn. Reply/contacts can return
-    # once the user is on a paid tier or a bigger request budget.
+    # costs ~1k tokens on every single turn.
     "GMAIL": [
         "GMAIL_FETCH_EMAILS",
         "GMAIL_SEND_EMAIL",
     ],
 }
 
-# Toolkits we have no curation for still get a bound, not a firehose.
-_UNCURATED_LIMIT = 8
+# Toolkits fetched whole still get a bound, not a firehose.
+_UNCURATED_LIMIT = 8  # tight providers (Groq)
+_FULL_TOOLKIT_LIMIT = 100  # everyone else — covers any real toolkit
+
+# Names this loader registered on the global registry. Lets a runtime
+# reload (user connects an app in the dashboard) replace the Composio
+# tools cleanly without touching the native ones.
+_registered_composio_tools: set[str] = set()
+
+
+def _should_curate() -> bool:
+    """Curated subsets only make sense under free-tier request caps."""
+    return settings.llm_provider.lower() == "groq"
 
 
 def _resolve_tool_selection(
-    toolkits: list[str], overrides: dict | None
+    toolkits: list[str], overrides: dict | None, curate: bool = True
 ) -> tuple[list[str], list[str]]:
-    """Split enabled toolkits into (explicit tool slugs, uncurated toolkits).
+    """Split enabled toolkits into (explicit tool slugs, whole toolkits).
 
     Order of precedence per toolkit: user override from config.json,
-    then the curated default, else the toolkit goes in the uncurated
-    bucket and is fetched with a size limit.
+    then — when ``curate`` — the curated default, else the toolkit is
+    fetched whole (with a sanity limit).
     """
     overrides = overrides if isinstance(overrides, dict) else {}
     slugs: list[str] = []
-    uncurated: list[str] = []
+    whole: list[str] = []
     for tk in toolkits:
-        chosen = overrides.get(tk) or _CURATED_TOOLS.get(tk)
+        chosen = overrides.get(tk) or (_CURATED_TOOLS.get(tk) if curate else None)
         if isinstance(chosen, list) and chosen:
             slugs.extend(str(s).upper() for s in chosen)
         else:
-            uncurated.append(tk)
-    return slugs, uncurated
+            whole.append(tk)
+    return slugs, whole
 
 
 def composio_api_key() -> str | None:
@@ -130,6 +144,13 @@ async def load_and_register_composio_tools(
     Returns:
         The names of the tools that were registered.
     """
+    # Reload-safe: drop whatever this loader registered last time, so a
+    # runtime reload (dashboard connect/disable) replaces the Composio
+    # tool set instead of erroring on collisions or leaving stale tools.
+    for name in _registered_composio_tools:
+        registry.unregister(name)
+    _registered_composio_tools.clear()
+
     if not composio_api_key():
         return []
     toolkits = enabled_toolkits()
@@ -138,17 +159,19 @@ async def load_and_register_composio_tools(
 
     factory = client_factory or get_composio_client
     overrides = load_global_config().get("COMPOSIO_TOOLS")
-    slugs, uncurated = _resolve_tool_selection(toolkits, overrides)
+    curate = _should_curate()
+    slugs, whole = _resolve_tool_selection(toolkits, overrides, curate=curate)
+    fetch_limit = _UNCURATED_LIMIT if curate else _FULL_TOOLKIT_LIMIT
 
     def _load() -> list[Any]:
         client = factory()
         loaded: list[Any] = []
         if slugs:
             loaded.extend(client.tools.get(user_id=USER_ID, tools=slugs))
-        for tk in uncurated:
+        for tk in whole:
             loaded.extend(
                 client.tools.get(
-                    user_id=USER_ID, toolkits=[tk], limit=_UNCURATED_LIMIT
+                    user_id=USER_ID, toolkits=[tk], limit=fetch_limit
                 )
             )
         return loaded
@@ -170,7 +193,13 @@ async def load_and_register_composio_tools(
             log.warning("composio_tool_collision_skipped", tool=tool.name)
             continue
         registry.register(tool, _COMPOSIO_POLICY)
+        _registered_composio_tools.add(tool.name)
         registered.append(tool.name)
 
-    log.info("composio_tools_registered", toolkits=toolkits, count=len(registered))
+    log.info(
+        "composio_tools_registered",
+        toolkits=toolkits,
+        count=len(registered),
+        curated=curate,
+    )
     return registered

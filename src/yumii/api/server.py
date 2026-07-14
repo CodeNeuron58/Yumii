@@ -263,7 +263,7 @@ _SETTING_CHOICES: dict[str, list[str]] = {
 # rather than against a fixed list.
 _TEXT_SETTINGS: dict[str, str] = {
     "GROQ_MODEL": "qwen/qwen3.6-27b",
-    "OLLAMA_MODEL": "gpt-oss:120b",
+    "OLLAMA_MODEL": "minimax-m3",
 }
 # Provider/key/model changes need a backend restart (settings load once
 # at import). Personality applies live (read from config.json every turn).
@@ -429,7 +429,8 @@ async def composio_connect(body: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         pass
 
-    # Enable the toolkit so the next boot loads its tools.
+    # Enable the toolkit, then hot-reload so its tools are usable the
+    # moment the OAuth sign-in completes — no app restart.
     from yumii.core.global_config import load_global_config, save_global_config
 
     config = load_global_config()
@@ -441,17 +442,28 @@ async def composio_connect(body: dict[str, Any]) -> dict[str, Any]:
         config["COMPOSIO_TOOLKITS"] = toolkits
         save_global_config(config)
 
-    log.info("composio_connect_link_minted", toolkit=toolkit.upper())
+    try:
+        reloaded = await engine.reload_tools()
+    except Exception as e:
+        log.error("composio_reload_failed", error=str(e), exc_info=True)
+        reloaded = []
+
+    log.info(
+        "composio_connect_link_minted",
+        toolkit=toolkit.upper(),
+        tools_loaded=len(reloaded),
+    )
     return {
         "toolkit": toolkit.upper(),
         "redirect_url": redirect_url,
-        "restart_required": True,
+        "restart_required": False,
+        "tools_loaded": len(reloaded),
     }
 
 
 @app.delete("/api/composio/toolkits/{toolkit}")
 async def composio_disable_toolkit(toolkit: str) -> dict[str, Any]:
-    """Disable a toolkit (its tools are no longer loaded at boot)."""
+    """Disable a toolkit and drop its tools immediately (hot reload)."""
     from yumii.core.global_config import load_global_config, save_global_config
 
     config = load_global_config()
@@ -461,7 +473,13 @@ async def composio_disable_toolkit(toolkit: str) -> dict[str, Any]:
     remaining = [t for t in toolkits if str(t).upper() != toolkit.upper()]
     config["COMPOSIO_TOOLKITS"] = remaining
     save_global_config(config)
-    return {"disabled": toolkit.upper(), "toolkits": remaining, "restart_required": True}
+
+    try:
+        await engine.reload_tools()
+    except Exception as e:
+        log.error("composio_reload_failed", error=str(e), exc_info=True)
+
+    return {"disabled": toolkit.upper(), "toolkits": remaining, "restart_required": False}
 
 
 # ---------------------------------------------------------------------------

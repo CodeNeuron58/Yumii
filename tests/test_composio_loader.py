@@ -20,11 +20,15 @@ pytestmark = pytest.mark.asyncio
 def preserved_registry():
     tools = dict(registry._tools)
     policies = dict(registry._policies)
+    loaded = set(composio_loader._registered_composio_tools)
+    composio_loader._registered_composio_tools.clear()
     yield
     registry._tools.clear()
     registry._policies.clear()
     registry._tools.update(tools)
     registry._policies.update(policies)
+    composio_loader._registered_composio_tools.clear()
+    composio_loader._registered_composio_tools.update(loaded)
 
 
 @tool
@@ -96,6 +100,37 @@ async def test_sdk_failure_never_raises(monkeypatch):
     factory = lambda: FakeClient(exc=RuntimeError("401 Invalid API key"))  # noqa: E731
 
     assert await composio_loader.load_and_register_composio_tools(client_factory=factory) == []
+
+
+async def test_reload_replaces_previous_composio_tools(monkeypatch):
+    """A second load (dashboard hot-reload) swaps the tool set cleanly."""
+    monkeypatch.setattr(composio_loader, "composio_api_key", lambda: "ak_test")
+    monkeypatch.setattr(composio_loader, "enabled_toolkits", lambda: ["GMAIL"])
+
+    first = lambda: FakeClient(tools=[gmail_fetch_emails, gmail_send_email])  # noqa: E731
+    names = await composio_loader.load_and_register_composio_tools(client_factory=first)
+    assert set(names) == {"gmail_fetch_emails", "gmail_send_email"}
+
+    second = lambda: FakeClient(tools=[gmail_fetch_emails])  # noqa: E731
+    names = await composio_loader.load_and_register_composio_tools(client_factory=second)
+    assert names == ["gmail_fetch_emails"]
+    # The tool dropped from the toolkit is gone from the registry too.
+    assert "gmail_send_email" not in registry
+    assert "gmail_fetch_emails" in registry
+
+
+async def test_reload_after_disable_drops_all_composio_tools(monkeypatch):
+    monkeypatch.setattr(composio_loader, "composio_api_key", lambda: "ak_test")
+    monkeypatch.setattr(composio_loader, "enabled_toolkits", lambda: ["GMAIL"])
+    factory = lambda: FakeClient(tools=[gmail_fetch_emails])  # noqa: E731
+    await composio_loader.load_and_register_composio_tools(client_factory=factory)
+    assert "gmail_fetch_emails" in registry
+
+    # User disabled the toolkit — reload with nothing enabled.
+    monkeypatch.setattr(composio_loader, "enabled_toolkits", lambda: [])
+    names = await composio_loader.load_and_register_composio_tools(client_factory=factory)
+    assert names == []
+    assert "gmail_fetch_emails" not in registry
 
 
 def test_enabled_toolkits_normalises(monkeypatch):

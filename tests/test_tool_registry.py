@@ -126,6 +126,19 @@ def test_register_duplicate_with_overwrite_succeeds(fresh_registry: ToolRegistry
     assert fresh_registry.get(_sample_tool.name) is _sample_tool
 
 
+def test_unregister_removes_tool_and_policy(fresh_registry: ToolRegistry) -> None:
+    """``unregister`` should drop the tool; re-registering then works."""
+    fresh_registry.register(_sample_tool)
+    fresh_registry.unregister(_sample_tool.name)
+    assert _sample_tool.name not in fresh_registry
+    fresh_registry.register(_sample_tool)  # no ValueError — really gone
+    assert _sample_tool.name in fresh_registry
+
+
+def test_unregister_unknown_name_is_a_noop(fresh_registry: ToolRegistry) -> None:
+    fresh_registry.unregister("never-registered")  # must not raise
+
+
 def test_get_unknown_tool_raises(fresh_registry: ToolRegistry) -> None:
     """``get`` for an unknown name should raise ``KeyError`` with a useful message."""
     with pytest.raises(KeyError, match="No tool named"):

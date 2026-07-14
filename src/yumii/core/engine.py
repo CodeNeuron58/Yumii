@@ -71,9 +71,12 @@ class YumiiEngine:
         self.speaker: BaseSpeaker = get_speaker()
 
         # graph_app is initialized lazily via initialize() because
-        # AsyncSqliteSaver requires an async context.
+        # AsyncSqliteSaver requires an async context. The saver is kept
+        # so reload_tools() can rebuild the graph on the same
+        # checkpoint store.
         self.graph_app: Any | None = None
         self._conn: aiosqlite.Connection | None = None
+        self._saver: AsyncSqliteSaver | None = None
 
     async def initialize(self) -> None:
         """Async one-time initialization: database tables + compiled graph."""
@@ -96,12 +99,34 @@ class YumiiEngine:
         # connection after the first turn and crash on restart.
         _CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
         self._conn = await aiosqlite.connect(str(_CHECKPOINT_DB))
-        saver = AsyncSqliteSaver(self._conn)
-        self.graph_app = await build_graph(checkpointer=saver)
+        self._saver = AsyncSqliteSaver(self._conn)
+        self.graph_app = await build_graph(checkpointer=self._saver)
         # PR 4: install the HITL confirmation hook so the gated
         # tools node knows who to ask when a tool needs approval.
         set_confirmation_hook(self._confirmation_hook)
         log.info("engine_ready")
+
+    async def reload_tools(self) -> list[str]:
+        """Re-fetch Composio tools and rebuild the agent graph in place.
+
+        Called by the dashboard endpoints after the user connects or
+        disables a toolkit, so tool changes apply without an app
+        restart. Conversation history is untouched (same checkpointer);
+        an in-flight turn keeps the old graph object and finishes on it.
+
+        Returns the Composio tool names now registered.
+        """
+        from yumii.agent.llm import clear_llm_cache
+        from yumii.tools.composio_loader import load_and_register_composio_tools
+
+        registered = await load_and_register_composio_tools()
+        # The shared tool binding caches the old tool list — drop it so
+        # the next turn binds the new registry contents.
+        clear_llm_cache()
+        if self._saver is not None:
+            self.graph_app = await build_graph(checkpointer=self._saver)
+        log.info("tools_reloaded", composio_count=len(registered))
+        return registered
 
     async def shutdown(self) -> None:
         """Clean shutdown: close SQLite connections and memory store."""
@@ -400,9 +425,10 @@ class YumiiEngine:
                 # add_messages dedupes the re-added HumanMessage) but
                 # unique across turns (so repeating the same phrase
                 # later doesn't overwrite the earlier message).
+                turn_id = uuid.uuid4().hex
                 initial_state = {
                     "input": user_text,
-                    "turn_id": uuid.uuid4().hex,
+                    "turn_id": turn_id,
                     "session_id": self.active_session_id,
                     "session_name": self.active_session_name,
                     "user_facts": facts,
@@ -471,16 +497,38 @@ class YumiiEngine:
                     log.info("reasoning_interrupted")
                     continue
 
-                # Fallback: if astream_events didn't yield an agent
-                # final output (older LangGraph behaviour), fall back
-                # to a blocking ainvoke so the conversation still
-                # produces a response. This keeps us safe against
-                # upstream API drift.
+                # Fallback: the stream ended without capturing the
+                # agent's final output. NEVER re-invoke the graph here
+                # — the stream may already have executed tools before
+                # failing, and a re-run would execute them again
+                # (double email send). Instead read what the
+                # checkpoint recorded; response_turn_id tells a fresh
+                # response apart from last turn's leftovers.
                 if reasoning_result is None:
-                    log.warning("reasoning_no_streamed_output_falling_back")
-                    reasoning_result = await self.graph_app.ainvoke(
-                        initial_state, config=config,
-                    )
+                    log.warning("reasoning_no_streamed_output_reading_state")
+                    try:
+                        state = await self.graph_app.aget_state(config)
+                        values = (state.values or {}) if state else {}
+                        if (
+                            values.get("response")
+                            and values.get("response_turn_id") == turn_id
+                        ):
+                            reasoning_result = {
+                                "response": values["response"],
+                                "expression": values.get("expression", "normal"),
+                                "motion": values.get("motion", "idle"),
+                            }
+                    except Exception:
+                        log.error("reasoning_state_read_failed", exc_info=True)
+                if reasoning_result is None:
+                    reasoning_result = {
+                        "response": (
+                            "Mm, something glitched on my end mid-thought. "
+                            "Say that again for me?"
+                        ),
+                        "expression": "sad",
+                        "motion": "shakehead",
+                    }
 
                 log.debug(
                     "reasoning_done",

@@ -124,6 +124,15 @@ class ToolRegistry:
         for tool in tools:
             self.register(tool, policies.get(tool.name), overwrite=overwrite)
 
+    def unregister(self, name: str) -> None:
+        """Remove a single tool (no-op if absent).
+
+        Used by runtime tool reloads (e.g. the Composio loader swapping
+        its tool set after the user connects an app in the dashboard).
+        """
+        self._tools.pop(name, None)
+        self._policies.pop(name, None)
+
     def clear(self) -> None:
         """Remove every registered tool. Intended for tests."""
         self._tools.clear()
