@@ -18,10 +18,28 @@ brain is unchanged — the desktop app wraps it and launches it for you.
 - ✅ Tauri v2 shell: frameless, transparent, always-on-top window; system tray;
   global hotkey; launches the backend as a managed subprocess. Runs from source
   today (`cd desktop && cargo tauri dev`).
-- ⏳ Next: a packaged one-click installer (PyInstaller sidecar + `cargo tauri
-  build` + GitHub Actions), then the Live2D companion mode.
+- ✅ Packaged one-click Windows installer (PyInstaller sidecar + `cargo tauri
+  build` + GitHub Actions) — shipped in 0.10.0.
+- ⏳ Next: the Live2D companion mode.
 
 ---
+
+## ✅ Shipped — 0.10.0 (July 2026)
+
+The installer release. See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
+
+- **One-click Windows installer** (setup.exe / MSI): frozen PyInstaller
+  backend + Kokoro voice model bundled — no Python, no downloads, first
+  run works fully offline
+- **Release automation**: pushing a version tag builds the installers
+  and publishes a draft GitHub Release
+- **torch dropped entirely** — Silero VAD runs on onnxruntime from a
+  bundled ~2.2 MB asset
+- **Ollama Cloud** LLM provider (`OLLAMA_API_KEY` / `OLLAMA_MODEL`;
+  `OLLAMA_BASE_URL` can target a local Ollama)
+- Documentation site (Next.js) rebuilt for the product that ships
+- CI: version-consistency guard + desktop shell compile job
+- **132 tests** total
 
 ## ✅ Shipped — 0.9.0 (July 2026)
 

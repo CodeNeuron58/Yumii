@@ -5,6 +5,58 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] — 2026-07-15
+
+The installer release. Yumii becomes a real Windows app: download one
+setup.exe, install, talk — no Python, no model downloads, no terminal.
+The frozen backend and the Kokoro voice model ship inside the
+installer, so the first run works fully offline. Under the hood, torch
+is gone entirely (Silero VAD now runs on onnxruntime from a ~2 MB
+bundled asset) and Ollama Cloud joins the LLM provider list.
+
+### Added
+- **Windows installer** (NSIS `setup.exe` + MSI): the backend is frozen
+  with PyInstaller (onedir) and bundled as a Tauri resource together
+  with the Kokoro fp32 model, so a fresh install needs no Python, no
+  downloads, and no setup — the shell launches the bundled sidecar and
+  points it at the bundled models via `YUMII_MODELS_DIR`. Build recipe:
+  `fetch_models.py` → `pyinstaller yumii-server.spec` → `tauri build
+  --config tauri.bundle.conf.json`.
+- **Release workflow** (GitHub Actions): pushing a `v*` tag builds the
+  installers and publishes them to a **draft** GitHub Release — nothing
+  goes public until the build is reviewed and the release is published.
+- **Ollama Cloud LLM provider**: `OLLAMA_API_KEY` + a cloud model name
+  (default `gpt-oss:120b`); `OLLAMA_BASE_URL` can point at a local
+  Ollama instead for a fully offline mind. Free-text model field in the
+  Dashboard.
+- **Documentation site** (`docs/`, Next.js + MDX): installation, first
+  conversation, guides (talking, personalities, memory, tools,
+  dashboard), provider setup, CLI/API/settings reference,
+  troubleshooting — rebuilt to describe the product that actually
+  ships.
+
+### Changed
+- **torch dropped entirely.** Silero VAD runs on onnxruntime from a
+  bundled ~2.2 MB ONNX asset (was: `torch.hub` download of the same
+  model, dragging in hundreds of MB of torch/torchaudio). Same v5
+  model, same probabilities, no first-run download.
+- **LLM provider clients build lazily** — importing the agent no longer
+  requires an API key to exist (fixed crashing imports on fresh clones
+  and in CI).
+
+### CI
+- **Version-consistency guard**: `pyproject.toml`,
+  `tauri.conf.json`, and `Cargo.toml` must agree on the version or CI
+  fails (they drifted once — a packaged app almost shipped labelled
+  v0.1.0).
+- **Desktop shell compile job** (Windows) so Rust breakage is caught on
+  every push, not at release time.
+
+### Notes
+- **132 tests.** The installer is not code-signed yet — Windows
+  SmartScreen shows "Windows protected your PC" on first run; that's
+  expected for any unsigned installer (More info → Run anyway).
+
 ## [0.9.0] — 2026-07-08
 
 The companion release. Yumii's entire prompt stack is rewritten to
