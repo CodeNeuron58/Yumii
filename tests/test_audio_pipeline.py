@@ -6,10 +6,20 @@ They exercise pure-Python helpers: the RMS energy gate and the PCM
 normalization, which are deterministic.
 """
 
+import asyncio
+
 import numpy as np
 import pytest
 
-from yumii.audio.stt import float_to_pcm16, normalize_audio, rms_energy
+from yumii.audio.stt import (
+    FRAME_SIZE,
+    SILENCE_END_FRAMES,
+    SPEECH_TRIGGER_FRAMES,
+    AudioPipeline,
+    float_to_pcm16,
+    normalize_audio,
+    rms_energy,
+)
 
 
 def test_rms_energy_silent_signal_is_zero() -> None:
@@ -62,6 +72,116 @@ def test_normalize_audio_peak_clamped_to_safe_level() -> None:
     # Peak should be ~ 0.9 * 32767 = 29490
     peak = int(np.max(np.abs(out.astype(np.int32))))
     assert 28000 < peak <= 29490
+
+
+# ---------------------------------------------------------------------------
+# Mute sentinel: a None chunk aborts any in-flight capture.
+# Exercised with fakes so no Silero/Whisper model loads.
+# ---------------------------------------------------------------------------
+
+
+class FakeVAD:
+    """Speech iff the frame is loud — deterministic, no model."""
+
+    def __init__(self) -> None:
+        self.resets = 0
+
+    def reset_states(self) -> None:
+        self.resets += 1
+
+    def __call__(self, frame: np.ndarray, sr: int) -> float:
+        return 1.0 if float(np.sqrt(np.mean(frame**2))) > 0.05 else 0.0
+
+
+class FakeStreamingTranscriber:
+    """Streaming-shaped transcriber (process_chunk/get_final) with counters."""
+
+    def __init__(self) -> None:
+        self.final_calls = 0
+
+    def process_chunk(self, pcm16_bytes: bytes) -> dict | None:
+        return None
+
+    def get_final(self) -> str | None:
+        self.final_calls += 1
+        return "post-mute words"
+
+    def transcribe(self, audio_data) -> str | None:
+        return None
+
+
+def _make_pipeline(transcriber=None) -> AudioPipeline:
+    """Build an AudioPipeline without running __init__ (no model loads)."""
+    p = AudioPipeline.__new__(AudioPipeline)
+    p._silero_model = FakeVAD()
+    p.transcriber = transcriber or FakeStreamingTranscriber()
+    return p
+
+
+_SPEECH = (np.full(FRAME_SIZE, 0.3, dtype=np.float32) * 32767).astype(np.int16).tobytes()
+_SILENCE = np.zeros(FRAME_SIZE, dtype=np.int16).tobytes()
+
+
+def _utterance() -> list[bytes]:
+    """Chunks for one complete utterance: trigger speech, then end silence."""
+    return [_SPEECH] * SPEECH_TRIGGER_FRAMES + [_SILENCE] * SILENCE_END_FRAMES
+
+
+@pytest.mark.asyncio
+async def test_mute_sentinel_abandons_half_captured_utterance() -> None:
+    """Speech before the mute must not leak into the post-unmute capture."""
+    pipeline = _make_pipeline()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    # Half an utterance (capture triggers, never completes), then mute.
+    for _ in range(SPEECH_TRIGGER_FRAMES):
+        await queue.put(_SPEECH)
+    await queue.put(None)
+    # A full clean utterance after unmute.
+    for chunk in _utterance():
+        await queue.put(chunk)
+
+    audio = await asyncio.wait_for(pipeline.stream_capture(queue), timeout=5)
+
+    # Only the post-mute utterance: trigger frames + end-silence frames.
+    expected = (SPEECH_TRIGGER_FRAMES + SILENCE_END_FRAMES) * FRAME_SIZE
+    assert len(audio) == expected
+
+
+@pytest.mark.asyncio
+async def test_mute_sentinel_while_idle_is_harmless() -> None:
+    pipeline = _make_pipeline()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    await queue.put(None)  # muted before any speech
+    for chunk in _utterance():
+        await queue.put(chunk)
+
+    audio = await asyncio.wait_for(pipeline.stream_capture(queue), timeout=5)
+    expected = (SPEECH_TRIGGER_FRAMES + SILENCE_END_FRAMES) * FRAME_SIZE
+    assert len(audio) == expected
+
+
+@pytest.mark.asyncio
+async def test_mute_sentinel_discards_streaming_partial_state() -> None:
+    """The streaming transcriber's half-utterance is thrown away on mute."""
+    transcriber = FakeStreamingTranscriber()
+    pipeline = _make_pipeline(transcriber)
+    queue: asyncio.Queue = asyncio.Queue()
+
+    for _ in range(SPEECH_TRIGGER_FRAMES):
+        await queue.put(_SPEECH)
+    await queue.put(None)
+    for chunk in _utterance():
+        await queue.put(chunk)
+
+    text = await asyncio.wait_for(
+        pipeline.stream_capture_and_transcribe(queue), timeout=5
+    )
+
+    assert text == "post-mute words"
+    # One discard on the sentinel + one real final at utterance end.
+    assert transcriber.final_calls == 2
 
 
 # ---------------------------------------------------------------------------

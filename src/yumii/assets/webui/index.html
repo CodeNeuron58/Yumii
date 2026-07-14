@@ -162,6 +162,42 @@
         }
         #status-bar.visible { opacity: 1; }
 
+        /* ── Mic mute button (top-left, mirrors the gear) ──────────────── */
+        #mic-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 20;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            color: var(--c-dim);
+            background: rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s ease, background 0.2s ease;
+        }
+        #mic-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.12); }
+        #mic-btn.muted {
+            opacity: 1;
+            background: rgba(248, 81, 73, 0.16);
+        }
+        /* Red diagonal strike across the mic when muted */
+        #mic-btn.muted::after {
+            content: "";
+            position: absolute;
+            width: 22px;
+            height: 2px;
+            background: #f85149;
+            transform: rotate(-45deg);
+            border-radius: 1px;
+            pointer-events: none;
+        }
+
         /* ── Mode menu (gear) ──────────────────────────────────────────── */
         #gear {
             position: absolute;
@@ -248,6 +284,7 @@
 
 <body>
     <!-- Whole surface is draggable in Tauri; ignored in a browser. -->
+    <div id="mic-btn" title="Mute microphone">🎤</div>
     <div id="gear" title="Mode">⚙</div>
 
     <div id="mode-menu" class="hidden">
@@ -370,6 +407,35 @@
             document.getElementById('soon-modal').classList.add('hidden');
         });
 
+        // ── Manual mic mute ────────────────────────────────────────────
+        // A gate, not a teardown: the mic stream, socket, and backend
+        // loops all keep running — muted just means no audio frames
+        // leave the page (and the backend drops/resets anything in
+        // flight). Unmute is instant. Speaking is unaffected.
+        let micMuted = false;
+        const micBtn = document.getElementById('mic-btn');
+        function setMicMuted(muted) {
+            micMuted = muted;
+            micBtn.classList.toggle('muted', muted);
+            micBtn.title = muted ? 'Unmute microphone' : 'Mute microphone';
+            // Second layer: disable the hardware track (kept attached,
+            // so re-enabling is instant).
+            if (micStream) micStream.getAudioTracks().forEach(t => { t.enabled = !muted; });
+            // Tell the backend so it drops in-flight audio and resets
+            // any half-captured utterance.
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'mic_mute', muted }));
+            }
+            if (muted && orbState === 'listening') setOrbState('idle');
+            if (started) {
+                hintEl.textContent = muted ? "Muted — Yumii can't hear you" : 'Listening… just talk';
+            }
+        }
+        micBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setMicMuted(!micMuted);
+        });
+
         // ── Microphone capture (16 kHz PCM16 → WebSocket) ──────────────
         // Identical to the Live2D build, plus a local RMS tick so the orb
         // can show a "listening" state while the user talks.
@@ -379,12 +445,15 @@
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
                 });
                 micStream = stream;
+                // Respect a mute toggled before the mic finished opening.
+                if (micMuted) stream.getAudioTracks().forEach(t => { t.enabled = false; });
 
                 const recContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 const source = recContext.createMediaStreamSource(stream);
                 micProcessor = recContext.createScriptProcessor(4096, 1, 1);
 
                 micProcessor.onaudioprocess = (e) => {
+                    if (micMuted) return;
                     if (!socket || socket.readyState !== WebSocket.OPEN) return;
                     const inputData = e.inputBuffer.getChannelData(0);
 
@@ -443,8 +512,15 @@
                     ? { type: 'session_select', action: 'resume', session_id: resumeId }
                     : { type: 'session_select', action: 'auto' }));
                 sessionNegotiated = true;
+                // Re-sync the mute state — the backend flag doesn't
+                // survive its own restarts, and reconnects must agree.
+                if (micMuted) {
+                    socket.send(JSON.stringify({ type: 'mic_mute', muted: true }));
+                }
                 if (!micStream) initMicrophone();
-                hintEl.textContent = "Listening… just talk";
+                hintEl.textContent = micMuted
+                    ? "Muted — Yumii can't hear you"
+                    : "Listening… just talk";
                 setOrbState('idle');
             };
 

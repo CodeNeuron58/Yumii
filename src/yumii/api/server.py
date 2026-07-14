@@ -582,9 +582,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     # retries every 3s) must NOT mint a new session each time.
 
     # Any audio that raced ahead of the negotiation belongs to this
-    # session — feed it through now.
-    for chunk in stashed_audio:
-        await engine.audio_input_queue.put(chunk)
+    # session — feed it through now (unless the user is muted).
+    if not engine.mic_muted:
+        for chunk in stashed_audio:
+            await engine.audio_input_queue.put(chunk)
 
     # Take-over: if another connection is active, politely evict it.
     for conn in engine.active_connections:
@@ -618,6 +619,14 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         # so the engine's command handler can process it.
                         await engine.transcription_queue.put(cmd)
 
+                    # Manual mic mute from the orb. The frontend also
+                    # stops sending audio; this makes the engine drop
+                    # anything already in flight and reset the capture.
+                    elif msg_type == "mic_mute":
+                        await engine.set_mic_muted(
+                            bool(payload.get("muted", False))
+                        )
+
                     # PR 4: HITL confirmation reply from the browser.
                     # The engine is awaiting the future registered
                     # under ``request_id``; we just resolve it.
@@ -630,9 +639,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     pass
                 continue
 
-            # Binary audio chunk from the browser
+            # Binary audio chunk from the browser. Dropped while muted —
+            # the frontend gates too; this covers stale in-flight frames.
             if "bytes" in message:
-                await engine.audio_input_queue.put(message["bytes"])
+                if not engine.mic_muted:
+                    await engine.audio_input_queue.put(message["bytes"])
 
     except WebSocketDisconnect:
         pass

@@ -41,10 +41,15 @@ class YumiiEngine:
         """Initialize the Yumii Engine, including audio pipelines and reasoning graph."""
         self.transcription_queue: asyncio.Queue[str] = asyncio.Queue()
         self.tts_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        self.audio_input_queue: asyncio.Queue[bytes] = asyncio.Queue()
+        # ``None`` is the mute sentinel — it tells an in-flight capture
+        # in the audio pipeline to reset (see AudioPipeline.stream_capture).
+        self.audio_input_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
         self.interrupt_event: asyncio.Event = asyncio.Event()
         self.active_connections: List[WebSocket] = []
         self.is_speaking: bool = False
+        # Manual mic mute (user-controlled from the orb). Gates listening
+        # only — speaking, reasoning, and the WS all keep running.
+        self.mic_muted: bool = False
         self.active_session_id: str | None = None
         self.active_session_name: str = "New Chat"
 
@@ -138,6 +143,33 @@ class YumiiEngine:
                 pass
             self._conn = None
         await memory_manager.close()
+
+    # ------------------------------------------------------------------
+    # Manual mic mute
+    # ------------------------------------------------------------------
+
+    async def set_mic_muted(self, muted: bool) -> None:
+        """Gate the listening pipeline without disturbing the active loop.
+
+        The mic stream, WebSocket, and all three engine tasks keep
+        running — muting only stops audio from entering the pipeline.
+        Muting also abandons any half-captured utterance (drain the
+        queue, then push the ``None`` sentinel that resets the capture
+        state), so words spoken just before the mute can't complete
+        into a turn when the user unmutes later. Speaking and
+        reasoning are unaffected: she can finish her reply while muted.
+        """
+        if muted == self.mic_muted:
+            return
+        self.mic_muted = muted
+        if muted:
+            while not self.audio_input_queue.empty():
+                try:
+                    self.audio_input_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+            await self.audio_input_queue.put(None)
+        log.info("mic_mute_set", muted=muted)
 
     # ------------------------------------------------------------------
     # Session lifecycle

@@ -84,7 +84,12 @@ class AudioPipeline:
     async def stream_capture(
         self, queue: asyncio.Queue, on_speech_start: Callable[[], None] | None = None
     ) -> np.ndarray:
-        """Continuously consume audio chunks from a queue until a speech segment completes."""
+        """Continuously consume audio chunks from a queue until a speech segment completes.
+
+        A ``None`` chunk is the engine's mute sentinel: abandon any
+        in-flight capture and keep waiting, so words spoken just before
+        the user muted can't complete into a turn after unmute.
+        """
         self._reset_vad()
         recording = []
         pre_buffer: collections.deque = collections.deque(maxlen=15)
@@ -93,6 +98,14 @@ class AudioPipeline:
 
         while True:
             chunk_bytes = await queue.get()
+            if chunk_bytes is None:  # mute sentinel
+                self._reset_vad()
+                recording = []
+                pre_buffer.clear()
+                triggered = False
+                accumulation_buffer = np.array([], dtype=np.float32)
+                log.debug("capture_reset_by_mute")
+                continue
             audio_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
             audio_f32 = audio_int16.astype(np.float32) / 32768.0
             accumulation_buffer = np.append(accumulation_buffer, audio_f32)
@@ -138,7 +151,13 @@ class AudioPipeline:
         on_speech_start: Callable[[], None] | None = None,
         on_partial: Callable[[str], Any] | None = None
     ) -> str | None:
-        """Continuously consume audio chunks, streaming them to the transcriber."""
+        """Continuously consume audio chunks, streaming them to the transcriber.
+
+        A ``None`` chunk is the engine's mute sentinel — see
+        :meth:`stream_capture`. The streaming transcriber's partial
+        state is discarded too so pre-mute words don't leak into the
+        next utterance.
+        """
         self._reset_vad()
         pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
@@ -146,6 +165,15 @@ class AudioPipeline:
 
         while True:
             chunk_bytes = await queue.get()
+            if chunk_bytes is None:  # mute sentinel
+                self._reset_vad()
+                pre_buffer.clear()
+                triggered = False
+                accumulation_buffer = np.array([], dtype=np.float32)
+                if hasattr(self.transcriber, "get_final"):
+                    self.transcriber.get_final()  # discard the half-utterance
+                log.debug("capture_reset_by_mute")
+                continue
             audio_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
             audio_f32 = audio_int16.astype(np.float32) / 32768.0
             accumulation_buffer = np.append(accumulation_buffer, audio_f32)
