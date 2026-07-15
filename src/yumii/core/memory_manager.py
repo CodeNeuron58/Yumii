@@ -212,6 +212,122 @@ class MemoryManager:
         return [f.fact for f in facts]
 
     # ------------------------------------------------------------------
+    # Substring lookup + delta operations (agent tool & review pass)
+    # ------------------------------------------------------------------
+
+    async def find_facts_matching(self, substring: str, *, limit: int = 500) -> list[UserFact]:
+        """Facts whose text contains *substring* (case-insensitive)."""
+        needle = substring.lower().strip()
+        if not needle:
+            return []
+        facts = await self.get_facts(limit=limit)
+        return [f for f in facts if needle in f.fact.lower()]
+
+    async def replace_fact_by_text(self, old_substring: str, new_fact: str) -> str:
+        """Replace the single fact matching *old_substring* with *new_fact*.
+
+        Returns "replaced" on success, "not_found" when nothing matches,
+        or "ambiguous" when several facts match (caller should retry with
+        a more specific substring).
+        """
+        matches = await self.find_facts_matching(old_substring)
+        if not matches:
+            return "not_found"
+        if len(matches) > 1:
+            return "ambiguous"
+        await self.update_fact(matches[0].id, new_fact)
+        return "replaced"
+
+    async def remove_fact_by_text(self, old_substring: str) -> str:
+        """Delete the single fact matching *old_substring* (same contract)."""
+        matches = await self.find_facts_matching(old_substring)
+        if not matches:
+            return "not_found"
+        if len(matches) > 1:
+            return "ambiguous"
+        await self.delete_fact(matches[0].id)
+        return "removed"
+
+    async def apply_review_ops(
+        self,
+        ops: list[dict[str, Any]],
+        session_id: str | None = None,
+    ) -> dict[str, int]:
+        """Apply reviewer delta operations; returns counts per outcome.
+
+        Adds are still deduplicated against existing facts (the reviewer
+        is told not to re-add, but a cheap model will sometimes try).
+        Ambiguous/missing replace-remove targets are skipped and counted —
+        a background review must never guess at which fact to overwrite.
+        """
+        counts = {"added": 0, "replaced": 0, "removed": 0, "skipped": 0}
+        if not ops:
+            return counts
+
+        existing_lower = [f.lower() for f in await self.get_facts_raw(limit=500)]
+
+        for op in ops:
+            action = op.get("action")
+            fact_text = str(op.get("fact", "") or "").strip()
+            old = str(op.get("old", "") or "").strip()
+
+            if action == "add":
+                lowered = fact_text.lower()
+                if any(lowered in e or e in lowered for e in existing_lower):
+                    counts["skipped"] += 1
+                    continue
+                await self.store_fact(
+                    fact_text,
+                    category=op.get("category", "general"),
+                    confidence=op.get("confidence", 1.0),
+                    session_id=session_id,
+                )
+                existing_lower.append(lowered)
+                counts["added"] += 1
+
+            elif action == "replace":
+                result = await self.replace_fact_by_text(old, fact_text)
+                if result == "replaced":
+                    counts["replaced"] += 1
+                else:
+                    counts["skipped"] += 1
+
+            elif action == "remove":
+                result = await self.remove_fact_by_text(old)
+                if result == "removed":
+                    counts["removed"] += 1
+                else:
+                    counts["skipped"] += 1
+
+        return counts
+
+    async def review_recent_turns(
+        self,
+        turns: list[dict[str, str]],
+        session_id: str | None = None,
+    ) -> dict[str, int]:
+        """The periodic memory review: LLM delta pass over recent turns.
+
+        Runs as a fire-and-forget background task every N turns (see the
+        engine). Replaces the old per-turn add-only extractor: the
+        reviewer sees existing facts, so it can correct and prune, not
+        just append. Failures are logged and swallowed.
+        """
+        if not turns:
+            return {"added": 0, "replaced": 0, "removed": 0, "skipped": 0}
+        try:
+            from yumii.agent.fact_extractor import review_facts
+
+            existing = await self.get_facts_raw(limit=500)
+            ops = await review_facts(turns, existing)
+            counts = await self.apply_review_ops(ops, session_id=session_id)
+            log.info("memory_review_applied", session_id=session_id, **counts)
+            return counts
+        except Exception as exc:
+            log.warning("memory_review_failed", error=str(exc))
+            return {"added": 0, "replaced": 0, "removed": 0, "skipped": 0}
+
+    # ------------------------------------------------------------------
     # Extraction
     # ------------------------------------------------------------------
 

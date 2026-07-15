@@ -29,6 +29,15 @@ from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
 
+# How many completed turns accumulate before the background memory
+# review runs (Hermes's "nudge"). The reviewer sees the buffered turns
+# plus existing facts and emits add/replace/remove deltas — periodic
+# review over a window beats the old per-turn add-only extractor on
+# both quality and LLM-call count. The buffer also flushes on session
+# switch and shutdown so trailing turns aren't lost.
+_MEMORY_REVIEW_INTERVAL = 5
+
+
 class YumiiEngine:
     """The central orchestration engine for Yumii.
 
@@ -60,6 +69,10 @@ class YumiiEngine:
         # :meth:`request_confirmation` and
         # :meth:`resolve_confirmation`.
         self.pending_confirmations: dict[str, "asyncio.Future[bool]"] = {}
+
+        # Turns since the last background memory review, and the buffer
+        # of (role, content) dicts the reviewer will see.
+        self._memory_turn_buffer: list[dict[str, str]] = []
 
         self.stt_provider: str = settings.stt_provider
         self.model_size: str = settings.whisper_model_size
@@ -193,9 +206,37 @@ class YumiiEngine:
         log.info("tools_reloaded", composio_count=len(registered))
         return registered
 
+    def _flush_memory_review(self, session_id: str | None = None) -> None:
+        """Fire the background memory review over the buffered turns."""
+        if not self._memory_turn_buffer:
+            return
+        turns = self._memory_turn_buffer
+        self._memory_turn_buffer = []
+        asyncio.create_task(
+            memory_manager.review_recent_turns(
+                turns, session_id or self.active_session_id
+            )
+        )
+
     async def shutdown(self) -> None:
         """Clean shutdown: close SQLite connections and memory store."""
         log.info("engine_shutting_down")
+
+        # Review any turns still buffered — quitting the app must not
+        # lose what the user just told her. Bounded so a slow provider
+        # can't hang the exit.
+        if self._memory_turn_buffer:
+            turns, self._memory_turn_buffer = self._memory_turn_buffer, []
+            try:
+                await asyncio.wait_for(
+                    memory_manager.review_recent_turns(
+                        turns, self.active_session_id
+                    ),
+                    timeout=20.0,
+                )
+            except Exception:
+                log.warning("shutdown_memory_review_failed", exc_info=True)
+
         if self._conn is not None:
             try:
                 await self._conn.close()
@@ -237,6 +278,8 @@ class YumiiEngine:
 
     async def create_new_session(self, name: str | None = None) -> str:
         """Create a new session, clear all queues, and set it active."""
+        # Review what's buffered for the outgoing session first.
+        self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
         self.is_speaking = False
@@ -261,6 +304,8 @@ class YumiiEngine:
             log.warning("session_not_found", session_id=session_id)
             return await self.create_new_session(name=f"Resumed-{session_id[:8]}")
 
+        # Review what's buffered for the outgoing session first.
+        self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
         self.is_speaking = False
@@ -654,16 +699,20 @@ class YumiiEngine:
                     if refreshed:
                         self.active_session_name = refreshed.name
 
-                # Fire-and-forget fact extraction from this turn.
-                asyncio.create_task(
-                    memory_manager.extract_facts_from_messages(
-                        [
-                            {"role": "user", "content": user_text},
-                            {"role": "assistant", "content": reasoning_result["response"]},
-                        ],
-                        self.active_session_id,
-                    )
+                # Buffer the turn for the periodic memory review. Every
+                # _MEMORY_REVIEW_INTERVAL turns a background reviewer
+                # sees the buffer + existing facts and emits deltas
+                # (replaces the old per-turn add-only extraction — the
+                # agent can also write memory directly via the
+                # manage_memory tool for "remember this" moments).
+                self._memory_turn_buffer.extend(
+                    [
+                        {"role": "user", "content": user_text},
+                        {"role": "assistant", "content": reasoning_result["response"]},
+                    ]
                 )
+                if len(self._memory_turn_buffer) >= _MEMORY_REVIEW_INTERVAL * 2:
+                    self._flush_memory_review()
 
                 await self.tts_queue.put(reasoning_result)
             except Exception as e:

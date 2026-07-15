@@ -1,8 +1,14 @@
-"""Fact extraction engine for Yumii's long-term memory.
+"""Fact extraction & memory review for Yumii's long-term memory.
 
-Uses a cheap LLM to analyse a short conversation snippet and extract atomic
-facts about the user.  Returns structured JSON so downstream code can store
-them directly in :class:`~yumii.core.memory_manager.MemoryManager`.
+Two LLM passes live here, both cheap and structured-JSON:
+
+* :func:`extract_facts` — the original add-only extractor over a short
+  snippet (kept for compatibility; no longer called per turn).
+* :func:`review_facts` — the periodic reviewer. Sees the last few
+  conversation turns AND the facts already stored, and returns delta
+  operations (add / replace / remove), so memory gets corrected and
+  pruned instead of only growing. This is what the engine's
+  every-N-turns memory review runs.
 """
 
 from __future__ import annotations
@@ -43,6 +49,38 @@ Categories (choose exactly one per fact):
 
 Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {"facts":[{"fact":"...","category":"...","confidence":0.0}]}
+"""
+
+# ---------------------------------------------------------------------------
+# System prompt for the periodic memory REVIEW (delta operations)
+# ---------------------------------------------------------------------------
+
+_REVIEW_SYSTEM_PROMPT = """\
+You are the memory curator for a personal AI companion. You are shown the \
+facts currently stored about the USER, followed by the most recent \
+conversation turns. Decide how memory should change.
+
+Emit operations:
+- add — a NEW, durable, atomic fact the user revealed (preferences, identity, \
+habits, relationships, goals). Not covered by any existing fact.
+- replace — an existing fact is outdated, wrong, or can be improved/merged \
+with new information. "old" must be a short substring copied EXACTLY from \
+the existing fact; "fact" is the corrected full text.
+- remove — an existing fact the user contradicted or asked to forget. \
+"old" must be a short substring copied EXACTLY from the existing fact.
+
+Rules:
+- Prefer replace over adding a near-duplicate.
+- Do NOT re-add anything already covered by an existing fact.
+- Skip trivia, small talk, task progress, and anything easily re-asked.
+- Each fact must be one atomic statement about the user.
+- Most reviews should produce FEW or ZERO operations. An empty list is a \
+good answer.
+- Categories: preference, identity, habit, relationship, goal, general.
+- Confidence 0.0-1.0 by how explicitly the user stated it.
+
+Return ONLY valid JSON in this exact format (no markdown, no extra text):
+{"operations":[{"action":"add|replace|remove","fact":"...","old":"...","category":"...","confidence":0.0}]}
 """
 
 # ---------------------------------------------------------------------------
@@ -195,3 +233,108 @@ async def extract_facts(
 
     log.info("facts_extracted", count=len(valid_facts), raw_count=len(facts))
     return valid_facts
+
+
+# ---------------------------------------------------------------------------
+# Periodic review (delta operations against existing facts)
+# ---------------------------------------------------------------------------
+
+_VALID_ACTIONS = {"add", "replace", "remove"}
+_VALID_CATEGORIES = {
+    "preference", "identity", "habit", "relationship", "goal", "general",
+}
+
+
+def _parse_review_json(raw: str) -> list[dict[str, Any]]:
+    """Parse the reviewer's JSON into validated operation dicts."""
+    text = raw.strip()
+    match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+    if match:
+        text = match.group(1).strip()
+    if not text.startswith("{"):
+        brace_match = re.search(r"(\{.*\})", text, re.DOTALL)
+        if brace_match:
+            text = brace_match.group(1).strip()
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        log.warning("review_json_parse_failed", raw_preview=text[:200], error=str(exc))
+        return []
+
+    raw_ops = parsed.get("operations", []) if isinstance(parsed, dict) else []
+    if not isinstance(raw_ops, list):
+        return []
+
+    ops: list[dict[str, Any]] = []
+    for op in raw_ops:
+        if not isinstance(op, dict):
+            continue
+        action = str(op.get("action", "")).lower().strip()
+        if action not in _VALID_ACTIONS:
+            continue
+        fact = str(op.get("fact", "") or "").strip()
+        old = str(op.get("old", "") or "").strip()
+        if action in ("add", "replace") and not fact:
+            continue
+        if action in ("replace", "remove") and not old:
+            continue
+        category = str(op.get("category", "general")).lower().strip()
+        if category not in _VALID_CATEGORIES:
+            category = "general"
+        try:
+            confidence = max(0.0, min(1.0, float(op.get("confidence", 1.0))))
+        except (TypeError, ValueError):
+            confidence = 1.0
+        ops.append(
+            {
+                "action": action,
+                "fact": fact,
+                "old": old,
+                "category": category,
+                "confidence": confidence,
+            }
+        )
+    return ops
+
+
+async def review_facts(
+    turns: list[dict[str, str]],
+    existing_facts: list[str],
+) -> list[dict[str, Any]]:
+    """Review recent *turns* against *existing_facts*; return delta operations.
+
+    Each operation dict has ``action`` (add/replace/remove), ``fact``,
+    ``old`` (substring of an existing fact, for replace/remove),
+    ``category``, and ``confidence``. Returns an empty list when nothing
+    should change or the LLM/parsing fails — a failed review must never
+    hurt the conversation.
+    """
+    if not turns:
+        return []
+
+    facts_block = (
+        "\n".join(f"- {f}" for f in existing_facts)
+        if existing_facts
+        else "(no facts stored yet)"
+    )
+    prompt = (
+        f"FACTS CURRENTLY STORED ABOUT THE USER:\n{facts_block}\n\n"
+        f"RECENT CONVERSATION:\n{_format_messages_for_prompt(turns)}"
+    )
+
+    llm = _get_extractor_llm()
+    try:
+        response = await llm.ainvoke(
+            [
+                SystemMessage(content=_REVIEW_SYSTEM_PROMPT),
+                HumanMessage(content=prompt),
+            ]
+        )
+    except Exception as exc:
+        log.error("review_llm_failed", error=str(exc))
+        return []
+
+    ops = _parse_review_json(getattr(response, "content", str(response)))
+    log.info("memory_review_ops", count=len(ops))
+    return ops

@@ -34,6 +34,10 @@ from yumii.tools.registry import (
     register_many,
     registry as global_registry,
 )
+from yumii.tools.memory_tool import (  # noqa: F401
+    ManageMemoryInput,
+    manage_memory,
+)
 from yumii.tools.session_search_tool import (  # noqa: F401
     RecallInput,
     search_past_conversations,
@@ -63,4 +67,6 @@ __all__ = [
     "WebSearchInput",
     "RecallInput",
     "search_past_conversations",
+    "ManageMemoryInput",
+    "manage_memory",
 ]
