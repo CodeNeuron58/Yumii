@@ -33,6 +33,7 @@ to the user / WS layer.
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from pathlib import Path
 from typing import Any
@@ -393,11 +394,37 @@ def _build_gated_tools_node(tools: list) -> Any:
         hook = _gated_tools_hook.get("fn")
         denied_messages: list[ToolMessage] = []
         approved_calls: list[dict] = []
+        seen_calls: set[tuple[str, str]] = set()
 
         for call in last_ai.tool_calls:
             name = call.get("name", "")
             args = call.get("args", {}) or {}
             call_id = call.get("id", "")
+
+            # Some models (minimax, llama) emit the SAME call several
+            # times in one message. Execute the first occurrence only:
+            # duplicates of a send-email would fire it N times, and
+            # gated duplicates would stack N confirmation popups for
+            # what the user perceives as one action. Runs BEFORE the
+            # HITL gate so duplicates never even prompt. Each duplicate
+            # still gets a ToolMessage — every tool_call_id must be
+            # answered or the history is invalid.
+            call_key = (name, json.dumps(args, sort_keys=True, default=str))
+            if call_key in seen_calls:
+                log.info("duplicate_tool_call_dropped", tool=name)
+                denied_messages.append(
+                    ToolMessage(
+                        content=(
+                            "Duplicate call skipped — this exact tool call "
+                            "already ran in this step; use its result."
+                        ),
+                        tool_call_id=call_id,
+                        name=name,
+                    )
+                )
+                continue
+            seen_calls.add(call_key)
+
             if not _tool_needs_confirmation(name):
                 # Not gated. Let the inner node handle it.
                 approved_calls.append(call)
