@@ -38,10 +38,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.14.0",
     "groq>=0.28.0",
-    "prompt_toolkit>=3.0.36",
-    "rich>=15.0.0",
     "structlog>=24.1.0",
-    "typer>=0.25.1",
     "uvicorn>=0.41.0",
     "websockets>=16.0",
     "aiohttp>=3.13.5",
@@ -72,7 +69,7 @@ Documentation = "https://github.com/CodeNeuron58/Yumii#readme"
 "Bug Tracker" = "https://github.com/CodeNeuron58/Yumii/issues"
 
 [project.scripts]
-yumii = "yumii.cli:app"
+yumii = "yumii.cli:main"
 
 [tool.hatch.build.targets.wheel]
 # Explicitly include everything under src/yumii/ in the wheel,
@@ -86,8 +83,4 @@ exclude = ["Experiments", "Trash", ".git", ".venv", "__pycache__"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 
-[dependency-groups]
-dev = [
-    "pyinstaller>=6.21.0",
-]
 

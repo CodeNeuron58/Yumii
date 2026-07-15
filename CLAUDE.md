@@ -33,8 +33,8 @@ unchanged by the pivot; the desktop app wraps it.
 - **STT:** faster-whisper (local, CPU, int8) OR Groq Whisper (cloud) OR Vosk (local, streaming partials)
 - **VAD:** Silero VAD (snakers4/silero-vad via torch.hub) — always local
 - **TTS:** Kokoro-82M (local ONNX, recommended default) OR ElevenLabs OR CAMB.ai (all streaming)
-- **CLI:** Typer + Rich + prompt_toolkit (now primarily the launcher for
-  `yumii server`; its wizards are slated to move into an in-app settings GUI)
+- **CLI:** none (retired with the desktop pivot; preserved on the `cli-launch`
+  branch). `yumii server` is a bare launcher the desktop shell invokes.
 
 ---
 
@@ -55,7 +55,7 @@ src/yumii/
   assets/
     prompts/      # 6 personality .txt files (caring, tsundere, genki, kuudere, yandere, dandere)
     webui/        # index.html (orb) + _companion_live2d.reference.html (archived)
-  cli.py          # Typer CLI entry point (yumii command)
+  cli.py          # bare launcher: `yumii server` (no interactive CLI)
 
 desktop/
   src-tauri/      # Tauri v2 Rust app: main.rs (window, tray, hotkey, Python sidecar),
@@ -78,13 +78,11 @@ desktop/
 ---
 
 ## Entry Points
-- `yumii` CLI command → `src/yumii/cli.py:app`
-- `yumii server` → starts FastAPI on `127.0.0.1:8000` (headless; this is what the desktop app launches)
-- `yumii wake-up` → starts the server and opens the browser (browser mode still works)
-- **Desktop app:** `cd desktop && cargo tauri dev` (or `npx @tauri-apps/cli dev`)
+- **Desktop app (the ONLY product surface):** `cd desktop && npx @tauri-apps/cli dev` (or `cargo tauri dev`)
+- `yumii server` / `python -m yumii server` → starts FastAPI on `127.0.0.1:8000` (headless; this is what the desktop shell launches). Bare `yumii` just prints usage.
 - WebSocket: `ws://127.0.0.1:8000/ws` (binary audio in, JSON events out)
 - Health probe: `GET /health` (used by the desktop shell before connecting the WS)
-- Frontend served at: `http://127.0.0.1:8000/`
+- The backend serves ONLY `/dashboard.html` (the shell's dashboard window) — there is no browser orb; the orb page is rendered by the Tauri shell from its own assets. Browser mode is retired (preserved on `cli-launch`).
 
 ---
 
@@ -107,11 +105,10 @@ desktop/
 ## Commands
 ```bash
 uv sync                 # Install Python dependencies
-uv run yumii            # Launch the CLI / dashboard
 uv run yumii server     # Run the backend headless (the desktop app calls this)
 uv run ruff check .     # Lint
 uv run pytest tests/    # Tests
 uv build                # Build the Python wheel
 
-cd desktop && cargo tauri dev   # Run the desktop app (needs Rust + MSVC Build Tools)
+cd desktop && npx @tauri-apps/cli dev   # Run the desktop app — the only way to run Yumii
 ```

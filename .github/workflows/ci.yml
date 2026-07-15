@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "master", "v1.1-dev" ]
+    branches: [ "master", "feat/one-command-install" ]
   pull_request:
-    branches: [ "master", "v1.1-dev" ]
+    branches: [ "master" ]
 
 jobs:
   build:

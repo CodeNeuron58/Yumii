@@ -655,15 +655,21 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Static file mounts
+# Static files
 # ---------------------------------------------------------------------------
+# Yumii is a desktop application: the orb window is rendered by the
+# Tauri shell from its own bundled assets, NOT served from here. The
+# backend serves exactly one page — dashboard.html, loaded by the
+# shell's dashboard window. The old catch-all mount that made the orb
+# reachable in any browser at / is gone (browser mode was retired with
+# the desktop pivot; it lives on in the ``cli-launch`` branch).
 
 _pkg_dir = Path(__file__).parent.parent
-webui_dir = str(_pkg_dir / "assets" / "webui")
+_webui_dir = _pkg_dir / "assets" / "webui"
 
 
 def _find_avatar_dir() -> str | None:
-    """Resolve the user's Live2D avatar directory."""
+    """Resolve the user's Live2D avatar directory (future companion mode)."""
     candidates = [
         Path.home() / ".yumii" / "avatar",
         _pkg_dir.parent.parent / "assets" / "avatar",  # repo root fallback
@@ -680,4 +686,20 @@ def _find_avatar_dir() -> str | None:
 avatar_dir = _find_avatar_dir()
 if avatar_dir:
     app.mount("/Yumii_Avatar", StaticFiles(directory=avatar_dir), name="avatar")
-app.mount("/", StaticFiles(directory=webui_dir, html=True), name="static")
+
+
+@app.get("/dashboard.html")
+async def dashboard_page() -> Any:
+    """The dashboard page, loaded by the desktop shell's second window."""
+    from fastapi.responses import FileResponse
+
+    return FileResponse(_webui_dir / "dashboard.html", media_type="text/html")
+
+
+@app.get("/")
+async def root() -> dict[str, str]:
+    """Friendly note for anyone poking the port — this is not a web app."""
+    return {
+        "service": "yumii-backend",
+        "note": "Yumii is a desktop application; this API serves the desktop shell.",
+    }
