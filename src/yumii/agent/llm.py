@@ -161,7 +161,11 @@ def _get_bound_llm() -> Any:
     return _bound_llm
 
 
-def _build_system_prompt(personality_name: str, user_facts: str | None = None) -> str:
+def _build_system_prompt(
+    personality_name: str,
+    user_facts: str | None = None,
+    session_context: str | None = None,
+) -> str:
     """Assemble the system prompt in provider-cache-friendly order.
 
     Prefix (KV) caching on Groq/OpenAI/Anthropic matches the request
@@ -170,7 +174,9 @@ def _build_system_prompt(personality_name: str, user_facts: str | None = None) -
 
       1. core + personality  — static forever            → always cached
       2. today's date        — changes once per day
-      3. user facts          — changes when a fact lands
+      3. session context     — changes ~once per session
+         (time since last talk + recent conversation summaries)
+      4. user facts          — changes when a fact lands
       (conversation history and the new message follow, append-only)
 
     The date deliberately has no clock time (that would break the
@@ -186,6 +192,8 @@ def _build_system_prompt(personality_name: str, user_facts: str | None = None) -
     persona = personality_manager.load_personality(personality_name)
     prompt = f"{core}\n\n{persona}"
     prompt += f"\n\nToday is {datetime.datetime.now().strftime('%A, %B %d, %Y')}."
+    if session_context:
+        prompt += f"\n\n{session_context}"
     if user_facts:
         prompt += f"\n\nWhat you know about the user:\n{user_facts}"
     return prompt
@@ -195,6 +203,7 @@ def get_agent_llm(
     session_id: str,
     session_name: str = "",
     user_facts: str | None = None,
+    session_context: str | None = None,
 ) -> BoundLLM:
     """Return a :class:`BoundLLM` for the current personality + fact set.
 
@@ -208,6 +217,8 @@ def get_agent_llm(
         session_name: Human-readable session label. Currently unused.
         user_facts: Pre-formatted facts string to append to the
             system prompt. ``None`` or empty means no facts.
+        session_context: Episodic block — time since last talk +
+            recent conversation summaries (see core/summarizer.py).
 
     Returns:
         A :class:`BoundLLM` carrying the shared tool-bound LLM and the
@@ -218,7 +229,7 @@ def get_agent_llm(
     personality = personality_manager.get_current_personality()
     return BoundLLM(
         llm=_get_bound_llm(),
-        system_prompt=_build_system_prompt(personality, user_facts),
+        system_prompt=_build_system_prompt(personality, user_facts, session_context),
         personality=personality,
     )
 

@@ -74,6 +74,12 @@ class YumiiEngine:
         # of (role, content) dicts the reviewer will see.
         self._memory_turn_buffer: list[dict[str, str]] = []
 
+        # Episodic block injected into the system prompt: time since
+        # last talk + recent conversation summaries. Rebuilt at session
+        # start and refreshed as the live session grows (summarizer.py).
+        self.session_context: str = ""
+        self._session_msg_count: int = 0
+
         self.stt_provider: str = settings.stt_provider
         self.model_size: str = settings.whisper_model_size
         self.groq_api_key: str | None = settings.groq_api_key
@@ -218,6 +224,32 @@ class YumiiEngine:
             )
         )
 
+    async def _rebuild_session_context(self, *, include_current: bool) -> None:
+        """Recompute the episodic prompt block (never lets a failure block)."""
+        from yumii.core.summarizer import build_session_context
+
+        try:
+            self.session_context = await build_session_context(
+                self.active_session_id or "", include_current=include_current
+            )
+        except Exception:
+            log.warning("session_context_build_failed", exc_info=True)
+            self.session_context = ""
+
+    async def _finalize_session(self, session_id: str) -> None:
+        """Summarize an ended session, then refresh the episodic block
+        so the just-finished conversation shows up in it."""
+        from yumii.core.summarizer import summarize_session
+
+        try:
+            await summarize_session(session_id)
+            # include_current is harmless when the active session has no
+            # summary row yet — the "Earlier in this conversation" line
+            # is simply omitted.
+            await self._rebuild_session_context(include_current=True)
+        except Exception:
+            log.warning("session_finalize_failed", session_id=session_id, exc_info=True)
+
     async def shutdown(self) -> None:
         """Clean shutdown: close SQLite connections and memory store."""
         log.info("engine_shutting_down")
@@ -236,6 +268,18 @@ class YumiiEngine:
                 )
             except Exception:
                 log.warning("shutdown_memory_review_failed", exc_info=True)
+
+        # Summarize the session that's ending so the next boot's
+        # "Recent conversations" block includes it. Same bound.
+        if self.active_session_id and self._session_msg_count > 0:
+            try:
+                from yumii.core.summarizer import summarize_session
+
+                await asyncio.wait_for(
+                    summarize_session(self.active_session_id), timeout=20.0
+                )
+            except Exception:
+                log.warning("shutdown_session_summary_failed", exc_info=True)
 
         if self._conn is not None:
             try:
@@ -278,7 +322,8 @@ class YumiiEngine:
 
     async def create_new_session(self, name: str | None = None) -> str:
         """Create a new session, clear all queues, and set it active."""
-        # Review what's buffered for the outgoing session first.
+        # Review + summarize what the outgoing session left behind.
+        previous_session = self.active_session_id
         self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
@@ -287,6 +332,10 @@ class YumiiEngine:
         session_id = await session_manager.create_session(name)
         self.active_session_id = session_id
         self.active_session_name = name or "New Chat"
+        self._session_msg_count = 0
+        await self._rebuild_session_context(include_current=False)
+        if previous_session:
+            asyncio.create_task(self._finalize_session(previous_session))
 
         facts = await memory_manager.get_facts_raw()
         log.info(
@@ -304,7 +353,8 @@ class YumiiEngine:
             log.warning("session_not_found", session_id=session_id)
             return await self.create_new_session(name=f"Resumed-{session_id[:8]}")
 
-        # Review what's buffered for the outgoing session first.
+        # Review + summarize what the outgoing session left behind.
+        previous_session = self.active_session_id
         self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
@@ -312,7 +362,13 @@ class YumiiEngine:
 
         self.active_session_id = session.id
         self.active_session_name = session.name
+        self._session_msg_count = 0
         await session_manager.update_session_activity(session.id)
+        # include_current: on resume, "Earlier in this conversation: …"
+        # bridges whatever the history window no longer carries.
+        await self._rebuild_session_context(include_current=True)
+        if previous_session and previous_session != session.id:
+            asyncio.create_task(self._finalize_session(previous_session))
 
         facts = await memory_manager.get_facts_raw()
         log.info(
@@ -569,6 +625,7 @@ class YumiiEngine:
                     "session_id": self.active_session_id,
                     "session_name": self.active_session_name,
                     "user_facts": facts,
+                    "session_context": self.session_context,
                 }
 
                 reasoning_result: dict | None = None
@@ -692,6 +749,17 @@ class YumiiEngine:
                     )
                 except Exception:
                     log.warning("transcript_record_failed", exc_info=True)
+
+                # Long-session continuity: refresh this session's summary
+                # every SUMMARY_REFRESH_MESSAGES so early turns that slid
+                # out of the history window survive in the prompt block.
+                self._session_msg_count += 2
+                from yumii.core.summarizer import SUMMARY_REFRESH_MESSAGES
+
+                if self._session_msg_count % SUMMARY_REFRESH_MESSAGES == 0:
+                    asyncio.create_task(
+                        self._finalize_session(self.active_session_id)
+                    )
                 if self.active_session_name == "New Chat":
                     refreshed = await session_manager.get_session(
                         self.active_session_id

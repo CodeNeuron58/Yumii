@@ -177,6 +177,9 @@ def _build_state_class() -> type:
         session_id: str
         session_name: str
         user_facts: list[str]
+        # Episodic block: time since last talk + recent conversation
+        # summaries. Built by the engine at session start (summarizer.py).
+        session_context: str
 
     return YumiiMainState
 
@@ -206,6 +209,7 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
     session_id: str = state.get("session_id", "")
     session_name: str = state.get("session_name", "")
     facts: list[str] = state.get("user_facts", []) or []
+    session_context: str = state.get("session_context", "") or ""
 
     log.debug("agent_node_start", text=user_input)
 
@@ -225,6 +229,7 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
         session_id=session_id,
         session_name=session_name,
         user_facts=facts_text or None,
+        session_context=session_context or None,
     )
 
     # NOTE: no per-turn time message. The old layout injected "The
