@@ -15,7 +15,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "CodeNeuron58/Yumi"
+$Repo = "CodeNeuron58/Yumii"
 $AppDir = Join-Path $env:LOCALAPPDATA "Yumii"
 $ExePath = Join-Path $AppDir "Yumii.exe"
 $UvBin = Join-Path $env:USERPROFILE ".local\bin"

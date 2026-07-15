@@ -6,7 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Tauri](https://img.shields.io/badge/desktop-Tauri%20v2-24C8DB.svg)](https://tauri.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumi?style=social)](https://github.com/CodeNeuron58/Yumi)
+[![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumii?style=social)](https://github.com/CodeNeuron58/Yumii)
 
 Yumii is an open-source AI companion that lives on your desktop — a floating
 orb you talk to, with real-time voice, six personalities, and a memory of
@@ -66,8 +66,8 @@ Needs [uv](https://docs.astral.sh/uv/), Rust + MSVC C++ Build Tools (Windows);
 WebView2 ships with Win 10/11.
 
 ```bash
-git clone https://github.com/CodeNeuron58/Yumi.git
-cd Yumi
+git clone https://github.com/CodeNeuron58/Yumii.git
+cd Yumii
 uv sync
 
 cd desktop && npx @tauri-apps/cli dev   # the desktop app — the only way to run Yumii
