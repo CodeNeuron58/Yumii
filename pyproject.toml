@@ -63,10 +63,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/CodeNeuron58/Yumii"
-Repository = "https://github.com/CodeNeuron58/Yumii"
-Documentation = "https://github.com/CodeNeuron58/Yumii#readme"
-"Bug Tracker" = "https://github.com/CodeNeuron58/Yumii/issues"
+Homepage = "https://yumii.me"
+Repository = "https://github.com/CodeNeuron58/Yumi"
+Documentation = "https://yumii.me"
+"Bug Tracker" = "https://github.com/CodeNeuron58/Yumi/issues"
 
 [project.scripts]
 yumii = "yumii.cli:main"

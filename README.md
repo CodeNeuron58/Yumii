@@ -1,4 +1,4 @@
-# Yumii 🌸 — Real-Time AI Companion
+# Yumii 🌸 — An AI Companion for Your Desktop
 
 [![Version](https://img.shields.io/badge/version-0.10.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
@@ -6,221 +6,90 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Tauri](https://img.shields.io/badge/desktop-Tauri%20v2-24C8DB.svg)](https://tauri.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumii?style=social)](https://github.com/CodeNeuron58/Yumii)
+[![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumi?style=social)](https://github.com/CodeNeuron58/Yumi)
 
-Yumii is an open-source, locally-runnable AI companion with real-time voice
-conversation and expressive personality. She runs on a standard CPU — no
-expensive GPU required.
+Yumii is an open-source AI companion that lives on your desktop — a floating
+orb you talk to, with real-time voice, six personalities, and a memory of
+your life together that stays in a file on your machine. Runs on a normal
+CPU, no GPU needed.
 
-> ⚠️ **This is v0.10.0 — an alpha release. No API stability promise yet.**
-> The voice loop, six personalities, persistent memory, multi-session support,
-> and tool-calling (with a human-in-the-loop confirmation gate) all work
-> end-to-end.
->
-> 🖥️ **Pivoting to a desktop app.** Yumii is moving from a browser page to a
-> native **desktop app** (Tauri) with a small floating **orb** UI. The animated
-> Live2D **companion/avatar is a planned "coming soon" mode**. The desktop app
-> and the browser UI run the same Python brain. See
-> [`CHANGELOG.md`](CHANGELOG.md) and [`ROADMAP.md`](ROADMAP.md).
+> ⚠️ **Alpha — no API stability promise yet.** The voice loop, personalities,
+> persistent memory (recall of any past conversation, self-written facts,
+> session summaries with time sense), and tool-calling behind a
+> human-in-the-loop gate all work end-to-end. The animated Live2D avatar is a
+> planned "coming soon" mode. See [`CHANGELOG.md`](CHANGELOG.md) and
+> [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
-## ⚡ Install
+## ⚡ Install (one command)
 
-### 🪟 Windows — one-click installer *(recommended)*
-
-The easiest way to run Yumii. **No Python, no setup — works offline on first launch.**
-
-1. **Download** the latest **`Yumii_…_x64-setup.exe`** from the
-   [**Releases**](https://github.com/CodeNeuron58/Yumii/releases) page.
-2. **Run it.** Yumii is a new open-source app and isn't code-signed yet, so
-   Windows may show a blue **"Windows protected your PC"** screen. This is
-   expected for *any* unsigned installer — click **More info → Run anyway**.
-3. **Launch Yumii** from the Start menu. A floating orb appears — open the
-   ⚙️ dashboard, paste one API key (a free [Groq](https://console.groq.com)
-   key is plenty), and start talking.
-
-The installer bundles the voice model, the speech engine, and the whole
-backend (~450 MB), so the first run needs **no download and no configuration**
-beyond that one API key. An `.msi` is also attached to each release for
-managed/enterprise installs.
-
-### 🛠 From source — developers · macOS · Linux
-
-Yumii runs from source on any platform with **Python 3.12+** and
-[`uv`](https://docs.astral.sh/uv/):
-
-```bash
-git clone https://github.com/CodeNeuron58/Yumii.git
-cd Yumii
-uv sync
-uv run yumii            # CLI + browser orb
-```
-
-Prefer just the `yumii` command without cloning?
+**Windows** (PowerShell):
 
 ```powershell
-# Windows (PowerShell)
-irm https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.ps1 | iex
-```
-```bash
-# macOS / Linux
-curl -LsSf https://raw.githubusercontent.com/CodeNeuron58/Yumii/master/install.sh | sh
+iex (irm https://yumii.me/install.ps1)
 ```
 
-Run the **desktop app** from source (needs Rust + the MSVC C++ Build Tools on
-Windows; WebView2 ships with Win 10/11):
+That's the whole install. It sets up [uv](https://docs.astral.sh/uv/), a
+private Python 3.12, Yumii's backend, and the desktop app — then puts
+**Yumii in your Start Menu**. Open her, paste one API key in the ⚙️ dashboard
+(a free [Groq](https://console.groq.com) key is plenty, or an
+[Ollama](https://ollama.com) key), and start talking. Her local voice model
+downloads itself the first time she speaks.
 
-```bash
-cd desktop && npx @tauri-apps/cli dev
-```
+**Updating:** re-run the same command.
 
-> ⚠️ Use `uv`, **not** `pip` — `torch` is pinned to a CPU-only wheel index that
-> `pip` doesn't understand (it would pull the 2 GB CUDA build or fail).
+**macOS / Linux:** the desktop shell is Windows-first for now —
+`curl -fsSL https://yumii.me/install.sh | bash` installs the backend for
+development, and the native shells are on the roadmap.
 
 ---
 
 ## ✨ What Yumii Does
 
-- 🎙 **Listens** — picks up your voice using Silero VAD + Whisper (local or Groq cloud)
-- 🧠 **Thinks** — responds via Groq, OpenAI, or Anthropic LLMs with a persistent personality
-- 🛠 **Acts** — calls tools (time, web search) behind a human-in-the-loop confirmation gate
-- 🗣 **Speaks** — synthesizes voice through ElevenLabs or CAMB.ai, streamed in real time
-- 🟢 **Reacts** — a floating orb that pulses and shifts colour with the conversation (Live2D avatar mode coming soon)
-- 🧠 **Remembers** — extracts and stores user facts in local SQLite, injects them into every session
-- 💬 **Sessions** — multiple independent conversations with resume, rename, and delete
-- 🔐 **Private** — API keys stored in `~/.yumii/auth.json`, an owner-only local file (the same model Claude Code and opencode use); never sent anywhere except your chosen provider
+- 🎙 **Listens** — Silero VAD + Whisper (local or Groq cloud), with a manual mic mute
+- 🧠 **Thinks** — Groq, Ollama Cloud, OpenAI, or Anthropic, with a persistent personality
+- 🗣 **Speaks** — Kokoro (fully local, no API key) or ElevenLabs / CAMB.ai, streamed in real time
+- 🛠 **Acts** — tools (web search, Gmail/Calendar/Notion via Composio) behind a permission gate
+- 🧠 **Remembers** — searches every past conversation (local FTS), writes and corrects her own
+  facts, and knows *when* you last spoke and what happened — all in local SQLite
+- 🟢 **Reacts** — a floating orb that pulses and shifts colour with the conversation
+  (Live2D avatar mode coming soon)
+- 🔐 **Private by architecture** — no account, no server, nothing phones home; API keys
+  live in an owner-only local file, memory lives in `~/.yumii/`
 
 ---
 
-## 🚀 Quick Start
+## 🛠 Run From Source (developers)
 
-> **Used the Windows installer?** You're already set up — launch Yumii from the
-> Start menu, open the ⚙️ dashboard, add one API key, and skip to talking. The
-> steps below are for **running from source**.
-
-### 1. Prerequisites
-
-- Python **3.12+**
-- [`uv`](https://docs.astral.sh/uv/) (the project's package manager)
-
-Install `uv` if you don't have it:
-```bash
-# macOS / Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows (PowerShell)
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-### 2. Clone & Install
+Needs [uv](https://docs.astral.sh/uv/), Rust + MSVC C++ Build Tools (Windows);
+WebView2 ships with Win 10/11.
 
 ```bash
-git clone https://github.com/CodeNeuron58/Yumii.git
-cd Yumii
+git clone https://github.com/CodeNeuron58/Yumi.git
+cd Yumi
 uv sync
+
+cd desktop && npx @tauri-apps/cli dev   # the desktop app — the only way to run Yumii
 ```
 
-> ⚠️ **Do NOT use `pip install`**. The project pins `torch` to a CPU-only wheel
-> index. `pip` doesn't understand this and will try to download the full 2 GB
-> CUDA build or fail outright. Always use `uv sync`.
+The shell starts the backend for you (`yumii server` is the headless
+launcher it invokes — there is no interactive CLI and no browser UI).
 
-### 3. The UI — Orb (today) · Avatar (coming soon)
-
-The default interface is a lightweight **orb**: a floating circle that pulses
-and shifts colour with the conversation. It needs no assets and works out of
-the box.
-
-The animated **Live2D companion/avatar is a planned "coming soon" mode** —
-selecting it in the UI shows a placeholder for now. The previous Live2D UI is
-preserved (but not shipped) as
-[`_companion_live2d.reference.html`](src/yumii/assets/webui/_companion_live2d.reference.html)
-for that future work, and user-supplied models will live in `~/.yumii/avatar/`.
-
-Either way, **voice + LLM + personality + memory all work** — the UI is purely
-how Yumii shows up on screen.
-
-### 4. Configure Yumii
-
-```bash
-# Option A — activate venv (then use bare commands for the rest of the session)
-.venv\Scripts\activate    # Windows
-source .venv/bin/activate  # macOS / Linux
-yumii
-
-# Option B — no activation needed
-uv run yumii
-```
-
-On first launch, an interactive wizard walks you through:
-
-| Step | What it sets up |
-|------|----------------|
-| **Mind** | LLM provider (Groq / OpenAI / Anthropic) + API key |
-| **Voice** | ElevenLabs API key + Voice ID |
-| **Ears** | STT backend — Local Whisper (private, offline) or Groq Whisper (cloud, 5-10x faster) |
-| **Personality** | Caring · Tsundere · Genki · Kuudere · Yandere · Dandere |
-
-All API keys are saved to **`~/.yumii/auth.json`** — a local file with owner-only
-permissions, created by the wizard. You can change any setting later via the
-dashboard or by editing the file directly.
-
-### 5. Wake Up
-
-```bash
-# If venv is activated
-yumii
-
-# Without activation
-uv run yumii
-```
-
-Select **🌸 Wake Yumii Up** (or run `yumii wake-up`). Your browser opens
-automatically to the orb UI — **tap the orb**, allow microphone access, and
-start talking.
-
-**Prefer the desktop app?** (early — runs from source; needs Rust + the MSVC C++
-Build Tools on Windows, WebView2 is preinstalled on Win 10/11):
-```bash
-cd desktop
-cargo tauri dev        # or: npx @tauri-apps/cli dev
-```
-This opens Yumii as a frameless floating orb window and starts the backend for you.
-
-You can also manage sessions and memory directly from the CLI **before** waking Yumii up:
-
-| Command | What it does |
-|---------|-------------|
-| `/chat` | Browse, resume, or delete past sessions |
-| `/resume` | Resume your most recent session |
-| `/sessions` | List all saved sessions |
-| `/memory` | Browse and edit what Yumii remembers about you |
-| `/forget` | Wipe all long-term memory (keeps sessions) |
-| `/name <name>` | Rename the active session |
+> ⚠️ Use `uv`, **not** `pip` — dependencies are locked with uv and installed
+> via `uv sync`.
 
 ---
 
-## 🎛 STT Backends
+## 🤖 Providers
 
-| Backend | Privacy | Speed | Requirements |
-|---------|---------|-------|-------------|
-| **Local Whisper** *(default)* | ✅ Fully local | ~1-2s per sentence | None |
-| **Groq Whisper** | ☁️ Cloud | ~100-300ms per sentence | Free Groq API key |
+| Role | Options |
+|------|---------|
+| **Mind (LLM)** | Groq *(free tier)* · **Ollama Cloud** (minimax-m3, 1M context) · OpenAI · Anthropic |
+| **Ears (STT)** | Local Whisper *(private, offline)* · Groq Whisper *(fast, cloud)* · Vosk *(offline streaming)* |
+| **Voice (TTS)** | **Kokoro** *(local, free, recommended)* · ElevenLabs · CAMB.ai |
 
-Switch backends anytime via ⚙️ Configure Senses → Listening Settings.
-
-For **Groq Whisper**: if you've already configured Groq as your LLM provider,
-Yumii will reuse the same API key — no duplicate entry needed.
-
----
-
-## 🤖 LLM Providers
-
-| Provider | Model | Notes |
-|----------|-------|-------|
-| **Groq** *(recommended)* | llama-3.3-70b-versatile | Fastest inference, free tier |
-| **OpenAI** | gpt-4o | Most capable |
-| **Anthropic** | claude-3-5-sonnet | Most nuanced |
+Everything is switchable from the in-app ⚙️ dashboard.
 
 ---
 
@@ -234,14 +103,14 @@ flowchart TD
 
     subgraph agent [LangGraph Agent]
         direction TB
-        sys["SystemMessage<br/>personality + user facts"] --> llm["LLM invoke<br/>Groq · OpenAI · Anthropic<br/>binds tools · HITL-gated"]
-        llm --> synth["Synthesizer<br/>response_text + expression"]
+        sys["System prompt<br/>personality + episodic context + facts"] --> llm["LLM invoke<br/>Groq · Ollama · OpenAI · Anthropic<br/>tools bound · HITL-gated"]
+        llm --> synth["Synthesizer<br/>response + expression"]
     end
 
-    agent <--> mem[("SQLite memory<br/>sessions · facts · checkpoints<br/>~/.yumii/memory")]
-    agent --> tts["TTS<br/>ElevenLabs · CAMB.ai · streaming"]
+    agent <--> mem[("SQLite memory<br/>sessions · facts · transcript+FTS ·<br/>summaries · checkpoints — ~/.yumii")]
+    agent --> tts["TTS<br/>Kokoro local · ElevenLabs · CAMB.ai"]
     tts --> ws["WebSocket"]
-    ws --> orb["Orb UI<br/>browser or Tauri desktop app<br/>pulse + emotion colour"]
+    ws --> orb["Desktop orb (Tauri)<br/>pulse + emotion colour"]
     orb -.->|coming soon| live2d["Live2D avatar mode"]
 ```
 
@@ -251,64 +120,45 @@ flowchart TD
 
 ```
 src/yumii/
-  agent/          # LangGraph state machine, LLM agent, personality manager
-                  #   graph.py      → agent → tools → agent loop, AsyncSqliteSaver checkpoints
-                  #   llm.py        → tool-bound LLM factory with fact injection
-                  #   nodes.py      → personality-switch detector
-                  #   synthesizer.py→ heuristic emotion/motion classifier
-                  #   fact_extractor.py → Automatic user-fact extraction
-  api/            # FastAPI server, WebSocket, REST endpoints
-                  #   server.py     → /health, /api/sessions, /api/facts, /ws
-  audio/          # STT pipeline (Silero VAD + Whisper/Groq)
-  core/           # Pydantic settings, auth.json credential store, engine orchestrator
-                  #   engine.py     → Session lifecycle + command interception
-                  #   memory_db.py  → Low-level SQLite schema
-                  #   memory_manager.py → Fact CRUD + extraction trigger
-                  #   session_manager.py  → Session CRUD
-  tts/            # ElevenLabs TTS + CAMB.ai streaming TTS
-  tools/          # LangChain tools + registry/policy (time, web search, MCP loader)
-  assets/
-    prompts/      # Personality prompt files (.txt)
-    webui/        # index.html (orb) + _companion_live2d.reference.html (archived)
-  cli.py          # Typer CLI entry point (yumii command)
+  agent/          # LangGraph state machine, tool-bound LLM, personality manager,
+                  # emotion synthesizer, fact extraction + memory review
+  api/            # FastAPI server: /health, /ws, REST, /dashboard.html
+  audio/          # STT pipeline (Silero VAD + Whisper/Groq/Vosk)
+  core/           # settings, auth.json credential store, engine orchestrator,
+                  # SQLite memory (facts, transcript+FTS, session summaries)
+  tts/            # Kokoro (local ONNX) + ElevenLabs + CAMB.ai streaming
+  tools/          # tool registry + policies: web search, recall, memory,
+                  # Composio integrations
+  assets/         # personality prompts, orb + dashboard pages, Silero model
+  cli.py          # bare launcher: `yumii server` (the shell invokes this)
 
 desktop/
-  src-tauri/      # Tauri v2 Rust app: main.rs (window, tray, hotkey, Python sidecar),
-                  # tauri.conf.json, Cargo.toml, capabilities/, icons/
+  src-tauri/      # Tauri v2 shell: orb window, tray, global hotkey,
+                  # backend launcher
 ```
 
-> **Avatar files** go in `~/.yumii/avatar/` (user-provided, not bundled).
-> **Memory database** lives at `~/.yumii/memory/yumii.db` (auto-created).
+> **Memory** lives at `~/.yumii/memory/` (auto-created). **API keys** at
+> `~/.yumii/auth.json`.
 
 ---
 
 ## 🔐 Security
 
-Yumii keeps secrets and preferences in two separate local files, and nothing
-ever leaves your machine except calls to the providers you configured:
-
-- **`~/.yumii/auth.json`** — API keys. Created with owner-only permissions
-  (0600) and written atomically by
-  [`credential_store.py`](src/yumii/core/credential_store.py). This is the
-  same storage model Claude Code and opencode use.
-- **`~/.yumii/config.json`** — non-sensitive preferences (personality,
-  provider choice, model sizes).
-
-Upgrading from an older version that used the OS keychain? Your keys are
-migrated to `auth.json` automatically on first run.
+- **`~/.yumii/auth.json`** — API keys, owner-only permissions, atomic writes
+  (the same storage model Claude Code and opencode use).
+- **`~/.yumii/config.json`** — non-sensitive preferences.
+- No accounts, no telemetry, no server of ours: your data goes only to the
+  LLM/STT/TTS providers *you* configure — or stays fully on-device with the
+  local options.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Ideas for contributions:
-- New personality prompts
-- Additional LangChain tools (weather, reminders, etc.)
-- Alternative TTS backends (Kokoro, system TTS)
-- UI/avatar improvements
-- Performance optimizations
+Ideas: new personality prompts, more tools, TTS backends, the Live2D avatar
+mode, macOS/Linux desktop shells.
 
 ---
 

@@ -18,76 +18,94 @@ struct Backend(Mutex<Option<Child>>);
 
 /// Launch the Yumii Python backend.
 ///
-/// Packaged build: the PyInstaller onedir bundle is shipped as a Tauri
-/// resource at `<resources>/yumii-server/yumii-server.exe`; we run that
-/// directly — no Python needed on the user's machine.
+/// Installed build (release): the one-command installer put the backend
+/// on this machine via `uv tool install yumii`, so we launch the
+/// `yumii` launcher it created — first from uv's default tool-bin
+/// directory (`~/.local/bin/yumii.exe`), then from PATH. No bundled
+/// sidecar, no frozen Python: the shell is a thin window over the
+/// uv-managed backend.
 ///
-/// Dev build: there's no such resource, so we fall back to
-/// `python -m yumii server` from the project venv (overridable with
-/// `YUMII_PYTHON` / `YUMII_REPO`) so `cargo tauri dev` keeps working.
-fn spawn_backend(app: &tauri::AppHandle) -> Option<Child> {
-    // Release only: use the bundled frozen backend. In dev we always run
-    // live Python source — Tauri copies the resource into the dev target
-    // dir too, and without this gate `cargo tauri dev` would silently run
-    // the last frozen build instead of your current code.
-    #[cfg(not(debug_assertions))]
-    let sidecar = app
-        .path()
-        .resource_dir()
-        .ok()
-        .map(|d| d.join("yumii-server").join("yumii-server.exe"))
-        .filter(|p| p.exists());
-    #[cfg(debug_assertions)]
-    let sidecar: Option<std::path::PathBuf> = {
-        let _ = app; // silence unused warning in dev
-        None
-    };
+/// Dev build: run `python -m yumii server` from the project venv
+/// (overridable with `YUMII_PYTHON` / `YUMII_REPO`) so
+/// `cargo tauri dev` keeps running your live source.
+fn spawn_backend(_app: &tauri::AppHandle) -> Option<Child> {
+    let mut candidates: Vec<Command> = Vec::new();
 
-    let mut cmd = if let Some(exe) = sidecar {
-        println!("[yumii] launching bundled backend: {}", exe.display());
-        Command::new(exe)
-    } else {
-        let python = std::env::var("YUMII_PYTHON")
-            .unwrap_or_else(|_| r"..\..\.venv\Scripts\python.exe".to_string());
+    // Explicit override first — works in dev AND installed builds, for
+    // nonstandard setups (custom venv, testing a local wheel).
+    if let Ok(python) = std::env::var("YUMII_PYTHON") {
+        println!("[yumii] YUMII_PYTHON override: {python} -m yumii server");
+        let mut c = Command::new(python);
+        c.args(["-m", "yumii", "server"]);
+        if let Ok(repo) = std::env::var("YUMII_REPO") {
+            c.current_dir(repo);
+        }
+        candidates.push(c);
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        // The uv tool shim the installer created. uv's default tool-bin
+        // dir is ~/.local/bin on every platform; PATH is the fallback in
+        // case the user moved it (UV_TOOL_BIN_DIR).
+        if let Ok(home) = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }) {
+            let shim = std::path::Path::new(&home)
+                .join(".local")
+                .join("bin")
+                .join(if cfg!(windows) { "yumii.exe" } else { "yumii" });
+            if shim.exists() {
+                println!("[yumii] launching uv-installed backend: {}", shim.display());
+                let mut c = Command::new(shim);
+                c.arg("server");
+                candidates.push(c);
+            }
+        }
+        let mut on_path = Command::new("yumii");
+        on_path.arg("server");
+        candidates.push(on_path);
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        // Dev fallback: live source from the project venv.
+        let python = r"..\..\.venv\Scripts\python.exe".to_string();
         let repo = std::env::var("YUMII_REPO").unwrap_or_else(|_| r"..\..".to_string());
         println!("[yumii] dev fallback: {python} -m yumii server");
         let mut c = Command::new(python);
         c.args(["-m", "yumii", "server"]).current_dir(repo);
-        c
-    };
-
-    cmd.env("KMP_DUPLICATE_LIB_OK", "TRUE")
-        // Output is captured/redirected, which on Windows would otherwise
-        // use a legacy codepage and crash Unicode log lines.
-        .env("PYTHONIOENCODING", "utf-8");
-
-    // Point the backend at the models bundled in the installer
-    // (<resources>/models) so a fresh install needs no download. Harmless
-    // in dev — the path won't exist there, and the backend falls back to
-    // downloading, as before.
-    if let Ok(res) = app.path().resource_dir() {
-        cmd.env("YUMII_MODELS_DIR", res.join("models"));
+        candidates.push(c);
     }
 
-    // Release on Windows: don't flash a console window for the backend.
-    // Dev keeps the console so the backend's logs stay visible.
-    #[cfg(all(windows, not(debug_assertions)))]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
+    for mut cmd in candidates {
+        cmd.env("KMP_DUPLICATE_LIB_OK", "TRUE")
+            // Output is captured/redirected, which on Windows would
+            // otherwise use a legacy codepage and crash Unicode logs.
+            .env("PYTHONIOENCODING", "utf-8");
 
-    match cmd.spawn() {
-        Ok(child) => {
-            println!("[yumii] backend spawned (pid {})", child.id());
-            Some(child)
+        // Release on Windows: don't flash a console window for the
+        // backend. Dev keeps the console so logs stay visible.
+        #[cfg(all(windows, not(debug_assertions)))]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
         }
-        Err(e) => {
-            eprintln!("[yumii] failed to spawn backend: {e}");
-            None
+
+        match cmd.spawn() {
+            Ok(child) => {
+                println!("[yumii] backend spawned (pid {})", child.id());
+                return Some(child);
+            }
+            Err(e) => {
+                eprintln!("[yumii] backend candidate failed to spawn: {e}");
+            }
         }
     }
+
+    eprintln!(
+        "[yumii] no backend found — install it with the command at https://yumii.me"
+    );
+    None
 }
 
 /// Show the window if hidden, hide it if visible.

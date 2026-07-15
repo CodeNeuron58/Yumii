@@ -1,0 +1,76 @@
+name: Release
+
+# Machine plumbing for the one-command installer at https://yumii.me —
+# humans never download anything from this page by hand.
+#
+#   git tag v0.11.0 && git push origin v0.11.0
+#
+# publishes two artifacts:
+#   * the `yumii` wheel to PyPI        (installed via `uv tool install yumii`)
+#   * the bare desktop shell Yumii.exe (fetched by install.ps1 from
+#     .../releases/latest/download/Yumii.exe)
+#
+# PyPI auth is Trusted Publishing (GitHub OIDC) — no tokens, no secrets.
+# The PyPI project's publisher must point at THIS workflow filename and
+# the `pypi` environment.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the release + upload the shell exe
+
+jobs:
+  pypi:
+    name: Publish wheel to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # OIDC for PyPI trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Build the wheel + sdist
+        run: uv build
+
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  shell:
+    name: Desktop shell (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Build the bare shell (no bundling)
+        working-directory: desktop
+        run: npx @tauri-apps/cli@latest build
+
+      - name: Stage the exe under its public name
+        run: Copy-Item desktop/src-tauri/target/release/yumii-desktop.exe Yumii.exe
+
+      - name: Publish release with the shell exe
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Yumii ${{ github.ref_name }}
+          body: |
+            **Don't download anything here.** Install Yumii with one command — see https://yumii.me
+
+            This page is plumbing for the installer: it fetches `Yumii.exe`
+            (the desktop shell) from here, and the backend comes from PyPI.
+          files: Yumii.exe
