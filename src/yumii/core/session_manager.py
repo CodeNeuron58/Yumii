@@ -169,12 +169,15 @@ class SessionManager:
         log.info("session_archived", session_id=session_id)
 
     async def delete_session(self, session_id: str) -> None:
-        """Hard-delete a session and its summary."""
+        """Hard-delete a session, its summary, and its transcript."""
         await execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         await execute(
             "DELETE FROM session_summaries WHERE session_id = ?",
             (session_id,),
         )
+        # Searchable transcript rows too — deleting a conversation must
+        # really delete it (the FTS index rows go via trigger).
+        await execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
         log.info("session_deleted", session_id=session_id)
 
     async def get_last_active_session(self) -> SessionRow | None:

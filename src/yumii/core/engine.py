@@ -109,7 +109,67 @@ class YumiiEngine:
         # PR 4: install the HITL confirmation hook so the gated
         # tools node knows who to ask when a tool needs approval.
         set_confirmation_hook(self._confirmation_hook)
+
+        # One-time transcript backfill: conversations that predate the
+        # searchable transcript live only in LangGraph checkpoints, which
+        # can't be searched. Copy them over once so recall covers the
+        # user's whole history, not just turns after this upgrade.
+        try:
+            await self._backfill_transcript_once()
+        except Exception:
+            log.warning("transcript_backfill_failed", exc_info=True)
+
         log.info("engine_ready")
+
+    async def _backfill_transcript_once(self) -> None:
+        """Populate the transcript from checkpoints, first boot only.
+
+        Runs only when the transcript is completely empty (fresh upgrade)
+        — any recorded message means backfill already happened or normal
+        recording is underway. Timestamps are approximated with each
+        session's created_at (checkpoints don't store per-message times).
+        """
+        from langchain_core.messages import AIMessage, HumanMessage
+
+        from yumii.core import transcript
+
+        if not await transcript.is_empty():
+            return
+        sessions = await session_manager.list_sessions(
+            include_archived=True, limit=1000
+        )
+        if not sessions:
+            return
+
+        total = 0
+        for session in sessions:
+            try:
+                state = await self.graph_app.aget_state(
+                    {"configurable": {"thread_id": session.id}}
+                )
+                messages = (state.values or {}).get("messages", []) if state else []
+                turns: list[tuple[str, str]] = []
+                for m in messages:
+                    content = m.content if isinstance(m.content, str) else str(m.content)
+                    if not content.strip():
+                        continue
+                    if isinstance(m, HumanMessage):
+                        turns.append(("user", content))
+                    elif isinstance(m, AIMessage) and not getattr(m, "tool_calls", None):
+                        turns.append(("assistant", content))
+                total += await transcript.record_many(
+                    session.id, turns, created_at=session.created_at
+                )
+            except Exception:
+                log.warning(
+                    "transcript_backfill_session_failed",
+                    session_id=session.id,
+                    exc_info=True,
+                )
+        if total:
+            log.info(
+                "transcript_backfilled", sessions=len(sessions), messages=total
+            )
 
     async def reload_tools(self) -> list[str]:
         """Re-fetch Composio tools and rebuild the agent graph in place.
@@ -574,6 +634,19 @@ class YumiiEngine:
                 await session_manager.bump_after_turn(
                     self.active_session_id, user_text
                 )
+
+                # Append the turn to the searchable transcript so the
+                # recall tool can find it in any future conversation.
+                try:
+                    from yumii.core import transcript
+
+                    await transcript.record_turn(
+                        self.active_session_id,
+                        user_text,
+                        reasoning_result["response"],
+                    )
+                except Exception:
+                    log.warning("transcript_record_failed", exc_info=True)
                 if self.active_session_name == "New Chat":
                     refreshed = await session_manager.get_session(
                         self.active_session_id

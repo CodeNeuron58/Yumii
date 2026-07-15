@@ -19,6 +19,13 @@ DB_PATH = MEMORY_DIR / "yumii.db"
 # ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
+# The ``messages`` table is the searchable transcript: every spoken
+# user/assistant turn is appended here (the LangGraph checkpoint remains
+# the source of truth for the agent's own history — this table exists so
+# past conversations can be *searched*, which checkpoints can't do).
+# ``messages_fts`` is an FTS5 full-text index over it, using external
+# content (content='messages') so the text is stored once; the triggers
+# keep the index in sync. Porter stemming so "running" matches "run".
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -35,6 +42,30 @@ CREATE TABLE IF NOT EXISTS session_summaries (
     message_count INTEGER DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+    content,
+    content='messages',
+    content_rowid='id',
+    tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS messages_after_insert AFTER INSERT ON messages BEGIN
+    INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+END;
+CREATE TRIGGER IF NOT EXISTS messages_after_delete AFTER DELETE ON messages BEGIN
+    INSERT INTO messages_fts(messages_fts, rowid, content)
+    VALUES ('delete', old.id, old.content);
+END;
 """
 
 # ---------------------------------------------------------------------------

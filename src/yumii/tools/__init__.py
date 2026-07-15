@@ -34,6 +34,10 @@ from yumii.tools.registry import (
     register_many,
     registry as global_registry,
 )
+from yumii.tools.session_search_tool import (  # noqa: F401
+    RecallInput,
+    search_past_conversations,
+)
 from yumii.tools.time_tool import TimeInput, get_current_time
 from yumii.tools.web_search_tool import WebSearchInput  # noqa: F401
 
@@ -57,4 +61,6 @@ __all__ = [
     "TimeInput",
     "get_current_time",
     "WebSearchInput",
+    "RecallInput",
+    "search_past_conversations",
 ]
