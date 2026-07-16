@@ -1,4 +1,4 @@
-# Yumii 🌸 — An AI Companion for Your Desktop
+# Yumii 🟢 — An AI Companion for Your Desktop
 
 [![Version](https://img.shields.io/badge/version-0.11.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)

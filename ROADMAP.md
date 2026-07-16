@@ -1,4 +1,4 @@
-# 🌸 Yumii Roadmap
+# 🟢 Yumii Roadmap
 
 This document tracks what is **shipped**, what is **in progress**, and
 what is **planned**. Anything not listed under "Shipped" is not in the
