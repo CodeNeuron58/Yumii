@@ -5,6 +5,65 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] — 2026-07-16
+
+The one-command release. Yumii drops the installer entirely — the
+official (and only) way to run her is now a single command that
+installs uv, a private Python, her backend from PyPI, and an 8.8 MB
+desktop shell, then puts her in the Start Menu. Along with the new
+distribution model, memory got dramatically deeper: she now searches
+every past conversation, writes and corrects her own facts, and knows
+what happened between you and when.
+
+### Added
+- **One-command install**: `iex (irm https://yumii.me/install.ps1)`.
+  uv installs its own Python 3.12 (no prerequisites), `uv tool install
+  yumii` brings the backend from PyPI, a bare desktop shell downloads
+  from the release, a Start Menu shortcut lands. Re-run to update.
+- **Searchable memory (FTS5)**: every turn is now indexed for full-text
+  recall — "what did we talk about last week?" actually works, ranked
+  by relevance, across every session ever had.
+- **Agent-written memory**: a `manage_memory` tool lets her save,
+  correct, or forget facts the moment you ask — plus a periodic
+  background review (replacing the old per-turn extractor) that
+  reconciles new information against what's already stored instead of
+  only ever adding.
+- **Session summaries + time sense**: she now knows how long it's been
+  since you last spoke and what you talked about, woven naturally into
+  conversation instead of recited.
+- **Manual mic mute** — a button on the orb to control exactly when
+  she's listening, without disturbing the active conversation loop.
+- **Ollama Cloud** as a first-class provider (`minimax-m3` verified
+  end-to-end — fast, strong tool-calling, no paid tier required),
+  alongside Groq, OpenAI, and Anthropic.
+- **Full Composio toolkits on capable providers**: request-size guards
+  now scale to the provider instead of always assuming Groq's free-tier
+  ceiling, so a 1M-context model gets the whole toolkit, not two tools.
+
+### Changed
+- **The CLI and browser mode are retired.** The interactive REPL,
+  setup wizards, and "open Yumii in your browser" flow are gone — the
+  desktop app is the only face. (Preserved on the `cli-launch` branch
+  for anyone who wants that shape later.)
+- The backend no longer serves a public web UI — it serves exactly one
+  page (the dashboard) for the desktop shell's second window.
+- Duplicate identical tool calls (a model quirk that could fire a
+  write tool, like sending an email, more than once) now execute only
+  the first occurrence.
+
+### Removed
+- The PyInstaller-frozen backend, the bundled installer, and the
+  `packaging/` machinery that built it — replaced by the PyPI + bare
+  shell model above.
+- `main.py`, a legacy entry point that bound `0.0.0.0` and exposed the
+  API beyond localhost.
+
+### Notes
+- **204 tests.** This is alpha software — the distribution model
+  changed underneath the version number; expect first-run rough edges
+  (onboarding and a few error-surfacing gaps) to be smoothed in the
+  next release.
+
 ## [0.10.0] — 2026-07-15
 
 The installer release. Yumii becomes a real Windows app: download one
