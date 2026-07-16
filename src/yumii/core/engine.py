@@ -14,9 +14,11 @@ from typing import Any, Dict, List
 
 import aiosqlite
 from fastapi import WebSocket
+from langchain_core.messages import AIMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from yumii.agent.graph import _CHECKPOINT_DB, build_graph, set_confirmation_hook
+from yumii.agent.synthesizer import _THINK_BLOCK, synthesize
 from yumii.audio.stt import AudioPipeline
 from yumii.core.config import settings
 from yumii.core.interfaces import BaseSpeaker
@@ -36,6 +38,51 @@ log = get_logger(__name__)
 # both quality and LLM-call count. The buffer also flushes on session
 # switch and shutdown so trailing turns aren't lost.
 _MEMORY_REVIEW_INTERVAL = 5
+
+# Spoken when the model calls a tool without saying anything alongside
+# it (some models emit bare tool calls). Short and personality-neutral
+# — the prompt asks her to narrate in her own voice, so these are only
+# the safety net that keeps a tool turn from ever being dead air.
+_TOOL_NARRATION_FILLERS = (
+    "Let me check that for you.",
+    "One moment.",
+    "On it, give me a second.",
+)
+
+
+def _derive_tool_narration(output: Any, *, allow_filler: bool = True) -> str | None:
+    """Spoken line for an agent pass that decided to call tools.
+
+    A tool turn takes seconds (LLM pass → confirmation → tool call →
+    final pass) and used to be dead air: the model's narration ("let
+    me check your inbox") was discarded and only the final reply was
+    spoken. Returns that narration (think-blocks stripped), a filler
+    when the model stayed silent, or ``None`` when this pass isn't a
+    tool pass / already carries the final response.
+
+    ``allow_filler`` is True only for the FIRST tool pass of a turn:
+    models sometimes chain several silent tool passes back-to-back,
+    and narrating a canned filler for each ("On it… one moment… on
+    it…") is worse than the silence it replaces. Later passes speak
+    only words the model actually produced.
+    """
+    if not isinstance(output, dict) or output.get("response"):
+        return None
+    messages = output.get("messages") or []
+    last_ai = next(
+        (m for m in reversed(messages) if isinstance(m, AIMessage)), None
+    )
+    if last_ai is None or not getattr(last_ai, "tool_calls", None):
+        return None
+    raw = last_ai.content if isinstance(last_ai.content, str) else str(last_ai.content or "")
+    narration = _THINK_BLOCK.sub("", raw).strip()
+    if not narration:
+        if not allow_filler:
+            return None
+        import random
+
+        narration = random.choice(_TOOL_NARRATION_FILLERS)
+    return narration
 
 
 class YumiiEngine:
@@ -630,6 +677,8 @@ class YumiiEngine:
 
                 reasoning_result: dict | None = None
                 streamed_delta_count = 0
+                tool_passes_narrated = 0
+                last_narration: str | None = None
 
                 try:
                     async for event in self.graph_app.astream_events(
@@ -677,6 +726,37 @@ class YumiiEngine:
                             output = event.get("data", {}).get("output")
                             if isinstance(output, dict) and output.get("response"):
                                 reasoning_result = output
+                            else:
+                                # Tool pass: speak the model's narration
+                                # (or, on the first pass only, a short
+                                # filler) NOW, while the tools run — the
+                                # queue is FIFO, so the real answer
+                                # follows right after. A 20-second Gmail
+                                # fetch is no longer dead air. Repeats
+                                # of the same line are suppressed so a
+                                # model looping on a tool doesn't chant.
+                                narration = _derive_tool_narration(
+                                    output,
+                                    allow_filler=tool_passes_narrated == 0,
+                                )
+                                if (
+                                    narration
+                                    and narration != last_narration
+                                    and not self.interrupt_event.is_set()
+                                ):
+                                    tool_passes_narrated += 1
+                                    last_narration = narration
+                                    spoken = synthesize(narration)
+                                    log.info(
+                                        "tool_narration", text=spoken.response_text[:80]
+                                    )
+                                    await self.tts_queue.put(
+                                        {
+                                            "response": spoken.response_text,
+                                            "expression": spoken.expression,
+                                            "motion": spoken.motion,
+                                        }
+                                    )
                 except Exception as stream_exc:
                     log.error(
                         "reasoning_stream_error",
