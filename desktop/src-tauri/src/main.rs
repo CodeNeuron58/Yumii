@@ -156,6 +156,25 @@ fn open_dashboard(app: tauri::AppHandle) {
     show_dashboard(&app);
 }
 
+/// Restart the Python backend. The orb calls this after first-run
+/// onboarding saves the API key: the backend reads credentials once at
+/// import, so a fresh key only takes effect on a restart. Kill the old
+/// child, spawn a new one, swap it into managed state. The orb then
+/// polls /health until it's back and re-checks /api/status.
+#[tauri::command]
+fn restart_backend(app: tauri::AppHandle) {
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        if let Some(mut child) = handle.state::<Backend>().0.lock().unwrap().take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        let fresh = spawn_backend(&handle);
+        *handle.state::<Backend>().0.lock().unwrap() = fresh;
+        println!("[yumii] backend restarted");
+    });
+}
+
 fn main() {
     // Ctrl+Shift+Space toggles the window from anywhere.
     let toggle_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Space);
@@ -174,7 +193,7 @@ fn main() {
                 .build(),
         )
         .manage(Backend(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![open_dashboard])
+        .invoke_handler(tauri::generate_handler![open_dashboard, restart_backend])
         .setup(move |app| {
             // 1. Launch the Python brain in the background.
             let child = spawn_backend(app.handle());

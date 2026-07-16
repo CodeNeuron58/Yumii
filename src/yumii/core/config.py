@@ -35,7 +35,11 @@ class Settings(BaseSettings):
     from auth.json (secrets) and config.json (preferences).
     """
 
-    tts_provider: str = Field(default="ElevenLabs", alias="TTS_PROVIDER")
+    # Fresh-install default is the "everything local except the brain"
+    # shape: Kokoro voice (local), local Whisper ears, Silero VAD
+    # (bundled) — so the only key a new user needs is the LLM's. An
+    # existing ~/.yumii/config.json overrides these.
+    tts_provider: str = Field(default="Kokoro", alias="TTS_PROVIDER")
     elevenlabs_api_key: str | None = Field(default=None, alias="ELEVENLABS_API_KEY")
     elevenlabs_voice_id: str | None = Field(default=None, alias="ELEVENLABS_VOICE_ID")
     camb_api_key: str | None = Field(default=None, alias="CAMB_API_KEY")
@@ -46,7 +50,7 @@ class Settings(BaseSettings):
     # on an i5-13500H. int8 stays available for machines where it wins.
     kokoro_voice: str = Field(default="af_heart", alias="KOKORO_VOICE")
     kokoro_model_size: str = Field(default="fp32", alias="KOKORO_MODEL_SIZE")
-    llm_provider: str = Field(default="Groq", alias="LLM_PROVIDER")
+    llm_provider: str = Field(default="Ollama", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     # Which Groq-hosted model runs the agent. qwen3.6-27b is the
     # default after live testing: cleaner tool calls than llama-3.3

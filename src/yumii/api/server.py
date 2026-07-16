@@ -34,14 +34,13 @@ engine = YumiiEngine()
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
     """Manage the lifecycle of the FastAPI application.
 
-    Initializes the background audio and reasoning tasks on startup.
+    ``engine.initialize()`` returns as soon as the graph is ready and
+    starts audio preparation (model download + STT/TTS load + the three
+    interaction loops) in the background, so the server responds to
+    ``/health`` and ``/api/status`` immediately — the orb shows download
+    progress instead of waiting on a blocked boot.
     """
     await engine.initialize()
-
-    # Spawn the three parallel engines in the background
-    asyncio.create_task(engine.audio_listener_task())
-    asyncio.create_task(engine.reasoning_engine_task())
-    asyncio.create_task(engine.tts_speaker_task())
     yield
     # --- shutdown ---
     await engine.shutdown()
@@ -108,6 +107,55 @@ async def health() -> dict[str, str]:
     """Liveness probe. The desktop shell polls this before connecting the
     WebSocket so it can show a 'waking up…' state while the brain boots."""
     return {"status": "ok"}
+
+
+# Sign-in pages the orb may open in the system browser during
+# onboarding. An allowlist — never open an arbitrary URL.
+_EXTERNAL_LINKS = {
+    "ollama": "https://ollama.com/settings/keys",
+    "groq": "https://console.groq.com/keys",
+}
+
+
+@app.post("/api/open-external")
+async def open_external(body: dict[str, Any]) -> dict[str, Any]:
+    """Open an allowlisted sign-in page in the user's real browser.
+
+    ``window.open`` is suppressed inside the Tauri webview, so the orb's
+    'get a key' link routes through here (the same pattern the Composio
+    OAuth flow uses)."""
+    import webbrowser
+
+    url = _EXTERNAL_LINKS.get(str(body.get("target", "")))
+    if not url:
+        raise HTTPException(status_code=400, detail="Unknown link target")
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+    return {"opened": url}
+
+
+@app.get("/api/status")
+async def status() -> dict[str, Any]:
+    """First-run status for the orb: is the LLM key set, and are the
+    local models downloaded yet?
+
+    Drives the orb's routing — downloading → onboarding (no key) →
+    ready. ``configured`` checks the credential for the *active* LLM
+    provider (a fresh install defaults to Ollama)."""
+    from yumii.core.config import settings
+    from yumii.core.credential_store import get_credential
+
+    config = load_global_config()
+    provider = config.get("LLM_PROVIDER", settings.llm_provider)
+    configured = bool(get_credential(f"{provider.upper()}_API_KEY"))
+    return {
+        "configured": configured,
+        "provider": provider,
+        "audio_ready": engine.audio_ready,
+        "models": engine.model_status,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -582,8 +630,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     # retries every 3s) must NOT mint a new session each time.
 
     # Any audio that raced ahead of the negotiation belongs to this
-    # session — feed it through now (unless the user is muted).
-    if not engine.mic_muted:
+    # session — feed it through now (unless the user is muted, or audio
+    # isn't ready yet: no ears until the STT model has loaded).
+    if not engine.mic_muted and engine.audio_ready:
         for chunk in stashed_audio:
             await engine.audio_input_queue.put(chunk)
 
@@ -639,10 +688,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     pass
                 continue
 
-            # Binary audio chunk from the browser. Dropped while muted —
-            # the frontend gates too; this covers stale in-flight frames.
+            # Binary audio chunk from the browser. Dropped while muted or
+            # before audio is ready — the frontend gates too; this covers
+            # stale in-flight frames.
             if "bytes" in message:
-                if not engine.mic_muted:
+                if not engine.mic_muted and engine.audio_ready:
                     await engine.audio_input_queue.put(message["bytes"])
 
     except WebSocketDisconnect:

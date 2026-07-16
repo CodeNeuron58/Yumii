@@ -85,6 +85,48 @@ def _derive_tool_narration(output: Any, *, allow_filler: bool = True) -> str | N
     return narration
 
 
+def _classify_turn_error(exc: Exception) -> tuple[str, str]:
+    """Map a reasoning failure to (kind, user-facing message).
+
+    So the orb can show a clear, actionable card instead of a frozen
+    'Thinking…' — the #1 first-run failure (bad or missing LLM key)
+    finally says what's wrong.
+    """
+    text = str(exc).lower()
+    if any(
+        s in text
+        for s in (
+            "401", "403", "unauthorized", "invalid api key", "invalid_api_key",
+            "authentication", "no api key", "requires a subscription",
+        )
+    ):
+        return (
+            "auth",
+            "I can't reach my mind — the API key doesn't seem to be working. "
+            "Mind checking it in the dashboard?",
+        )
+    if any(
+        s in text
+        for s in ("429", "rate limit", "rate_limit", "quota", "insufficient", "capacity", "overloaded")
+    ):
+        return (
+            "quota",
+            "I've hit my thinking limit for now. Give it a little while and try me again.",
+        )
+    if any(
+        s in text
+        for s in ("connection", "timed out", "timeout", "getaddrinfo", "unreachable", "connect", "network")
+    ):
+        return (
+            "network",
+            "I can't reach my mind right now — is the connection okay?",
+        )
+    return (
+        "generic",
+        "Something glitched on my end mid-thought. Say that again for me?",
+    )
+
+
 class YumiiEngine:
     """The central orchestration engine for Yumii.
 
@@ -131,15 +173,21 @@ class YumiiEngine:
         self.model_size: str = settings.whisper_model_size
         self.groq_api_key: str | None = settings.groq_api_key
 
-        log.info("audio_pipeline_init", stt_provider=self.stt_provider)
-        self.pipeline = AudioPipeline(
-            provider=self.stt_provider,
-            model_size=self.model_size,
-            groq_api_key=self.groq_api_key,
-        )
-
-        log.info("speaker_init")
-        self.speaker: BaseSpeaker = get_speaker()
+        # Audio (STT + TTS) is prepared AFTER the server is up, so the
+        # first launch can download the local models behind a progress
+        # screen in the orb instead of stalling boot (or the first spoken
+        # word). ``pipeline`` and ``speaker`` stay None until then.
+        self.pipeline: AudioPipeline | None = None
+        self.speaker: BaseSpeaker | None = None
+        self.audio_ready: bool = False
+        # Consumed by /api/status and shown by the orb. ``progress`` is
+        # 0..1; ``indeterminate`` marks a stage with no byte-level %.
+        self.model_status: dict[str, Any] = {
+            "ready": False,
+            "stage": "starting",
+            "progress": 0.0,
+            "indeterminate": False,
+        }
 
         # graph_app is initialized lazily via initialize() because
         # AsyncSqliteSaver requires an async context. The saver is kept
@@ -185,7 +233,67 @@ class YumiiEngine:
         except Exception:
             log.warning("transcript_backfill_failed", exc_info=True)
 
+        # Prepare audio (download local models, build STT + TTS, start
+        # the interaction loops) in the background so the server is
+        # already responding to /health and /api/status while the orb
+        # shows download progress.
+        asyncio.create_task(self._prepare_audio())
+
         log.info("engine_ready")
+
+    async def _prepare_audio(self) -> None:
+        """Download local models (with progress), build the STT pipeline
+        and TTS speaker, then start the three interaction loops.
+
+        Runs off the boot path so the server stays responsive during the
+        first-launch model download. Retries on failure so a flaky
+        download never leaves her permanently deaf — the orb keeps
+        showing progress and she recovers on her own.
+        """
+        from yumii.core.models import ensure_models_ready
+
+        def on_progress(stage: str, frac: float | None) -> None:
+            self.model_status = {
+                "ready": False,
+                "stage": stage,
+                "progress": frac if frac is not None else self.model_status.get("progress", 0.0),
+                "indeterminate": frac is None,
+            }
+
+        while not self.audio_ready:
+            try:
+                await asyncio.to_thread(ensure_models_ready, on_progress)
+                # Models are on disk now — load them (heavy, off-loop).
+                self.pipeline = await asyncio.to_thread(self._build_pipeline)
+                self.speaker = await asyncio.to_thread(get_speaker)
+                self.audio_ready = True
+                self.model_status = {
+                    "ready": True,
+                    "stage": "ready",
+                    "progress": 1.0,
+                    "indeterminate": False,
+                }
+                asyncio.create_task(self.audio_listener_task())
+                asyncio.create_task(self.reasoning_engine_task())
+                asyncio.create_task(self.tts_speaker_task())
+                log.info("audio_ready")
+            except Exception:
+                log.error("audio_prepare_failed_retrying", exc_info=True)
+                self.model_status = {
+                    "ready": False,
+                    "stage": "error",
+                    "progress": self.model_status.get("progress", 0.0),
+                    "indeterminate": False,
+                }
+                await asyncio.sleep(3)
+
+    def _build_pipeline(self) -> AudioPipeline:
+        log.info("audio_pipeline_init", stt_provider=self.stt_provider)
+        return AudioPipeline(
+            provider=self.stt_provider,
+            model_size=self.model_size,
+            groq_api_key=self.groq_api_key,
+        )
 
     async def _backfill_transcript_once(self) -> None:
         """Populate the transcript from checkpoints, first boot only.
@@ -679,6 +787,7 @@ class YumiiEngine:
                 streamed_delta_count = 0
                 tool_passes_narrated = 0
                 last_narration: str | None = None
+                turn_error: tuple[str, str] | None = None  # (kind, message)
 
                 try:
                     async for event in self.graph_app.astream_events(
@@ -763,12 +872,25 @@ class YumiiEngine:
                         error=str(stream_exc),
                         exc_info=True,
                     )
+                    turn_error = _classify_turn_error(stream_exc)
 
                 # Always close the thinking indicator, even on error.
                 await self.broadcast_payload({"type": "thinking_end"})
 
                 if self.interrupt_event.is_set():
                     log.info("reasoning_interrupted")
+                    continue
+
+                # A hard failure with nothing to say: surface a clear,
+                # actionable card (never a silent frozen "Thinking…").
+                # Skip the spoken generic apology — the card is clearer,
+                # and an auth error means she couldn't think at all.
+                if reasoning_result is None and turn_error is not None:
+                    kind, message = turn_error
+                    log.info("turn_error_surfaced", kind=kind)
+                    await self.broadcast_payload(
+                        {"type": "error", "kind": kind, "message": message}
+                    )
                     continue
 
                 # Fallback: the stream ended without capturing the

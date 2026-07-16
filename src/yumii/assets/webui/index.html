@@ -279,6 +279,79 @@
         .confirm-buttons { display: flex; gap: 10px; justify-content: center; }
         #confirm-yes { background: rgba(0, 212, 170, 0.22); border-color: rgba(0, 212, 170, 0.5); }
         #confirm-yes:hover { background: rgba(0, 212, 170, 0.38); }
+
+        /* ── First-run download progress ───────────────────────────────── */
+        #progress {
+            margin-top: 18px;
+            width: 200px;
+            height: 5px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        #progress.visible { opacity: 1; }
+        #progress-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--c-neon), var(--c-cyan));
+            transition: width 0.3s ease;
+        }
+        /* Indeterminate: a sweeping bar for stages with no byte-% */
+        #progress.indeterminate #progress-fill {
+            width: 40%;
+            animation: sweep 1.2s ease-in-out infinite;
+        }
+        @keyframes sweep {
+            0%   { margin-left: -40%; }
+            100% { margin-left: 100%; }
+        }
+
+        /* ── First-run onboarding (one key) ────────────────────────────── */
+        #onboard .field {
+            width: 100%;
+            box-sizing: border-box;
+            margin: 4px 0 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(0, 0, 0, 0.35);
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+        }
+        #onboard .field:focus { outline: 1px solid var(--c-primary); }
+        #onboard .getkey {
+            display: inline-block;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: var(--c-primary);
+            cursor: pointer;
+            text-decoration: none;
+        }
+        #onboard .getkey:hover { text-decoration: underline; }
+        #onboard #onboard-save {
+            width: 100%;
+            background: rgba(0, 212, 170, 0.22);
+            border-color: rgba(0, 212, 170, 0.5);
+        }
+        #onboard #onboard-save:hover { background: rgba(0, 212, 170, 0.38); }
+        #onboard .more {
+            display: block;
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--c-dim);
+            cursor: pointer;
+        }
+        #onboard .more:hover { color: var(--c-text); }
+        #onboard .err { color: #f8a; font-size: 12.5px; min-height: 16px; margin: 0 0 4px; }
+
+        /* ── Error card (auth / quota / network / generic) ─────────────── */
+        #error-modal h3 { color: #ffcf6b; }
+        #error-modal .err-buttons { display: flex; gap: 10px; justify-content: center; }
+        #error-modal #err-fix { background: rgba(0, 212, 170, 0.22); border-color: rgba(0, 212, 170, 0.5); }
     </style>
 </head>
 
@@ -306,6 +379,7 @@
             <div id="orb"></div>
         </div>
         <div id="hint">Waking Yumii up…</div>
+        <div id="progress"><div id="progress-fill"></div></div>
         <div id="card"></div>
     </div>
 
@@ -315,6 +389,29 @@
         <p>An animated avatar you can watch react in real time is on the way.
            For now, meet Yumii as an orb.</p>
         <button id="soon-close">Got it</button>
+    </div>
+
+    <!-- First-run onboarding: one key and she wakes up -->
+    <div id="onboard" class="modal hidden">
+        <h3>Hi — I'm Yumii</h3>
+        <p>My ears and voice are ready. I just need a mind to think with —
+           one key and we're talking.</p>
+        <a class="getkey" id="onboard-getkey">Get a free Ollama key ↗</a>
+        <input class="field" id="onboard-key" type="password"
+               placeholder="paste your Ollama key" autocomplete="off" spellcheck="false" />
+        <p class="err" id="onboard-err"></p>
+        <button id="onboard-save">Wake her up</button>
+        <span class="more" id="onboard-more">more options →</span>
+    </div>
+
+    <!-- Something went wrong (never a silent freeze) -->
+    <div id="error-modal" class="modal hidden">
+        <h3 id="err-title">Hmm</h3>
+        <p id="err-msg"></p>
+        <div class="err-buttons">
+            <button id="err-dismiss">OK</button>
+            <button id="err-fix" class="hidden">Open dashboard</button>
+        </div>
     </div>
 
     <!-- HITL tool confirmation -->
@@ -342,6 +439,7 @@
         let audioByteRemainder = new Uint8Array(0); // Buffer for odd-sized chunks
         let started = false;
         let sessionNegotiated = false; // first connect may deep-link a session
+        let appReady = false;          // false until models downloaded + LLM key set
 
         // ── Orb state machine ──────────────────────────────────────────
         const stage = document.getElementById('stage');
@@ -613,6 +711,17 @@
                     return;
                 }
 
+                // A turn failed with nothing to say — show a clear,
+                // actionable card instead of a frozen "Thinking…".
+                if (data.type === "error") {
+                    stopAllAudio();
+                    hideCard();
+                    setStatus('');
+                    setOrbState('idle');
+                    showErrorCard(data.kind, data.message);
+                    return;
+                }
+
                 if (data.type === "thinking_start" || data.type === "thinking_delta") {
                     setStatus('Thinking…');
                     if (orbState !== 'speaking') setOrbState('thinking');
@@ -779,16 +888,145 @@
             }
         }
 
-        async function boot() {
+        const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+        async function fetchStatus() {
+            try {
+                const r = await fetch(HTTP_BASE + '/api/status', { cache: 'no-store' });
+                if (r.ok) return await r.json();
+            } catch (e) { /* server restarting */ }
+            return null;
+        }
+
+        // ── First-run download progress ────────────────────────────────
+        const progressEl = document.getElementById('progress');
+        const progressFill = document.getElementById('progress-fill');
+        function showProgress(frac, indeterminate) {
+            progressEl.classList.add('visible');
+            progressEl.classList.toggle('indeterminate', !!indeterminate);
+            if (!indeterminate) progressFill.style.width = Math.round((frac || 0) * 100) + '%';
+        }
+        function hideProgress() { progressEl.classList.remove('visible', 'indeterminate'); }
+
+        // ── First-run onboarding (one key) ─────────────────────────────
+        const onboardModal = document.getElementById('onboard');
+        function showOnboarding() {
+            hideProgress();
+            setOrbState('idle');
+            hintEl.textContent = "";
+            onboardModal.classList.remove('hidden');
+            document.getElementById('onboard-key').focus();
+        }
+        document.getElementById('onboard-getkey').addEventListener('click', () => {
+            // Open the sign-in page in the system browser (window.open is a
+            // no-op inside the Tauri webview, so the backend opens it).
+            fetch(HTTP_BASE + '/api/open-external', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target: 'ollama' }),
+            }).catch(() => {});
+        });
+        document.getElementById('onboard-more').addEventListener('click', () => {
+            if (IS_TAURI && window.__TAURI__?.core?.invoke) window.__TAURI__.core.invoke('open_dashboard');
+            else window.open(HTTP_BASE + '/dashboard.html', '_blank');
+        });
+        document.getElementById('onboard-key').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') saveOnboarding();
+        });
+        document.getElementById('onboard-save').addEventListener('click', saveOnboarding);
+
+        async function saveOnboarding() {
+            const errEl = document.getElementById('onboard-err');
+            const saveBtn = document.getElementById('onboard-save');
+            const key = document.getElementById('onboard-key').value.trim();
+            if (!key) { errEl.textContent = "Paste your key first."; return; }
+            errEl.textContent = "";
+            saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+            try {
+                const r = await fetch(HTTP_BASE + '/api/settings', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        preferences: { LLM_PROVIDER: 'Ollama' },
+                        credentials: { OLLAMA_API_KEY: key },
+                    }),
+                });
+                if (!r.ok) throw new Error(await r.text());
+            } catch (e) {
+                errEl.textContent = "Couldn't save — try again.";
+                saveBtn.disabled = false; saveBtn.textContent = "Wake her up";
+                return;
+            }
+            // The backend reads the key once at import, so restart it to
+            // pick up the new key, then re-run the first-run flow.
+            onboardModal.classList.add('hidden');
+            saveBtn.disabled = false; saveBtn.textContent = "Wake her up";
             setOrbState('boot');
-            hintEl.textContent = "Waking Yumii up…";
+            hintEl.textContent = "Waking her up…";
+            if (IS_TAURI && window.__TAURI__?.core?.invoke) {
+                try { await window.__TAURI__.core.invoke('restart_backend'); } catch (e) {}
+            }
+            await sleep(1500);
             await pollHealth();
+            await firstRunFlow();
+        }
+
+        // ── Error card — never a silent frozen "Thinking…" ─────────────
+        const errorModal = document.getElementById('error-modal');
+        function showErrorCard(kind, message) {
+            document.getElementById('err-title').textContent =
+                kind === 'auth' ? "I can't reach my mind" :
+                kind === 'quota' ? "Give me a moment" :
+                kind === 'network' ? "Connection trouble" : "Hmm";
+            document.getElementById('err-msg').textContent = message || "Something went wrong.";
+            document.getElementById('err-fix').classList.toggle('hidden', kind !== 'auth');
+            errorModal.classList.remove('hidden');
+        }
+        document.getElementById('err-dismiss').addEventListener('click', () => errorModal.classList.add('hidden'));
+        document.getElementById('err-fix').addEventListener('click', () => {
+            errorModal.classList.add('hidden');
+            if (IS_TAURI && window.__TAURI__?.core?.invoke) window.__TAURI__.core.invoke('open_dashboard');
+            else window.open(HTTP_BASE + '/dashboard.html', '_blank');
+        });
+
+        // ── First-run routing: download → onboard → ready ──────────────
+        async function firstRunFlow() {
+            let status = await fetchStatus();
+            // Wait for the local models (STT + voice), showing progress.
+            while (status && !status.audio_ready) {
+                const m = status.models || {};
+                setOrbState('boot');
+                if (m.stage === 'error') {
+                    hintEl.textContent = "Trouble downloading — retrying…";
+                } else if (m.stage && m.stage !== 'starting' && m.stage !== 'ready') {
+                    hintEl.textContent = m.stage + "…";
+                } else {
+                    hintEl.textContent = "Getting ready…";
+                }
+                showProgress(m.progress, m.indeterminate);
+                await sleep(700);
+                status = await fetchStatus();
+            }
+            hideProgress();
+            // Models ready — does she have a mind (an LLM key)?
+            if (status && !status.configured) { showOnboarding(); return; }
+            becomeReady();
+        }
+
+        function becomeReady() {
+            hideProgress();
+            appReady = true;
             setOrbState('idle');
             hintEl.textContent = "Tap the orb to talk";
         }
 
+        async function boot() {
+            setOrbState('boot');
+            hintEl.textContent = "Waking Yumii up…";
+            await pollHealth();
+            await firstRunFlow();
+        }
+
         async function startSession() {
-            if (started) return;
+            if (started || !appReady) return;   // no talking until ready + configured
             started = true;
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
