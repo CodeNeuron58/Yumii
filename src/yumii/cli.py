@@ -39,8 +39,47 @@ Development: run the app with  cd desktop && npx @tauri-apps/cli dev
 """
 
 
+# Loopback range the backend binds within. It prefers 8000; if that's
+# taken (a dev server, another Yumii), it walks up until it finds a free
+# port instead of dying — the orb probes the same range to find it, and
+# the chosen port is written to the file below so the shell can open the
+# dashboard on the right one.
+_PORT_BASE = 8000
+_PORT_TRIES = 12
+
+
+def _pick_free_port() -> int:
+    """Return the first free loopback port at or above 8000."""
+    import socket
+
+    for port in range(_PORT_BASE, _PORT_BASE + _PORT_TRIES):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(("127.0.0.1", port))
+            return port
+        except OSError:
+            continue
+        finally:
+            sock.close()
+    # Nothing free in range — return the base and let uvicorn fail
+    # loudly, which is far better than guessing a busy port silently.
+    return _PORT_BASE
+
+
+def _write_port_file(port: int) -> None:
+    """Publish the chosen port so the shell + orb can find the backend."""
+    from pathlib import Path
+
+    d = Path.home() / ".yumii"
+    d.mkdir(parents=True, exist_ok=True)
+    try:
+        (d / "backend.port").write_text(str(port), encoding="utf-8")
+    except OSError:
+        pass  # non-fatal; the orb still discovers the port by probing
+
+
 def _run_server() -> None:
-    """Boot the FastAPI backend on 127.0.0.1:8000 (blocking)."""
+    """Boot the FastAPI backend on a free loopback port (blocking)."""
     # onnxruntime/numpy can trip over duplicate OpenMP runtimes on
     # Windows; the desktop shell sets this too, but direct runs need it.
     os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
@@ -50,7 +89,9 @@ def _run_server() -> None:
 
     from yumii.api.server import app as fastapi_app
 
-    uvicorn.run(fastapi_app, host="127.0.0.1", port=8000, log_config=None)
+    port = _pick_free_port()
+    _write_port_file(port)
+    uvicorn.run(fastapi_app, host="127.0.0.1", port=port, log_config=None)
 
 
 def main() -> None:

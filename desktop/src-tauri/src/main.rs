@@ -108,6 +108,22 @@ fn spawn_backend(_app: &tauri::AppHandle) -> Option<Child> {
     None
 }
 
+/// The port the backend bound to. It prefers 8000 but walks up the
+/// range if taken, writing its choice to ~/.yumii/backend.port — read
+/// that (fresh each time; falls back to 8000 if unwritten/unreadable).
+fn backend_port() -> u16 {
+    let home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" });
+    if let Ok(home) = home {
+        let path = std::path::Path::new(&home).join(".yumii").join("backend.port");
+        if let Ok(text) = std::fs::read_to_string(path) {
+            if let Ok(port) = text.trim().parse::<u16>() {
+                return port;
+            }
+        }
+    }
+    8000
+}
+
 /// Show the window if hidden, hide it if visible.
 fn toggle_window(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
@@ -136,7 +152,8 @@ fn show_dashboard(app: &tauri::AppHandle) {
             let _ = win.set_focus();
             return;
         }
-        if let Ok(url) = "http://127.0.0.1:8000/dashboard.html".parse() {
+        let dash = format!("http://127.0.0.1:{}/dashboard.html", backend_port());
+        if let Ok(url) = dash.parse() {
             let _ = tauri::WebviewWindowBuilder::new(
                 &app,
                 "dashboard",

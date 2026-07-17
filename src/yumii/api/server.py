@@ -16,6 +16,7 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.websockets import WebSocketState
 
 from yumii.core.engine import YumiiEngine
@@ -79,6 +80,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Host-header allowlist — the DNS-rebinding guard. A page at evil.com
+# that resolves evil.com to 127.0.0.1 can send requests to
+# http://evil.com:<port>/ with ``Host: evil.com``; CORS/Origin checks
+# don't stop that, but this does — only requests whose Host is a real
+# loopback name reach the API that holds the user's memory and keys.
+# The port is stripped before matching, so any chosen port is fine.
+# "testserver" keeps Starlette's in-process TestClient working.
+_ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
+_ALLOWED_HOSTS += [
+    h.strip() for h in os.environ.get("YUMII_ALLOWED_HOSTS", "").split(",") if h.strip()
+]
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=_ALLOWED_HOSTS)
 
 
 @app.middleware("http")

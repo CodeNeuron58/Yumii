@@ -426,8 +426,11 @@
     <script>
         // ── Environment: browser vs Tauri desktop shell ────────────────
         const IS_TAURI = !!(window.__TAURI__ || window.__TAURI_INTERNALS__);
-        const HTTP_BASE = IS_TAURI ? 'http://127.0.0.1:8000' : '';
-        const WS_URL = IS_TAURI ? 'ws://127.0.0.1:8000/ws' : `ws://${window.location.host}/ws`;
+        // Prefer 8000, but the backend walks up the range if it's taken —
+        // discoverBackend() probes to find the real port and rewrites
+        // these before anything connects. (let, not const: reassigned.)
+        let HTTP_BASE = IS_TAURI ? 'http://127.0.0.1:8000' : '';
+        let WS_URL = IS_TAURI ? 'ws://127.0.0.1:8000/ws' : `ws://${window.location.host}/ws`;
 
         // ── Shared audio / socket state (unchanged from the Live2D build) ─
         let audioContext = null;
@@ -877,18 +880,46 @@
             return new Promise(resolve => { src.onended = () => resolve(); });
         }
 
-        // ── Boot: wait for the brain, then let the user tap to wake ────
+        const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+        // ── Find the backend ──────────────────────────────────────────
+        // It prefers 8000 but walks up the range if that port is taken,
+        // so we probe to discover the real one and point HTTP_BASE/WS_URL
+        // at it. Returns true once found. In a plain browser (no Tauri)
+        // the page is same-origin, so no probing is needed.
+        const PORT_BASE = 8000, PORT_TRIES = 12;
+        async function discoverBackend(deadlineMs = 30000) {
+            if (!IS_TAURI) {
+                try { return (await fetch('/health', { cache: 'no-store' })).ok; }
+                catch (e) { return false; }
+            }
+            const until = Date.now() + deadlineMs;
+            while (Date.now() < until) {
+                for (let p = PORT_BASE; p < PORT_BASE + PORT_TRIES; p++) {
+                    try {
+                        const r = await fetch(`http://127.0.0.1:${p}/health`, { cache: 'no-store' });
+                        if (r.ok) {
+                            HTTP_BASE = `http://127.0.0.1:${p}`;
+                            WS_URL = `ws://127.0.0.1:${p}/ws`;
+                            return true;
+                        }
+                    } catch (e) { /* nothing on this port yet */ }
+                }
+                await sleep(500);
+            }
+            return false;
+        }
+
+        // Also re-checked after a backend restart (onboarding key save).
         async function pollHealth() {
             for (;;) {
                 try {
                     const r = await fetch(HTTP_BASE + '/health', { cache: 'no-store' });
                     if (r.ok) return;
                 } catch (e) { /* server not up yet */ }
-                await new Promise(res => setTimeout(res, 500));
+                await sleep(500);
             }
         }
-
-        const sleep = (ms) => new Promise(res => setTimeout(res, ms));
 
         async function fetchStatus() {
             try {
@@ -975,7 +1006,8 @@
             document.getElementById('err-title').textContent =
                 kind === 'auth' ? "I can't reach my mind" :
                 kind === 'quota' ? "Give me a moment" :
-                kind === 'network' ? "Connection trouble" : "Hmm";
+                kind === 'network' ? "Connection trouble" :
+                kind === 'startup' ? "Couldn't start" : "Hmm";
             document.getElementById('err-msg').textContent = message || "Something went wrong.";
             document.getElementById('err-fix').classList.toggle('hidden', kind !== 'auth');
             errorModal.classList.remove('hidden');
@@ -1021,7 +1053,21 @@
         async function boot() {
             setOrbState('boot');
             hintEl.textContent = "Waking Yumii up…";
-            await pollHealth();
+            const up = await discoverBackend();
+            if (!up) {
+                // Her brain never started — say so instead of pretending
+                // to wake up forever. Almost always her port is taken by
+                // another app, or the install didn't finish.
+                setOrbState('idle');
+                hintEl.textContent = "";
+                showErrorCard(
+                    "startup",
+                    "Yumii's backend didn't start. Another app may be using her "
+                    + "port (8000–8011), or the install didn't finish. Close that "
+                    + "app, then reopen Yumii."
+                );
+                return;
+            }
             await firstRunFlow();
         }
 
