@@ -88,12 +88,16 @@ def test_ensure_downloads_local_whisper(monkeypatch):
     monkeypatch.setattr(config.settings, "whisper_model_size", "base")
     monkeypatch.setattr(models, "_kokoro_present", lambda: True)  # skip TTS
     monkeypatch.setattr(models, "_whisper_present", lambda: False)
+    monkeypatch.setattr(models, "_purge_whisper_cache", lambda: None)
 
     built = {}
 
     class FakeWhisper:
         def __init__(self, size, **kw):
             built["size"] = size
+
+        def transcribe(self, audio, **kw):  # the readiness probe
+            return iter([]), None
 
     monkeypatch.setattr(faster_whisper, "WhisperModel", FakeWhisper)
 
@@ -103,6 +107,69 @@ def test_ensure_downloads_local_whisper(monkeypatch):
     assert built["size"] == "base"
     assert "Getting her ears ready" in stages
     assert "ready" in stages
+
+
+# ── Partial-download protection (the real bug from the clean-machine run)
+
+
+def _make_snapshot(root, files):
+    snap = root / "snapshots" / "abc123"
+    snap.mkdir(parents=True)
+    for f in files:
+        (snap / f).write_text("x")
+
+
+def test_incomplete_cache_reads_as_absent(monkeypatch, tmp_path):
+    """The exact real failure: model.bin + tokenizer landed, config.json
+    didn't. HF calls that 'cached'; we must not."""
+    _make_snapshot(tmp_path, ["model.bin", "tokenizer.json"])
+    monkeypatch.setattr(models, "_whisper_cache_dir", lambda: tmp_path)
+    assert models._whisper_present() is False
+
+
+def test_complete_cache_reads_as_present(monkeypatch, tmp_path):
+    _make_snapshot(tmp_path, ["model.bin", "tokenizer.json", "config.json"])
+    monkeypatch.setattr(models, "_whisper_cache_dir", lambda: tmp_path)
+    assert models._whisper_present() is True
+
+
+def test_missing_cache_reads_as_absent(monkeypatch, tmp_path):
+    monkeypatch.setattr(models, "_whisper_cache_dir", lambda: tmp_path / "nope")
+    assert models._whisper_present() is False
+
+
+def test_unusable_model_purges_and_raises(monkeypatch):
+    """A model that loads but can't transcribe must never reach 'ready' —
+    it purges the cache and raises so the caller re-downloads."""
+    from yumii.core import config
+    import faster_whisper
+
+    monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
+    monkeypatch.setattr(config.settings, "stt_provider", "local")
+    monkeypatch.setattr(models, "_kokoro_present", lambda: True)
+    monkeypatch.setattr(models, "_whisper_present", lambda: False)
+
+    purges: list[int] = []
+    monkeypatch.setattr(models, "_purge_whisper_cache", lambda: purges.append(1))
+
+    class BrokenWhisper:
+        def __init__(self, *a, **kw):
+            pass
+
+        def transcribe(self, audio, **kw):
+            raise RuntimeError(
+                "[json.exception.type_error.305] cannot use operator[] "
+                "with a string argument with null"
+            )
+
+    monkeypatch.setattr(faster_whisper, "WhisperModel", BrokenWhisper)
+
+    stages: list[str] = []
+    with pytest.raises(RuntimeError):
+        models.ensure_models_ready(lambda s, f: stages.append(s))
+
+    assert "ready" not in stages  # never declared ready
+    assert len(purges) >= 2  # purged before the fetch AND after the bad probe
 
 
 def test_ensure_is_noop_when_present(monkeypatch):
