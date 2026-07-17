@@ -1,0 +1,66 @@
+name: Publish models
+
+# One-time (re-runnable) mirror of the faster-whisper models onto a
+# GitHub release, so Yumii can download them from GitHub instead of
+# HuggingFace's CDN — which is blocked/throttled on some networks.
+#
+# Trigger it by hand from the Actions tab (workflow_dispatch). It runs
+# on GitHub's servers, which reach HuggingFace freely, downloads the
+# Systran faster-whisper models (MIT), and publishes them (with their
+# license/README for attribution) to the permanent `whisper-models-v1`
+# release. The tag doesn't start with `v`, so it never triggers the
+# app-release pipeline. The models never change — run this once.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  whisper:
+    name: Mirror faster-whisper models
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the downloader
+        run: pip install "huggingface_hub>=0.20"
+
+      - name: Download + zip each Whisper size (flat, with license)
+        run: |
+          python - <<'PY'
+          import os, zipfile
+          from huggingface_hub import snapshot_download
+
+          for size in ["tiny", "base", "small"]:
+              repo = f"Systran/faster-whisper-{size}"
+              src = snapshot_download(repo)  # MIT; reaches HF fine here
+              out = f"whisper-{size}.zip"
+              with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+                  for name in sorted(os.listdir(src)):
+                      full = os.path.join(src, name)
+                      if os.path.isfile(full):
+                          # Flat layout: config.json, model.bin,
+                          # tokenizer.json, vocabulary.txt at the zip
+                          # root, plus README.md for MIT attribution.
+                          z.write(full, arcname=name)
+              print(f"wrote {out} ({os.path.getsize(out) // (1024*1024)} MB)")
+          PY
+
+      - name: Publish to the models release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: whisper-models-v1
+          name: Whisper models (mirror)
+          body: |
+            Mirror of the Systran faster-whisper models (**MIT license**),
+            republished so Yumii can download them from GitHub instead of
+            HuggingFace's CDN (unreachable on some networks).
+
+            Not for manual download — Yumii fetches the size it needs
+            during first-run setup. Each zip contains the model files plus
+            the upstream README for attribution.
+          files: whisper-*.zip

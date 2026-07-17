@@ -28,14 +28,22 @@ def _seg_field(seg: object, key: str, default: object) -> object:
 
 
 class LocalSTT(BaseSTTProvider):
-    """Transcription using faster-whisper on CPU."""
+    """Transcription using faster-whisper on CPU.
 
-    def __init__(self, model_size: str = "base") -> None:
+    Loads the model from a local directory (Yumii mirrors the
+    faster-whisper models on its own GitHub release — see
+    ``audio/whisper_model.py`` — so HuggingFace is never contacted). If
+    no ``model_dir`` is given it falls back to the size string, which
+    lets faster-whisper resolve/download from HuggingFace itself.
+    """
+
+    def __init__(self, model_size: str = "base", model_dir: str | None = None) -> None:
         """Initialize the local Whisper model."""
         from faster_whisper import WhisperModel
 
-        log.info("whisper_loading", model_size=model_size)
-        self._whisper = WhisperModel(model_size, device="cpu", compute_type="int8")
+        source = model_dir or model_size
+        log.info("whisper_loading", source=source)
+        self._whisper = WhisperModel(source, device="cpu", compute_type="int8")
         log.info("whisper_ready", model_size=model_size)
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:

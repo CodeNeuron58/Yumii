@@ -88,13 +88,25 @@ def test_ensure_downloads_local_whisper(monkeypatch):
     monkeypatch.setattr(config.settings, "whisper_model_size", "base")
     monkeypatch.setattr(models, "_kokoro_present", lambda: True)  # skip TTS
     monkeypatch.setattr(models, "_whisper_present", lambda: False)
-    monkeypatch.setattr(models, "_purge_whisper_cache", lambda: None)
+
+    import yumii.audio.whisper_model as wm
+
+    # The GitHub-mirror download is faked to report progress + return a dir.
+    fracs: list[float] = []
+
+    def fake_get_dir(size, on_progress=None):
+        if on_progress:
+            on_progress(0.5)
+            on_progress(1.0)
+        return "/fake/whisper/base"
+
+    monkeypatch.setattr(wm, "get_whisper_model_dir", fake_get_dir)
 
     built = {}
 
     class FakeWhisper:
-        def __init__(self, size, **kw):
-            built["size"] = size
+        def __init__(self, source, **kw):
+            built["source"] = source
 
         def transcribe(self, audio, **kw):  # the readiness probe
             return iter([]), None
@@ -102,55 +114,29 @@ def test_ensure_downloads_local_whisper(monkeypatch):
     monkeypatch.setattr(faster_whisper, "WhisperModel", FakeWhisper)
 
     stages: list[str] = []
-    models.ensure_models_ready(lambda s, f: stages.append(s))
+    models.ensure_models_ready(lambda s, f: stages.append(s) or fracs.append(f))
 
-    assert built["size"] == "base"
+    assert built["source"] == "/fake/whisper/base"  # loaded from the local dir
     assert "Getting her ears ready" in stages
+    assert 1.0 in fracs  # real % progress, not indeterminate
     assert "ready" in stages
-
-
-# ── Partial-download protection (the real bug from the clean-machine run)
-
-
-def _make_snapshot(root, files):
-    snap = root / "snapshots" / "abc123"
-    snap.mkdir(parents=True)
-    for f in files:
-        (snap / f).write_text("x")
-
-
-def test_incomplete_cache_reads_as_absent(monkeypatch, tmp_path):
-    """The exact real failure: model.bin + tokenizer landed, config.json
-    didn't. HF calls that 'cached'; we must not."""
-    _make_snapshot(tmp_path, ["model.bin", "tokenizer.json"])
-    monkeypatch.setattr(models, "_whisper_cache_dir", lambda: tmp_path)
-    assert models._whisper_present() is False
-
-
-def test_complete_cache_reads_as_present(monkeypatch, tmp_path):
-    _make_snapshot(tmp_path, ["model.bin", "tokenizer.json", "config.json"])
-    monkeypatch.setattr(models, "_whisper_cache_dir", lambda: tmp_path)
-    assert models._whisper_present() is True
-
-
-def test_missing_cache_reads_as_absent(monkeypatch, tmp_path):
-    monkeypatch.setattr(models, "_whisper_cache_dir", lambda: tmp_path / "nope")
-    assert models._whisper_present() is False
 
 
 def test_unusable_model_purges_and_raises(monkeypatch):
     """A model that loads but can't transcribe must never reach 'ready' —
-    it purges the cache and raises so the caller re-downloads."""
+    it purges the model and raises so the caller re-downloads."""
     from yumii.core import config
     import faster_whisper
+    import yumii.audio.whisper_model as wm
 
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "local")
     monkeypatch.setattr(models, "_kokoro_present", lambda: True)
     monkeypatch.setattr(models, "_whisper_present", lambda: False)
+    monkeypatch.setattr(wm, "get_whisper_model_dir", lambda size, on_progress=None: "/fake/dir")
 
-    purges: list[int] = []
-    monkeypatch.setattr(models, "_purge_whisper_cache", lambda: purges.append(1))
+    purges: list[str] = []
+    monkeypatch.setattr(wm, "purge", lambda size: purges.append(size))
 
     class BrokenWhisper:
         def __init__(self, *a, **kw):
@@ -169,7 +155,7 @@ def test_unusable_model_purges_and_raises(monkeypatch):
         models.ensure_models_ready(lambda s, f: stages.append(s))
 
     assert "ready" not in stages  # never declared ready
-    assert len(purges) >= 2  # purged before the fetch AND after the bad probe
+    assert purges  # purged the broken model so the retry re-fetches
 
 
 def test_ensure_is_noop_when_present(monkeypatch):

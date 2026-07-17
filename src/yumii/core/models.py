@@ -13,7 +13,6 @@ and reports progress via ``/api/status`` so the orb can show it.
 from __future__ import annotations
 
 import os
-import shutil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -26,22 +25,6 @@ log = get_logger(__name__)
 # indeterminate stage (no clean byte-progress available).
 ProgressCb = Callable[[str, "float | None"], None]
 
-# faster-whisper pulls these HF repos on first WhisperModel(size) call.
-_WHISPER_REPOS = {
-    "tiny": "Systran/faster-whisper-tiny",
-    "base": "Systran/faster-whisper-base",
-    "small": "Systran/faster-whisper-small",
-}
-
-# Files a usable faster-whisper model must have. A download that drops
-# mid-flight (flaky network) can leave model.bin + tokenizer without
-# config.json — the model then LOADS fine but crashes deep inside
-# CTranslate2 on the first real transcribe ("cannot use operator[] with
-# a string argument with null", because the absent config reads as
-# null). Worse, HuggingFace hands that partial snapshot back as "cached"
-# on every retry, so it never self-heals. We verify completeness
-# ourselves.
-_WHISPER_REQUIRED_FILES = ("config.json", "model.bin", "tokenizer.json")
 
 
 def _kokoro_present() -> bool:
@@ -59,44 +42,17 @@ def _kokoro_present() -> bool:
     return (kdir / KOKORO_MODELS[size]).exists() and (kdir / _VOICES_FILE).exists()
 
 
-def _hf_cache_root() -> Path:
-    if os.environ.get("HF_HUB_CACHE"):
-        return Path(os.environ["HF_HUB_CACHE"])
-    if os.environ.get("HF_HOME"):
-        return Path(os.environ["HF_HOME"]) / "hub"
-    return Path.home() / ".cache" / "huggingface" / "hub"
-
-
-def _whisper_cache_dir() -> Path:
-    """The HF cache folder for the configured Whisper model."""
-    repo = _WHISPER_REPOS.get(settings.whisper_model_size, _WHISPER_REPOS["base"])
-    return _hf_cache_root() / ("models--" + repo.replace("/", "--"))
-
-
 def _whisper_present() -> bool:
-    """True only when a COMPLETE Whisper model is cached.
+    """True only when a COMPLETE Whisper model is on disk.
 
-    Deliberately not "does the folder exist" — a partial download leaves
-    a folder that HF calls cached but that can't transcribe. Requiring
-    the real files means an incomplete cache re-downloads instead of
-    silently giving the user broken ears forever.
+    Delegates to the GitHub-mirror helper. Deliberately not "does the
+    folder exist" — a partial download leaves files that load but crash
+    on the first transcribe, so completeness is checked by the required
+    files' presence.
     """
-    snapshots = _whisper_cache_dir() / "snapshots"
-    if not snapshots.is_dir():
-        return False
-    return any(
-        all((snap / f).exists() for f in _WHISPER_REQUIRED_FILES)
-        for snap in snapshots.iterdir()
-        if snap.is_dir()
-    )
+    from yumii.audio import whisper_model
 
-
-def _purge_whisper_cache() -> None:
-    """Delete a partial model so the next fetch re-downloads it whole."""
-    target = _whisper_cache_dir()
-    if target.exists():
-        log.warning("whisper_cache_incomplete_purging", path=str(target))
-        shutil.rmtree(target, ignore_errors=True)
+    return whisper_model.is_present(settings.whisper_model_size)
 
 
 def _probe_whisper(model: Any) -> None:
@@ -154,30 +110,28 @@ def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
         )
         log.info("kokoro_prefetched")
 
-    # STT: local Whisper — faster-whisper downloads on instantiation and
-    # gives no clean byte hook, so this stage is indeterminate.
+    # STT: local Whisper — downloaded from Yumii's GitHub release (a zip,
+    # so a real % bar) rather than HuggingFace's CDN. get_whisper_model_dir
+    # purges partial downloads and guarantees completeness or raises.
     if settings.stt_provider.lower() == "local" and not _whisper_present():
-        report("Getting her ears ready", None)
+        from yumii.audio.whisper_model import get_whisper_model_dir, purge
 
-        # A leftover PARTIAL download must be purged first: HuggingFace
-        # would otherwise return that broken snapshot as "cached" on
-        # every retry, so the download never actually re-runs and she
-        # ends up permanently deaf with an opaque crash on each word.
-        _purge_whisper_cache()
-
+        report("Getting her ears ready", 0.0)
+        size = settings.whisper_model_size
+        model_dir = get_whisper_model_dir(
+            size, on_progress=lambda f: report("Getting her ears ready", f)
+        )
+        # Loading proves nothing — a model can load and still crash deep
+        # in CTranslate2 on the first word. Probe it before declaring
+        # ready; on failure, purge so the retry loop re-fetches.
         from faster_whisper import WhisperModel
 
-        model = WhisperModel(
-            settings.whisper_model_size, device="cpu", compute_type="int8"
-        )
-        # Loading proves nothing — make it transcribe before we call it
-        # ready. If the download was incomplete this raises, and the
-        # caller's retry loop purges and re-fetches.
         try:
+            model = WhisperModel(model_dir, device="cpu", compute_type="int8")
             _probe_whisper(model)
         except Exception:
-            _purge_whisper_cache()
+            purge(size)
             raise
-        log.info("whisper_prefetched", size=settings.whisper_model_size)
+        log.info("whisper_prefetched", size=size)
 
     report("ready", 1.0)
