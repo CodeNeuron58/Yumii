@@ -15,75 +15,104 @@
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "CodeNeuron58/Yumii"
-$AppDir = Join-Path $env:LOCALAPPDATA "Yumii"
+$Repo    = "CodeNeuron58/Yumii"
+$AppDir  = Join-Path $env:LOCALAPPDATA "Yumii"
 $ExePath = Join-Path $AppDir "Yumii.exe"
-$UvBin = Join-Path $env:USERPROFILE ".local\bin"
 
-Write-Host ""
-Write-Host "  Yumii - an AI companion for your desktop" -ForegroundColor Magenta
-Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
-Write-Host ""
+# Pull the PATH the uv installer just wrote (it edits the *User* PATH,
+# which only new terminals normally see) into this session.
+function Update-SessionPath {
+    $machine = [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+    $user    = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    $env:PATH = "$machine;$user"
+}
 
-# -- 1/4: uv ----------------------------------------------------------------
-Write-Host "[1/4] Package manager (uv)..." -ForegroundColor Cyan
-if (Get-Command uv -ErrorAction SilentlyContinue) {
-    Write-Host "      already installed." -ForegroundColor Green
-} else {
-    Write-Host "      installing uv..." -ForegroundColor DarkGray
-    irm https://astral.sh/uv/install.ps1 | iex
-    # Make uv visible to THIS session (the official installer updates the
-    # user PATH, but only new terminals see that).
-    $env:PATH = "$UvBin;$env:PATH"
-    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-        Write-Host ""
-        Write-Host "  uv was installed but isn't on PATH yet." -ForegroundColor Red
-        Write-Host "  Open a NEW terminal and run the install command again." -ForegroundColor Yellow
-        exit 1
+# Locate uv by full path so nothing depends on PATH being refreshed.
+function Find-Uv {
+    $cmd = Get-Command uv -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    foreach ($p in @(
+        (Join-Path $env:USERPROFILE ".local\bin\uv.exe"),
+        (Join-Path $env:USERPROFILE ".cargo\bin\uv.exe")
+    )) {
+        if (Test-Path $p) { return $p }
     }
-    Write-Host "      uv installed." -ForegroundColor Green
+    return $null
 }
 
-# -- 2/4: the Yumii backend (uv brings its own Python) ------------------------
-Write-Host "[2/4] Yumii's brain (Python backend)..." -ForegroundColor Cyan
-Write-Host "      (first install downloads a few hundred MB - one-time)" -ForegroundColor DarkGray
-uv tool install --python 3.12 --upgrade yumii
-if ($LASTEXITCODE -ne 0) {
+# The whole install runs inside try/catch so a failure prints a readable
+# message and LEAVES THE WINDOW OPEN. (The old script called `exit`,
+# which closes the PowerShell window when run via `iex (irm ...)` — so
+# any error vanished before you could read it.)
+try {
     Write-Host ""
-    Write-Host "  Backend install failed." -ForegroundColor Red
-    Write-Host "  Try manually: uv tool install --python 3.12 yumii" -ForegroundColor Yellow
-    exit 1
+    Write-Host "  Yumii - an AI companion for your desktop" -ForegroundColor Magenta
+    Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+    Write-Host ""
+
+    # -- 1/4: uv --------------------------------------------------------------
+    Write-Host "[1/4] Package manager (uv)..." -ForegroundColor Cyan
+    $uv = Find-Uv
+    if ($uv) {
+        Write-Host "      already installed." -ForegroundColor Green
+    } else {
+        Write-Host "      installing uv..." -ForegroundColor DarkGray
+        Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+        Update-SessionPath
+        $uv = Find-Uv
+        if (-not $uv) {
+            throw "uv was installed but couldn't be located. Close this window, open a NEW PowerShell, and run the command again."
+        }
+        Write-Host "      uv installed." -ForegroundColor Green
+    }
+
+    # -- 2/4: the Yumii backend (uv brings its own Python) --------------------
+    Write-Host "[2/4] Yumii's brain (Python backend)..." -ForegroundColor Cyan
+    Write-Host "      (first install downloads a few hundred MB - one-time)" -ForegroundColor DarkGray
+    & $uv tool install --python 3.12 --upgrade yumii
+    if ($LASTEXITCODE -ne 0) {
+        throw "Backend install failed. Try manually: uv tool install --python 3.12 yumii"
+    }
+    Write-Host "      backend ready." -ForegroundColor Green
+
+    # -- 3/4: the desktop app -------------------------------------------------
+    Write-Host "[3/4] Yumii's desktop app..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
+    $exeUrl = "https://github.com/$Repo/releases/latest/download/Yumii.exe"
+    Invoke-WebRequest $exeUrl -OutFile $ExePath -UseBasicParsing
+    # The download carries the Mark-of-the-Web; you chose to install Yumii,
+    # so clear it for the app you just asked for.
+    Unblock-File $ExePath -ErrorAction SilentlyContinue
+    Write-Host "      installed to $AppDir" -ForegroundColor Green
+
+    # -- 4/4: Start Menu ------------------------------------------------------
+    Write-Host "[4/4] Start Menu shortcut..." -ForegroundColor Cyan
+    $lnkPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Yumii.lnk"
+    $shell = New-Object -ComObject WScript.Shell
+    $lnk = $shell.CreateShortcut($lnkPath)
+    $lnk.TargetPath = $ExePath
+    $lnk.WorkingDirectory = $AppDir
+    $lnk.Description = "Yumii - an AI companion for your desktop"
+    $lnk.Save()
+    Write-Host "      done." -ForegroundColor Green
+
+    Write-Host ""
+    Write-Host "  Yumii is installed!" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "  Open the Start Menu and launch " -NoNewline
+    Write-Host "Yumii" -ForegroundColor Magenta -NoNewline
+    Write-Host "."
+    Write-Host "  (Her voice model downloads itself the first time she speaks.)" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  To update later: re-run this same command." -ForegroundColor DarkGray
+    Write-Host ""
 }
-Write-Host "      backend ready." -ForegroundColor Green
-
-# -- 3/4: the desktop app -----------------------------------------------------
-Write-Host "[3/4] Yumii's desktop app..." -ForegroundColor Cyan
-New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
-$exeUrl = "https://github.com/$Repo/releases/latest/download/Yumii.exe"
-Invoke-WebRequest $exeUrl -OutFile $ExePath -UseBasicParsing
-# The download carries the Mark-of-the-Web; you chose to install Yumii,
-# so clear it for the app you just asked for.
-Unblock-File $ExePath -ErrorAction SilentlyContinue
-Write-Host "      installed to $AppDir" -ForegroundColor Green
-
-# -- 4/4: Start Menu ----------------------------------------------------------
-Write-Host "[4/4] Start Menu shortcut..." -ForegroundColor Cyan
-$lnkPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Yumii.lnk"
-$shell = New-Object -ComObject WScript.Shell
-$lnk = $shell.CreateShortcut($lnkPath)
-$lnk.TargetPath = $ExePath
-$lnk.WorkingDirectory = $AppDir
-$lnk.Description = "Yumii - an AI companion for your desktop"
-$lnk.Save()
-Write-Host "      done." -ForegroundColor Green
-
-Write-Host ""
-Write-Host "  Yumii is installed!" -ForegroundColor Magenta
-Write-Host ""
-Write-Host "  Open the Start Menu and launch " -NoNewline
-Write-Host "Yumii" -ForegroundColor Magenta -NoNewline
-Write-Host "."
-Write-Host "  (Her voice model downloads itself the first time she speaks.)" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "  To update later: re-run this same command." -ForegroundColor DarkGray
-Write-Host ""
+catch {
+    Write-Host ""
+    Write-Host "  Install hit a snag:" -ForegroundColor Red
+    Write-Host "  $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  Nothing on your system was left broken. You can re-run the" -ForegroundColor DarkGray
+    Write-Host "  command, or report this at https://github.com/$Repo/issues" -ForegroundColor DarkGray
+    Write-Host ""
+}
