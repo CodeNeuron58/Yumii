@@ -5,6 +5,47 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] — 2026-07-17
+
+The first-run release — the experimental preview. A fresh install now
+guides you: it downloads the local models behind a progress screen,
+asks for one key, and never freezes silently. This is the build meant
+for the first preview users.
+
+### Added
+- **First-run onboarding.** On first launch the orb downloads the local
+  models (voice + ears) with a progress bar, then — if no LLM key is set
+  — shows a single-field card: get a free Ollama key (opened in your
+  browser), paste it, and she wakes up. Saving restarts the backend for
+  you; no "quit and reopen." A fresh install is "everything local except
+  the brain": Kokoro voice, local Whisper ears, Silero VAD — the only
+  key needed is the mind's (Ollama by default).
+- **Never a silent freeze.** Reasoning failures are classified
+  (bad key / rate-limit / network) and shown as a clear, actionable
+  card — the auth one links straight to the dashboard — instead of an
+  endless "Thinking…". A backend that can't start says so too.
+- **Whisper models mirrored on GitHub.** The speech model now downloads
+  from Yumii's own GitHub release (with a real % bar) instead of
+  HuggingFace's CDN, which is blocked/throttled on some networks. The
+  download is verified complete before use, so a dropped connection can
+  never leave broken ears.
+- **`THIRD_PARTY_LICENSES.md`** documenting the bundled/mirrored models
+  (faster-whisper MIT, Kokoro Apache-2.0, Silero VAD MIT).
+
+### Fixed
+- **Survives a taken port.** The backend prefers 8000 but walks the
+  range if it's busy; the orb and shell find the chosen port — no more
+  dying silently when another app holds 8000.
+- **DNS-rebinding guard.** A Host-header allowlist rejects requests from
+  any non-loopback host, so a malicious page resolving to 127.0.0.1
+  can't read your local memory or keys.
+- The "get a key" link opens in the system browser (window.open is a
+  no-op inside the desktop webview).
+
+### Notes
+- **245 tests.** Alpha — no API stability promise. Install with one
+  command at https://yumii.me.
+
 ## [0.11.0] — 2026-07-16
 
 The one-command release. Yumii drops the installer entirely — the

@@ -55,6 +55,9 @@ jobs:
         with:
           tag_name: whisper-models-v1
           name: Whisper models (mirror)
+          # Never claim "latest" — that pointer belongs to app releases,
+          # whose Yumii.exe the installer fetches from releases/latest.
+          make_latest: false
           body: |
             Mirror of the Systran faster-whisper models (**MIT license**),
             republished so Yumii can download them from GitHub instead of

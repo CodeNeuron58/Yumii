@@ -1,6 +1,6 @@
 # Yumii 🟢 — An AI Companion for Your Desktop
 
-[![Version](https://img.shields.io/badge/version-0.11.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.12.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![uv](https://img.shields.io/badge/package%20manager-uv-green.svg)](https://docs.astral.sh/uv/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)

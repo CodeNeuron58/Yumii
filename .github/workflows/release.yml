@@ -68,8 +68,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Yumii ${{ github.ref_name }}
+          # App releases must own the "latest" pointer — the installer
+          # fetches Yumii.exe from releases/latest/download, and the
+          # one-off models release must never steal it.
+          make_latest: true
           body: |
-            **Don't download anything here.** Install Yumii with one command — see https://yumii.me
+            **Experimental preview.** Don't download anything here — install
+            Yumii with one command: see https://yumii.me
 
             This page is plumbing for the installer: it fetches `Yumii.exe`
             (the desktop shell) from here, and the backend comes from PyPI.
