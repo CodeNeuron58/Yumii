@@ -27,6 +27,30 @@ function Update-SessionPath {
     $env:PATH = "$machine;$user"
 }
 
+# Resolve the PowerShell host exe to use when spawning child processes.
+# We must NOT hardcode "powershell" because under PowerShell 7+ (pwsh),
+# the classic powershell.exe may not be on PATH, causing:
+#   "The term 'powershell' is not recognized"
+# Strategy: prefer the absolute path of the host we're already running in,
+# then fall back to whichever of powershell/pwsh is findable on PATH.
+function Get-PowerShellHostExe {
+    try {
+        $hostExe = (Get-Process -Id $PID).Path
+        if ($hostExe -and (Test-Path $hostExe)) {
+            $leaf = Split-Path $hostExe -Leaf
+            # Only trust a real PowerShell CLI, not ISE or an embedded host.
+            if ($leaf -match '^(?i:powershell|pwsh)\.exe$') { return $hostExe }
+        }
+    } catch { }
+    foreach ($candidate in @("powershell", "pwsh")) {
+        $cmd = Get-Command $candidate -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($cmd -and $cmd.Source) { return $cmd.Source }
+    }
+    # Last resort: bare name so the spawn at least surfaces its own error.
+    return "powershell"
+}
+
 # Locate uv by full path so nothing depends on PATH being refreshed.
 function Find-Uv {
     $cmd = Get-Command uv -ErrorAction SilentlyContinue
@@ -57,7 +81,8 @@ try {
         Write-Host "      already installed." -ForegroundColor Green
     } else {
         Write-Host "      installing uv..." -ForegroundColor DarkGray
-        Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+        $psHostExe = Get-PowerShellHostExe
+        & $psHostExe -ExecutionPolicy Bypass -NoProfile -c "irm https://astral.sh/uv/install.ps1 | iex"
         Update-SessionPath
         $uv = Find-Uv
         if (-not $uv) {
