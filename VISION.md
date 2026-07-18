@@ -27,7 +27,7 @@ Today, she can:
 - Speak with an expressive, lifelike voice (ElevenLabs / CAMB.ai)
 - Listen locally via Whisper or at cloud speed via Groq
 - Remember you across restarts — preferences and details, stored locally
-- Live on your desktop as a small floating presence — an orb today, an expressive Live2D avatar coming soon
+- Live on your desktop as a small floating presence — an orb today, with an expressive Live2D avatar as the long-term dream
 - Switch personality modes to match your mood or workflow
 
 ---

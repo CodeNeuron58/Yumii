@@ -1,4 +1,4 @@
-# 🟢 Yumii Roadmap
+# Yumii Roadmap
 
 This document tracks what is **shipped**, what is **in progress**, and
 what is **planned**. Anything not listed under "Shipped" is not in the
@@ -7,7 +7,7 @@ binary you downloaded. The "What's not in v1" section of
 
 ---
 
-## 🖥️ The desktop pivot (0.4.0 — first cut shipped, ongoing)
+## The desktop pivot (0.4.0 — first cut shipped, ongoing)
 
 Yumii is moving from a browser-served Live2D page to a **native desktop app**
 (Tauri) with a small floating **orb** UI you can talk to any time. The Python
@@ -20,7 +20,6 @@ brain is unchanged — the desktop app wraps it and launches it for you.
   today (`cd desktop && cargo tauri dev`).
 - ✅ Packaged one-click Windows installer (PyInstaller sidecar + `cargo tauri
   build` + GitHub Actions) — shipped in 0.10.0.
-- ⏳ Next: the Live2D companion mode.
 
 ---
 
@@ -173,61 +172,32 @@ The first public release.
 
 ---
 
-## 🚧 In progress — v1.0 (target: Q3 2026)
+## Next up
 
-The next release. Focus: **declaring the architecture stable** so
-downstream code can rely on the public API (tool registry,
-`YumiiResponse` shape, WebSocket event protocol,
-`engine.request_confirmation`) without breakage.
+The two features being tackled next:
 
-Note: the original v1.0 plan called for a 3-stage
-**Triage / Planner / Synthesizer** agent loop. We abandoned that
-design in favor of a simpler custom `StateGraph` + `ToolNode`
-(shipped in 0.3.0) which is less code, more direct, and easier to
-test. The "Synthesizer" half of the original plan survives as the
-heuristic `synthesize()` classifier in 0.3.0; the Triage and
-Planner pre-pass stages were *not* built and *will not* be built
-— they are part of an abandoned design, not a backlog.
-
-- **`ToolContract` protocol.** A new tool is added in <30 lines:
-  Pydantic input schema, an `async run()` method, a
-  `requires_confirmation` flag, and an idempotency key. *Shipped
-  in 0.3.0 as `ToolPolicy` (no `async run()` envelope; tools remain
-  LangChain-native).*
-- **Confirmation gates.** Side-effecting tools pause the engine and
-  emit a `{"type": "confirmation_request"}` WebSocket event.
-  *Shipped in 0.3.0.*
-- **MCP server transport.** Expose the tool registry over the Model
-  Context Protocol so Claude Desktop, Cursor, etc. can call Yumii's
-  tools. *Partial in 0.3.0 — client-side loader (MCP servers → Yumii
-  tools) is in. The server-side (Yumii tools → external MCP clients)
-  is still pending.*
-- **A first real integration.** Likely Google Calendar (read-only)
-  or Google Tasks.
-- **More tests.** Aim for 60% coverage of `core/` and `agent/`.
-  *184 tests in 0.3.0, but coverage % not yet measured.*
+- **Seeing your screen.** Experimental screen awareness — she can look
+  at what you're looking at and help with it, using a multimodal LLM.
+- **Proactiveness.** Yumii is currently 100% reactive. The goal is for
+  her to notice and speak first instead of only answering ("It's been a
+  long day — how are you holding up?"). This needs a scheduler and a
+  permission model.
 
 ---
 
-## 🧠 Planned — v2.0 (target: Q4 2026)
+## Later
 
-The flagship release. Focus: **agentic capabilities**.
-
-- **Multimodal vision input.** Webcam or screen-share as visual
-  context. Uses a multimodal LLM (Llama-3.2-Vision, GPT-4o, or
-  Claude 3.5 Sonnet).
-- **Local TTS (Kokoro or similar).** A fully offline TTS provider
-  for users who don't want to depend on ElevenLabs or CAMB.ai.
-  *Shipped in 0.5.0 (Kokoro-82M). A second local provider with voice
-  cloning (NeuTTS Nano) is under consideration.*
-- **Proactive reach-outs.** Yumii is currently 100% reactive. The
-  vision is for her to occasionally check in unprompted ("It's been
-  a long day — how are you holding up?"). This requires a scheduler
-  and a permission model, both of which are open design questions.
+- **Direct MCP and tool integrations**, beyond Composio. (A client-side
+  MCP loader exists; the server side — exposing Yumii's tools to
+  external MCP clients — is pending.)
+- **macOS and Linux desktop shells.**
+- **More voices, personalities, and languages.**
+- **Deeper, honest emotional support** grounded in real psychology.
+- **Live2D avatar mode.** The long-term dream — no timeline yet.
 
 ---
 
-## 🗑️ Explicitly NOT planned
+## Explicitly NOT planned
 
 - A cloud-hosted / SaaS Yumii that keeps your data on a server. The whole
   point is local and private.

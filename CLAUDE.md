@@ -8,10 +8,12 @@ Claude Code / opencode model). Runs on CPU (cloud STT/LLM by default, or fully
 local models).
 
 **Current direction:** Yumii is pivoting from a browser-served Live2D page to a
-**native desktop app** (Tauri) with a small floating **orb** UI. The animated
-**Live2D companion/avatar is a planned "coming soon" mode** — the shipped
-frontend today is the orb. The Python "brain" (engine, agent, audio, memory) is
-unchanged by the pivot; the desktop app wraps it.
+**native desktop app** (Tauri) with a small floating **orb** UI. The shipped
+frontend is the orb; the animated **Live2D companion/avatar is a long-term
+goal with no timeline**. The next planned features are **screen awareness**
+(she can see what you're looking at) and **proactiveness** (she speaks first).
+The Python "brain" (engine, agent, audio, memory) is unchanged by the pivot;
+the desktop app wraps it.
 
 **GitHub:** https://github.com/CodeNeuron58/Yumii
 
