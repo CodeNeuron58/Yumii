@@ -1,14 +1,4 @@
-"""Local model readiness — download STT + TTS models before first use.
-
-VAD (Silero) ships bundled in the wheel, so it never downloads. Whisper
-(STT, when local) and Kokoro (TTS) are fetched on first launch — with a
-progress screen in the orb — instead of stalling mid-conversation the
-first time she tries to listen or speak. A fresh install is
-"everything local except the brain": only the LLM key is needed.
-
-The engine runs :func:`ensure_models_ready` on a worker thread at boot
-and reports progress via ``/api/status`` so the orb can show it.
-"""
+"""Download local STT + TTS models on first launch (VAD is bundled; only the LLM is cloud)."""
 
 from __future__ import annotations
 
@@ -21,10 +11,8 @@ from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
 
-# on_progress(stage_label, fraction) — fraction is 0..1, or None for an
-# indeterminate stage (no clean byte-progress available).
+# on_progress(stage_label, fraction); fraction is 0..1 or None for indeterminate.
 ProgressCb = Callable[[str, "float | None"], None]
-
 
 
 def _kokoro_present() -> bool:
@@ -43,26 +31,14 @@ def _kokoro_present() -> bool:
 
 
 def _whisper_present() -> bool:
-    """True only when a COMPLETE Whisper model is on disk.
-
-    Delegates to the GitHub-mirror helper. Deliberately not "does the
-    folder exist" — a partial download leaves files that load but crash
-    on the first transcribe, so completeness is checked by the required
-    files' presence.
-    """
+    """True only when a COMPLETE Whisper model is on disk (partial downloads crash on transcribe)."""
     from yumii.audio import whisper_model
 
     return whisper_model.is_present(settings.whisper_model_size)
 
 
 def _probe_whisper(model: Any) -> None:
-    """Prove a freshly-downloaded model can actually transcribe.
-
-    Loading is not enough: an incomplete model loads happily and only
-    dies inside CTranslate2's generate on the user's first word. Force
-    that code path here — while we can still purge and re-fetch — with
-    a second of tone. Raises if the model is unusable.
-    """
+    """Force a 1-second transcribe to prove a fresh model works (loading isn't enough)."""
     import numpy as np
 
     t = np.arange(16000, dtype=np.float32) / 16000.0
@@ -72,11 +48,7 @@ def _probe_whisper(model: Any) -> None:
 
 
 def needs_download() -> bool:
-    """Cheap check: is any configured local model missing?
-
-    Only the local providers matter — a cloud STT (Groq) or cloud TTS
-    needs no local model.
-    """
+    """True if any configured local model (Kokoro / local Whisper) is missing."""
     if settings.tts_provider == "Kokoro" and not _kokoro_present():
         return True
     if settings.stt_provider.lower() == "local" and not _whisper_present():
@@ -85,11 +57,7 @@ def needs_download() -> bool:
 
 
 def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
-    """Download any missing local models. Blocking — call in a thread.
-
-    Never raises for a provider that isn't configured local; a download
-    failure propagates so the caller can surface it (the orb retries).
-    """
+    """Download any missing local models. Blocking — call in a thread; raises on failure."""
 
     def report(stage: str, frac: float | None = None) -> None:
         if on_progress is None:
@@ -99,7 +67,6 @@ def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
         except Exception:
             pass
 
-    # TTS: Kokoro (~330 MB, the big one) — real % via urlretrieve hook.
     if settings.tts_provider == "Kokoro" and not _kokoro_present():
         from yumii.tts.kokoro_model import get_kokoro_model_paths
 
@@ -110,9 +77,6 @@ def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
         )
         log.info("kokoro_prefetched")
 
-    # STT: local Whisper — downloaded from Yumii's GitHub release (a zip,
-    # so a real % bar) rather than HuggingFace's CDN. get_whisper_model_dir
-    # purges partial downloads and guarantees completeness or raises.
     if settings.stt_provider.lower() == "local" and not _whisper_present():
         from yumii.audio.whisper_model import get_whisper_model_dir, purge
 
@@ -121,9 +85,7 @@ def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
         model_dir = get_whisper_model_dir(
             size, on_progress=lambda f: report("Getting her ears ready", f)
         )
-        # Loading proves nothing — a model can load and still crash deep
-        # in CTranslate2 on the first word. Probe it before declaring
-        # ready; on failure, purge so the retry loop re-fetches.
+        # Loading isn't enough — probe before declaring ready; purge on failure so retry re-fetches.
         from faster_whisper import WhisperModel
 
         try:

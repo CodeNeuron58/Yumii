@@ -1,19 +1,6 @@
-"""LLM (Large Language Model) initialization for Yumii.
+"""LLM setup: the YumiiResponse model + a get_agent_llm factory (tools bound via bind_tools).
 
-This module owns two things:
-
-* The :class:`YumiiResponse` Pydantic model — the structured shape
-  the engine reads from the graph output. PR 3's heuristic
-  :func:`yumii.agent.synthesizer.synthesize` produces it.
-* A factory :func:`get_agent_llm` that returns the active LLM
-  **with the registry's tools bound** via ``bind_tools``. The graph
-  uses this directly (no more ``create_agent`` wrapper) so we get
-  full control over the message stream and ``interrupt_before`` is
-  meaningful.
-
-Per-personality and per-fact system prompts are computed and cached
-here. Switching personalities (a slash command) simply invalidates
-the relevant cache key.
+The system prompt is assembled fresh each turn; only the tool-bound LLM is cached.
 """
 
 from __future__ import annotations
@@ -35,15 +22,7 @@ log = logging.getLogger(__name__)
 
 
 class YumiiResponse(BaseModel):
-    """Yumii's structured reply.
-
-    Always populate all three fields. ``expression`` and ``motion`` MUST
-    be chosen from the lists defined in the active personality prompt.
-
-    The agent (LLM with ``bind_tools``) does NOT emit this shape
-    directly — it emits plain text. The synthesizer runs after the
-    final LLM turn and produces this object.
-    """
+    """Yumii's structured reply: response_text + expression + motion (produced by the synthesizer)."""
 
     response_text: str = Field(
         description="The conversational, concise text Yumii will speak out loud."
@@ -67,13 +46,7 @@ class YumiiResponse(BaseModel):
 # ----------------------------------------------------------------------
 
 def build_ollama_llm(model: str, temperature: float = 0.7) -> ChatOllama:
-    """Build a ChatOllama for Ollama Cloud (or a custom base_url).
-
-    Cloud auth: point ``base_url`` at ollama.com and pass the API key as
-    a Bearer header through ``client_kwargs`` — langchain-ollama forwards
-    those to the underlying ollama httpx client. A local Ollama (no key)
-    works too; the header is simply omitted.
-    """
+    """Build a ChatOllama for Ollama Cloud (Bearer key via client_kwargs) or a local base_url."""
     client_kwargs: dict = {}
     if settings.ollama_api_key:
         client_kwargs["headers"] = {
@@ -88,14 +61,7 @@ def build_ollama_llm(model: str, temperature: float = 0.7) -> ChatOllama:
 
 
 def _build_base_llm() -> Any:
-    """Construct the configured provider's chat model.
-
-    Built lazily (not at import time): provider SDKs like ChatGroq
-    validate the API key in their constructor, so eager construction
-    crashed on import wherever no key is set — CI, fresh clones, and any
-    test that merely imports this module. Nothing here runs until the
-    agent actually needs the LLM, by which point a key exists.
-    """
+    """Construct the configured provider's chat model, lazily (constructors validate keys)."""
     provider = settings.llm_provider.lower()
     if provider == "openai":
         return ChatOpenAI(
@@ -125,16 +91,7 @@ def _build_base_llm() -> Any:
 
 @dataclass(frozen=True)
 class BoundLLM:
-    """A tool-bound LLM plus the system prompt the agent must prepend.
-
-    Bundling both in one cache entry lets the agent node do:
-
-        prompt_msg = SystemMessage(content=bound.system_prompt)
-        response = await bound.llm.ainvoke([prompt_msg, *messages])
-
-    without having to re-derive the personality / facts hash on every
-    turn.
-    """
+    """A tool-bound LLM plus the system prompt the agent prepends."""
 
     llm: Any  # BaseChatModel with tools bound
     system_prompt: str
@@ -147,10 +104,7 @@ class BoundLLM:
         return await self.llm.ainvoke([SystemMessage(content=self.system_prompt), *messages])
 
 
-# The tool-bound LLM is built once and shared: tool schemas don't
-# change after startup, and binding fresh per turn would defeat the
-# point. The system prompt, by contrast, is rebuilt every call — it's
-# a cheap string concat, and it must reflect facts/date changes.
+# Tool-bound LLM built once (tool schemas are static); the system prompt is rebuilt per call.
 _bound_llm: Any | None = None
 
 
@@ -166,26 +120,14 @@ def _build_system_prompt(
     user_facts: str | None = None,
     session_context: str | None = None,
 ) -> str:
-    """Assemble the system prompt in provider-cache-friendly order.
+    """Assemble the system prompt ordered by mutation frequency (static → date → context → facts).
 
-    Prefix (KV) caching on Groq/OpenAI/Anthropic matches the request
-    byte-for-byte from the start and dies at the first difference, so
-    the layout is strictly ordered by mutation frequency:
-
-      1. core + personality  — static forever            → always cached
-      2. today's date        — changes once per day
-      3. session context     — changes ~once per session
-         (time since last talk + recent conversation summaries)
-      4. user facts          — changes when a fact lands
-      (conversation history and the new message follow, append-only)
-
-    The date deliberately has no clock time (that would break the
-    cache every minute — the old layout's mistake); the agent has the
-    ``get_current_time`` tool for precise time.
+    Prefix caching dies at the first byte difference, so order matters; the
+    date has no clock time (that would break the cache every minute).
     """
     import datetime
 
-    # Import here to avoid a circular import at module load time
+    # Imported here to avoid a circular import at module load time.
     from yumii.agent.personality_manager import personality_manager
 
     core = personality_manager.load_core_prompt()
@@ -205,24 +147,9 @@ def get_agent_llm(
     user_facts: str | None = None,
     session_context: str | None = None,
 ) -> BoundLLM:
-    """Return a :class:`BoundLLM` for the current personality + fact set.
+    """Return a BoundLLM for the current personality + facts (its ainvoke prepends the prompt).
 
-    The returned object exposes ``ainvoke(messages)`` which prepends
-    the freshly-assembled system prompt. The graph wraps it in an
-    agent node.
-
-    Args:
-        session_id: The active session ID. Currently unused but kept
-            on the signature for future per-session prompt tuning.
-        session_name: Human-readable session label. Currently unused.
-        user_facts: Pre-formatted facts string to append to the
-            system prompt. ``None`` or empty means no facts.
-        session_context: Episodic block — time since last talk +
-            recent conversation summaries (see core/summarizer.py).
-
-    Returns:
-        A :class:`BoundLLM` carrying the shared tool-bound LLM and the
-        system prompt the agent must inject.
+    ``session_id`` / ``session_name`` are currently unused (kept for future tuning).
     """
     from yumii.agent.personality_manager import personality_manager
 
@@ -240,7 +167,6 @@ def clear_llm_cache() -> None:
     _bound_llm = None
 
 
-# Backwards-compat alias for code/tests that referenced the old name.
 def clear_agent_cache() -> None:
     """Deprecated alias for :func:`clear_llm_cache`."""
     clear_llm_cache()

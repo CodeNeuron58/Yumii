@@ -1,15 +1,6 @@
-"""Download + resolve faster-whisper models from Yumii's own GitHub release.
+"""Download faster-whisper models from Yumii's GitHub release (HF's CDN is blocked on some networks).
 
-Upstream, faster-whisper fetches its models from HuggingFace's CDN, which
-is unreachable on some networks (regional blocks/throttling). Kokoro
-already downloads reliably from a GitHub release, so the Whisper models
-are mirrored the same way: a one-time GitHub Actions workflow
-(``.github/workflows/publish-models.yml``) republishes the Systran
-faster-whisper models (MIT) as GitHub release assets, and this helper
-downloads + extracts the size the user needs into
-``~/.yumii/models/whisper/<size>/``. ``LocalSTT`` then loads
-``WhisperModel`` straight from that directory, so HuggingFace is never
-contacted.
+Extracts to ~/.yumii/models/whisper/<size>/; LocalSTT loads from there, so HF is never contacted.
 """
 
 from __future__ import annotations
@@ -25,16 +16,13 @@ from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
 
-# The models live on a dedicated, permanent release (separate from the
-# app's ``v*`` version tags — the model files never change).
+# Permanent release, separate from the app's v* tags (model files never change).
 _RELEASE_BASE = (
     "https://github.com/CodeNeuron58/Yumii/releases/download/whisper-models-v1"
 )
 
 _SIZES = ("tiny", "base", "small")
-# Files faster-whisper needs to load a model. A model missing any of
-# these loads but crashes deep in CTranslate2 on the first transcribe,
-# so completeness is checked by their presence.
+# A model missing any of these loads but crashes on first transcribe — check completeness.
 _REQUIRED_FILES = ("config.json", "model.bin", "tokenizer.json")
 
 ProgressFn = Callable[[float], None]
@@ -76,14 +64,7 @@ def _hook(on_progress: ProgressFn | None):
 def get_whisper_model_dir(
     size: str = "base", on_progress: ProgressFn | None = None
 ) -> str:
-    """Return the local dir of a ready faster-whisper model, downloading
-    it from Yumii's GitHub release if missing.
-
-    ``on_progress`` (0..1) drives the first-run download bar — unlike the
-    upstream HuggingFace path, a zip download gives a real percentage.
-    Raises if the download or extraction can't produce a complete model,
-    so the engine's retry loop can re-fetch.
-    """
+    """Return a ready model dir, downloading the zip from GitHub if missing (raises if incomplete)."""
     if size not in _SIZES:
         size = "base"
     target = model_dir_for(size)

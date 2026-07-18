@@ -14,13 +14,11 @@ def get_stt_provider() -> BaseSTTProvider:
     elif provider == "vosk":
         from yumii.audio.vosk_provider import VoskSTT
         from yumii.audio.vosk_model import get_vosk_model_path
-        
+
         model_path = get_vosk_model_path(settings.vosk_model_size)
         return VoskSTT(model_path=model_path)
 
-    # Default to local — load from the GitHub-mirrored model directory.
-    # ensure_models_ready has already downloaded it (with progress); this
-    # resolves the path (or downloads as a fallback if somehow missing).
+    # Default: local Whisper from the GitHub-mirrored dir (resolve, or fallback-download).
     from yumii.audio.whisper_model import get_whisper_model_dir
 
     model_dir = get_whisper_model_dir(settings.whisper_model_size)

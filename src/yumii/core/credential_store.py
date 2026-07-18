@@ -1,21 +1,7 @@
-"""Credential store — file-based secret storage (``~/.yumii/auth.json``).
+"""File-based secret storage at ~/.yumii/auth.json (owner-only, atomic writes).
 
-API keys live in a JSON file created with owner-only permissions, the
-same model tools like Claude Code and opencode use:
-
-    ~/.yumii/config.json   # non-sensitive preferences (see global_config.py)
-    ~/.yumii/auth.json     # secrets, e.g. {"GROQ_API_KEY": "gsk_..."}
-
-Writes are atomic (temp file + rename) so a crash mid-save can't
-truncate the file. A corrupt auth.json is set aside as
-``auth.json.corrupt`` rather than silently overwritten.
-
-Migration: installs prior to 0.6 stored secrets in the OS keychain via
-the ``keyring`` library. If ``auth.json`` doesn't exist yet and keyring
-is importable, those entries are copied over automatically on first
-read. The keychain entries themselves are left untouched — remove them
-manually (Windows: Control Panel → Credential Manager → Windows
-Credentials → entries named "Yumii:<KEY>").
+Secrets live here, never in config.json. A legacy OS-keychain store from
+installs before 0.6 is migrated in automatically on first read.
 """
 
 from __future__ import annotations
@@ -31,11 +17,10 @@ log = logging.getLogger(__name__)
 CONFIG_DIR = Path.home() / ".yumii"
 AUTH_FILE = CONFIG_DIR / "auth.json"
 
-# Service name older versions used as the keychain identifier; still
-# needed to find legacy entries during migration.
+# Legacy keychain identifier — only needed for migration.
 SERVICE_NAME = "Yumii"
 
-# Keys that are secrets (live ONLY in auth.json)
+# Secrets — live ONLY in auth.json.
 CREDENTIAL_KEYS: frozenset[str] = frozenset(
     {
         "ELEVENLABS_API_KEY",
@@ -50,7 +35,7 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
     }
 )
 
-# Keys that are preferences (safe to store in plaintext config.json)
+# Preferences — safe in plaintext config.json.
 PREFERENCE_KEYS: frozenset[str] = frozenset(
     {
         "LLM_PROVIDER",
@@ -69,8 +54,7 @@ PREFERENCE_KEYS: frozenset[str] = frozenset(
     }
 )
 
-# One attempt per process; flipped to True after the first check so a
-# missing auth.json doesn't re-probe the keychain on every read.
+# Probe the legacy keychain at most once per process.
 _migration_attempted = False
 
 
@@ -87,9 +71,7 @@ def _write_auth(data: dict[str, str]) -> None:
         json.dump(data, f, indent=2, sort_keys=True)
     os.replace(tmp, AUTH_FILE)
     try:
-        # Owner read/write only. On Windows this is mostly advisory —
-        # the user-profile ACLs are the real gate — but it matters on
-        # macOS/Linux.
+        # 0600 — owner only (advisory on Windows; real on macOS/Linux).
         os.chmod(AUTH_FILE, 0o600)
     except OSError:
         pass
@@ -104,8 +86,7 @@ def _read_auth() -> dict[str, str]:
     except FileNotFoundError:
         return {}
     except json.JSONDecodeError:
-        # Don't let a corrupt file get silently clobbered by the next
-        # save — set it aside so the keys inside remain recoverable.
+        # Set a corrupt file aside instead of clobbering it on the next save.
         corrupt = AUTH_FILE.with_suffix(".json.corrupt")
         log.warning("auth.json is not valid JSON; moving it to %s", corrupt)
         try:
@@ -119,11 +100,7 @@ def _read_auth() -> dict[str, str]:
 
 
 def _migrate_from_keyring_once() -> None:
-    """Copy legacy OS-keychain entries into auth.json, once per process.
-
-    Only runs when auth.json doesn't exist and the (no longer required)
-    ``keyring`` package happens to be importable. Never raises.
-    """
+    """Copy legacy OS-keychain secrets into auth.json, once per process (never raises)."""
     global _migration_attempted
     if _migration_attempted:
         return
@@ -148,7 +125,7 @@ def _migrate_from_keyring_once() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Public API (unchanged signatures)
+# Public API
 # ---------------------------------------------------------------------------
 
 
@@ -178,20 +155,12 @@ def is_set(key: str) -> bool:
 
 
 def load_all() -> dict[str, str]:
-    """Return every stored Yumii credential as a plain dict.
-
-    Filtered to :data:`CREDENTIAL_KEYS` so a hand-edited auth.json can't
-    inject arbitrary environment variables at startup.
-    """
+    """Return stored credentials, filtered to CREDENTIAL_KEYS (no arbitrary env injection)."""
     return {k: v for k, v in _read_auth().items() if k in CREDENTIAL_KEYS}
 
 
 def migrate_from_plaintext(config: dict) -> dict:
-    """One-time migration of credentials out of config.json.
-
-    Any credential key found in the plaintext config.json is moved into
-    auth.json and removed from the returned dict.
-    """
+    """Move any credential keys out of plaintext config.json into auth.json."""
     cleaned: dict[str, str] = {}
     auth = _read_auth()
     changed = False
@@ -200,7 +169,6 @@ def migrate_from_plaintext(config: dict) -> dict:
             if key not in auth:
                 auth[key] = str(value)
                 changed = True
-            # Strip from plaintext config regardless
         else:
             cleaned[key] = value
     if changed:

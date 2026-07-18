@@ -1,18 +1,4 @@
-# -*- coding: utf-8 -*-
-"""Yumii backend launcher.
-
-Yumii is a desktop application — the interactive CLI, setup wizards,
-and browser mode were retired with the desktop pivot (they live on in
-the ``cli-launch`` branch). This module exists so the desktop shell
-(and developers) can start the backend:
-
-    yumii server            # start the FastAPI backend (headless)
-    python -m yumii server  # same — what the desktop shell launches
-
-To actually meet Yumii, run the desktop app:
-
-    cd desktop && npx @tauri-apps/cli dev
-"""
+"""Yumii backend launcher: ``yumii server`` starts the headless FastAPI backend (no interactive CLI)."""
 
 from __future__ import annotations
 
@@ -39,11 +25,7 @@ Development: run the app with  cd desktop && npx @tauri-apps/cli dev
 """
 
 
-# Loopback range the backend binds within. It prefers 8000; if that's
-# taken (a dev server, another Yumii), it walks up until it finds a free
-# port instead of dying — the orb probes the same range to find it, and
-# the chosen port is written to the file below so the shell can open the
-# dashboard on the right one.
+# Bind range: prefer 8000, walk up if taken; the chosen port is written to backend.port.
 _PORT_BASE = 8000
 _PORT_TRIES = 12
 
@@ -61,8 +43,7 @@ def _pick_free_port() -> int:
             continue
         finally:
             sock.close()
-    # Nothing free in range — return the base and let uvicorn fail
-    # loudly, which is far better than guessing a busy port silently.
+    # Nothing free — return the base and let uvicorn fail loudly.
     return _PORT_BASE
 
 
@@ -80,8 +61,7 @@ def _write_port_file(port: int) -> None:
 
 def _run_server() -> None:
     """Boot the FastAPI backend on a free loopback port (blocking)."""
-    # onnxruntime/numpy can trip over duplicate OpenMP runtimes on
-    # Windows; the desktop shell sets this too, but direct runs need it.
+    # Avoid duplicate-OpenMP crashes (onnxruntime/numpy) on Windows.
     os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
     configure_logging()
 

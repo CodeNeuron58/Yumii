@@ -1,16 +1,7 @@
-"""Past-conversation recall tool — full-text search over the transcript.
+"""Past-conversation recall (search_past_conversations) — FTS over the transcript, no LLM.
 
-Registered with a READ policy (no confirmation gate): it only reads the
-user's own local transcript, and gating recall behind a permission
-popup would make "what did we talk about last week?" feel broken.
-
-One tool, three shapes (inferred from the arguments, Hermes-style):
-
-* ``query``                         → search all past conversations (FTS5/BM25)
-* ``session_id`` + ``message_id``   → read more context around one hit
-* no arguments                      → list recent conversations
-
-Every result is stored text straight from SQLite — no LLM calls.
+READ policy, ungated. Inferred from args: query → search; session_id + message_id →
+read around a hit; no args → list recent.
 """
 
 from __future__ import annotations
@@ -131,8 +122,7 @@ async def search_past_conversations(
     return "\n".join(lines)
 
 
-# Pure read of the user's own local history — no confirmation gate, so
-# recall feels instant instead of interrogative.
+# Pure local read — ungated so recall feels instant, not interrogative.
 register(
     search_past_conversations,
     ToolPolicy(

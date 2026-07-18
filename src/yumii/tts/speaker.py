@@ -12,6 +12,7 @@ from yumii.core.config import settings
 from yumii.core.interfaces import BaseSpeaker
 
 from yumii.core.logging import get_logger
+
 log = get_logger(__name__)
 
 
@@ -27,42 +28,21 @@ class YumiiSpeaker(BaseSpeaker):
         if not self.voice_id:
             msg = (
                 "\n\n  ❌  No ElevenLabs Voice ID configured.\n"
-                "  Run 'yumii attune' or open ⚙️ Configure Senses and set a Voice ID.\n"
+                "  Open the ⚙️ dashboard and set an ElevenLabs Voice ID.\n"
                 "  Find your Voice ID at: https://elevenlabs.io/voice-library\n"
                 "  It looks like this: 21m00Tcm4TlvDq8ikWAM\n"
             )
             raise ValueError(msg)
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
-        """Stream audio chunks from ElevenLabs.
-
-        Yields, in order:
-          1. ``{"type": "metadata", "sampleRate": 22050}`` — once,
-             tells the frontend the sample rate and lets it open
-             the audio context.
-          2. A sequence of base64-encoded audio chunks as they
-             arrive from ElevenLabs — one yield per chunk.
-
-        The engine consumes these in the
-        :func:`yumii.core.engine.YumiiEngine.tts_speaker_task` loop
-        and broadcasts each as a WebSocket ``audio_chunk`` event.
-        """
+        """Stream audio from ElevenLabs: first a metadata frame (sampleRate), then base64 PCM16 chunks."""
         if not text or not text.strip():
             return
 
-        # Yield metadata first so the frontend can prepare its audio
-        # context before the first chunk arrives.
         yield {"type": "metadata", "sampleRate": 22050}
 
         try:
-            # text_to_speech.stream returns an iterator of raw audio
-            # bytes. We base64-encode each chunk so the WebSocket
-            # payload stays JSON-safe (the engine's broadcast_payload
-            # uses json.dumps).
-            # pcm_22050 = raw signed 16-bit LE samples. The frontend's
-            # streaming decoder reinterprets chunks as PCM16, so the
-            # format must stay PCM (MP3 here plays as static) and the
-            # rate must match the metadata yield above.
+            # pcm_22050 raw PCM16 — must stay PCM (MP3 plays as static) and match the metadata rate.
             audio_stream = self.client.text_to_speech.stream(
                 voice_id=self.voice_id,
                 output_format="pcm_22050",
@@ -78,22 +58,14 @@ class YumiiSpeaker(BaseSpeaker):
             for chunk in audio_stream:
                 if not chunk:
                     continue
-                # base64-encode once, broadcast the chunk. The
-                # frontend stitches chunks together by appending raw
-                # bytes after base64-decoding.
                 yield base64.b64encode(chunk).decode("ascii")
         except Exception as e:
             log.error("elevenlabs_stream_error", error=str(e), exc_info=True)
-            # Re-raise so the engine's `except Exception` branch
-            # sends a final error payload to the frontend.
+            # Re-raise so the engine sends a final error payload.
             raise
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
-        """Perform blocking synthesis and return base64 encoded audio.
-
-        Kept for backwards-compatibility with the non-streaming
-        fallback path in :func:`yumii.core.engine.YumiiEngine.tts_speaker_task`.
-        """
+        """Blocking synthesis returning base64 audio (non-streaming fallback path)."""
         if not text:
             return None, 0.0
 

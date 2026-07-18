@@ -14,11 +14,10 @@ def get_speaker() -> BaseSpeaker:
         return CambSpeaker()
 
     if provider == "Kokoro":
-        # Imported lazily: pulls onnxruntime + espeak bindings and may
-        # trigger a first-run model download.
+        # Lazy import — pulls onnxruntime/espeak and may trigger a model download.
         from yumii.tts.kokoro_speaker import KokoroSpeaker
 
         return KokoroSpeaker()
 
-    # Default to ElevenLabs / YumiiSpeaker
+    # Default to ElevenLabs / YumiiSpeaker.
     return YumiiSpeaker()

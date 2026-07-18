@@ -1,17 +1,7 @@
-"""Agent-written long-term memory — the ``manage_memory`` tool.
+"""Agent-written long-term memory (manage_memory): add/replace/remove facts on the user's word.
 
-The hot path of Yumii's memory (Hermes-style): when the user says
-"remember this", "forget that", or corrects something she has wrong,
-the agent writes memory *itself*, immediately, instead of hoping the
-background review catches it.
-
-Registered with a WRITE policy and no confirmation gate: it mutates
-only the user's own local fact store, and gating "remember my
-birthday" behind an approval popup would be absurd.
-
-replace/remove identify the target fact by a short unique substring
-(not an ID) — the same convention Hermes uses, because language models
-are reliable at quoting substrings and terrible at bookkeeping IDs.
+WRITE policy, ungated — it only touches the user's own local facts. Replace/remove
+target a fact by a short unique substring, not an ID.
 """
 
 from __future__ import annotations
@@ -131,7 +121,7 @@ def _miss_message(result: str, old_text: str) -> str:
     )
 
 
-# Local-only mutation of the user's own memory — WRITE category, ungated.
+# Local-only WRITE, ungated.
 register(
     manage_memory,
     ToolPolicy(

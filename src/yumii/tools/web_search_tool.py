@@ -1,9 +1,4 @@
-"""Web search tool for Yumii using LangChain.
-
-A native LangChain tool that performs web searches using DuckDuckGoSearchResults,
-registered on the global :data:`yumii.tools.registry.registry` with an EXTERNAL
-policy (no API key required, confirmation gate recommended).
-"""
+"""Web search tool (DuckDuckGo via langchain-community), registered with an EXTERNAL policy."""
 
 from __future__ import annotations
 
@@ -17,11 +12,7 @@ log = get_logger(__name__)
 
 
 class WebSearchInput(BaseModel):
-    """Input schema for web search.
-
-    Attributes:
-        query: The search query to send to the web search engine.
-    """
+    """Input schema for web search."""
 
     query: str = Field(
         ...,
@@ -34,11 +25,7 @@ class WebSearchInput(BaseModel):
 
 
 def _create_web_search_tool():
-    """Initialize and return the DuckDuckGo web search tool.
-
-    Returns:
-        DuckDuckGoSearchResults tool instance, or None if import fails.
-    """
+    """Return the DuckDuckGo web search tool, or None if the optional deps aren't installed."""
     try:
         from langchain_community.tools import DuckDuckGoSearchResults
 
@@ -48,7 +35,7 @@ def _create_web_search_tool():
         log.warning(
             "langchain-community and/or ddgs not installed. "
             "Web search tool will not be registered. "
-            "Install with: uv pip install ddgs langchain-community"
+            "Install with: uv add ddgs langchain-community"
         )
         return None
     except Exception as e:
@@ -56,10 +43,9 @@ def _create_web_search_tool():
         return None
 
 
-# Initialize the web search tool
 _web_search_tool = _create_web_search_tool()
 
-# Register on the global registry only if the tool was successfully created
+# Register only if the optional deps loaded.
 if _web_search_tool is not None:
     register(
         _web_search_tool,

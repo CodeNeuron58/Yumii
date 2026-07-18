@@ -1,8 +1,4 @@
-"""FastAPI server for the Yumii backend.
-
-Provides WebSocket real-time communication, REST endpoints for session
-management, and serves the Live2D frontend assets.
-"""
+"""FastAPI backend for Yumii: voice WebSocket, REST API, and the dashboard page."""
 
 from __future__ import annotations
 
@@ -27,46 +23,30 @@ from yumii.core.session_manager import SessionRow, session_manager
 
 log = get_logger(__name__)
 
-# The Engine handles all the heavy lifting: STT, LLM, TTS, and state
 engine = YumiiEngine()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, None]:
-    """Manage the lifecycle of the FastAPI application.
-
-    ``engine.initialize()`` returns as soon as the graph is ready and
-    starts audio preparation (model download + STT/TTS load + the three
-    interaction loops) in the background, so the server responds to
-    ``/health`` and ``/api/status`` immediately — the orb shows download
-    progress instead of waiting on a blocked boot.
-    """
+    """Initialize the engine on startup, shut it down on exit."""
     await engine.initialize()
     yield
-    # --- shutdown ---
     await engine.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)
 
-# Only our own frontends may call this API from a browser context:
-# the served orb page (localhost:8000) and the Tauri webview. A
-# wildcard here would let any website the user visits read their
-# facts and sessions off 127.0.0.1 — this API holds personal memory.
+# CORS allowlist — only our own frontends; a wildcard would expose the
+# user's local memory and keys to any site they visit.
 _ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
-    # Packaged Tauri webview origins (platform-dependent).
     "tauri://localhost",
     "http://tauri.localhost",
     "https://tauri.localhost",
-    # `tauri dev` serves frontendDist from its own local static server
-    # (default port 1430) — the webview's origin in development.
     "http://127.0.0.1:1430",
     "http://localhost:1430",
 ]
-# Escape hatch for nonstandard setups (e.g. a custom Tauri dev port):
-# comma-separated origins appended to the allowlist.
 _ALLOWED_ORIGINS += [
     o.strip()
     for o in os.environ.get("YUMII_ALLOWED_ORIGINS", "").split(",")
@@ -81,13 +61,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Host-header allowlist — the DNS-rebinding guard. A page at evil.com
-# that resolves evil.com to 127.0.0.1 can send requests to
-# http://evil.com:<port>/ with ``Host: evil.com``; CORS/Origin checks
-# don't stop that, but this does — only requests whose Host is a real
-# loopback name reach the API that holds the user's memory and keys.
-# The port is stripped before matching, so any chosen port is fine.
-# "testserver" keeps Starlette's in-process TestClient working.
+# DNS-rebinding guard: only loopback Host headers reach this local API.
 _ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
 _ALLOWED_HOSTS += [
     h.strip() for h in os.environ.get("YUMII_ALLOWED_HOSTS", "").split(",") if h.strip()
@@ -97,12 +71,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=_ALLOWED_HOSTS)
 
 @app.middleware("http")
 async def _log_foreign_origins(request, call_next):
-    """Surface requests from origins outside the allowlist.
-
-    CORS failures are invisible server-side (the browser blocks the
-    *response*), so without this a legitimate frontend blocked by a
-    missing allowlist entry just polls forever with no clue in the logs.
-    """
+    """Log requests from non-allowlisted origins (CORS blocks them silently)."""
     origin = request.headers.get("origin")
     if origin and origin not in _ALLOWED_ORIGINS:
         log.warning(
@@ -118,13 +87,11 @@ async def _log_foreign_origins(request, call_next):
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    """Liveness probe. The desktop shell polls this before connecting the
-    WebSocket so it can show a 'waking up…' state while the brain boots."""
+    """Liveness probe polled by the desktop shell before connecting the WS."""
     return {"status": "ok"}
 
 
-# Sign-in pages the orb may open in the system browser during
-# onboarding. An allowlist — never open an arbitrary URL.
+# Allowlisted sign-in pages the orb may open — never an arbitrary URL.
 _EXTERNAL_LINKS = {
     "ollama": "https://ollama.com/settings/keys",
     "groq": "https://console.groq.com/keys",
@@ -133,11 +100,7 @@ _EXTERNAL_LINKS = {
 
 @app.post("/api/open-external")
 async def open_external(body: dict[str, Any]) -> dict[str, Any]:
-    """Open an allowlisted sign-in page in the user's real browser.
-
-    ``window.open`` is suppressed inside the Tauri webview, so the orb's
-    'get a key' link routes through here (the same pattern the Composio
-    OAuth flow uses)."""
+    """Open an allowlisted sign-in page in the system browser."""
     import webbrowser
 
     url = _EXTERNAL_LINKS.get(str(body.get("target", "")))
@@ -152,12 +115,7 @@ async def open_external(body: dict[str, Any]) -> dict[str, Any]:
 
 @app.get("/api/status")
 async def status() -> dict[str, Any]:
-    """First-run status for the orb: is the LLM key set, and are the
-    local models downloaded yet?
-
-    Drives the orb's routing — downloading → onboarding (no key) →
-    ready. ``configured`` checks the credential for the *active* LLM
-    provider (a fresh install defaults to Ollama)."""
+    """First-run status for the orb: LLM key configured + local model state."""
     from yumii.core.config import settings
     from yumii.core.credential_store import get_credential
 
@@ -234,12 +192,7 @@ async def rename_session_endpoint(session_id: str, body: dict[str, Any]) -> dict
 
 @app.get("/api/sessions/{session_id}/messages")
 async def session_messages_endpoint(session_id: str) -> list[dict[str, str]]:
-    """Return the conversation transcript from the LangGraph checkpoint.
-
-    Only user and assistant turns are included; tool traffic is
-    summarised as a one-line event so the dashboard can render a clean
-    transcript.
-    """
+    """Return the session transcript (user/assistant turns; tools as events)."""
     if engine.graph_app is None:
         raise HTTPException(status_code=503, detail="Engine not ready")
     if await session_manager.get_session(session_id) is None:
@@ -307,8 +260,7 @@ async def delete_fact_endpoint(fact_id: str) -> dict[str, Any]:
 # REST API: Settings (dashboard)
 # ---------------------------------------------------------------------------
 
-# What the dashboard may read/write. Everything else is rejected so a
-# compromised page can't write arbitrary preference keys.
+# Whitelist of writable preference keys — anything else is rejected.
 _SETTING_CHOICES: dict[str, list[str]] = {
     "LLM_PROVIDER": ["Groq", "OpenAI", "Anthropic", "Ollama"],
     "TTS_PROVIDER": ["Kokoro", "ElevenLabs", "CAMB.ai"],
@@ -321,14 +273,11 @@ _SETTING_CHOICES: dict[str, list[str]] = {
     ],
     "HITL_MODE": ["external", "always", "never"],
 }
-# Free-text preferences (model names) — validated as non-empty strings
-# rather than against a fixed list.
 _TEXT_SETTINGS: dict[str, str] = {
     "GROQ_MODEL": "qwen/qwen3.6-27b",
     "OLLAMA_MODEL": "minimax-m3",
 }
-# Provider/key/model changes need a backend restart (settings load once
-# at import). Personality applies live (read from config.json every turn).
+# Changing these needs a backend restart; personality applies live.
 _RESTART_KEYS = {
     "LLM_PROVIDER", "TTS_PROVIDER", "STT_PROVIDER",
     "WHISPER_MODEL_SIZE", "KOKORO_VOICE", "HITL_MODE",
@@ -369,11 +318,7 @@ async def get_settings() -> dict[str, Any]:
 
 @app.put("/api/settings")
 async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
-    """Save preferences and/or credentials from the dashboard.
-
-    Credentials with empty values are ignored (the UI sends passwords
-    write-only), and unknown keys are rejected.
-    """
+    """Save preferences and/or credentials from the dashboard."""
     from yumii.core.credential_store import CREDENTIAL_KEYS, save_credential
     from yumii.core.global_config import update_global_config
 
@@ -397,7 +342,7 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
             raise HTTPException(status_code=400, detail=f"Unknown setting: {key}")
         value = str(value).strip()
         if not value:
-            continue  # blank = keep current
+            continue
         if load_global_config().get(key) != value:
             update_global_config(key, value)
             if key in _RESTART_KEYS:
@@ -433,14 +378,7 @@ async def composio_status() -> dict[str, Any]:
 
 @app.post("/api/composio/connect")
 async def composio_connect(body: dict[str, Any]) -> dict[str, Any]:
-    """Mint an OAuth link for a toolkit and enable it.
-
-    Uses the composio 0.13.x flow that survived the retired
-    ``connected_accounts.initiate`` endpoint (journey doc §7):
-    ``auth_configs.create(...)`` then ``connected_accounts.link(...)``.
-    The dashboard opens the returned ``redirect_url``; the user
-    authenticates in the browser and Composio holds the tokens.
-    """
+    """Mint a Composio OAuth link for a toolkit and enable it (hot-reloaded)."""
     from yumii.tools.composio_loader import (
         USER_ID,
         composio_api_key,
@@ -479,11 +417,7 @@ async def composio_connect(body: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Composio error: {e}")
 
-    # Open the OAuth page in the user's real default browser from the
-    # backend: window.open() is silently suppressed inside the Tauri
-    # webview, and the system browser is where the user is actually
-    # signed in to Google anyway. The dashboard also shows the link as
-    # a clickable fallback.
+    # window.open() is suppressed in the Tauri webview, so open the system browser.
     import webbrowser
 
     try:
@@ -491,8 +425,6 @@ async def composio_connect(body: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         pass
 
-    # Enable the toolkit, then hot-reload so its tools are usable the
-    # moment the OAuth sign-in completes — no app restart.
     from yumii.core.global_config import load_global_config, save_global_config
 
     config = load_global_config()
@@ -555,11 +487,9 @@ async def get_config() -> dict[str, Any]:
     config = load_global_config()
     personality = config.get("PERSONALITY", "caring")
 
-    # Resolve avatar path
     avatar_dir = _find_avatar_dir()
     model_url = None
     if avatar_dir:
-        # Try to find the first .model3.json file
         avatar_path = Path(avatar_dir)
         for candidate in avatar_path.iterdir():
             if candidate.suffix == ".json" and "model3" in candidate.name:
@@ -579,18 +509,8 @@ async def get_config() -> dict[str, Any]:
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
-    """Handle real-time audio and event communication via WebSocket.
-
-    Protocol:
-        1. Client connects.
-        2. Server sends ``{"type": "session_list"}`` (or client sends
-           ``{"type": "session_select", "action": "new|resume", ...}``).
-        3. After session negotiation, normal audio flow begins.
-    """
-    # Browsers always send an Origin header; reject pages that aren't
-    # ours so a malicious website can't stream audio or commands into
-    # the engine. Non-browser clients (no Origin) are local tools
-    # already running with the user's privileges — allowed.
+    """Real-time audio + event WebSocket: first frame negotiates the session, then audio streams."""
+    # Reject browser pages that aren't ours; local (no-Origin) clients allowed.
     origin = websocket.headers.get("origin")
     if origin is not None and origin not in _ALLOWED_ORIGINS:
         log.warning("ws_origin_rejected", origin=origin)
@@ -599,11 +519,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     await websocket.accept()
 
-    # --- Phase 1: Session negotiation ---
-    # The frontend sends a session_select frame as its very first
-    # message (ordered before any mic audio). Legacy clients may lead
-    # with binary audio instead — stash those frames and fall through
-    # to the default after a short deadline.
+    # Phase 1: session negotiation — first frame is session_select; stash early audio.
     data: dict[str, Any] = {}
     stashed_audio: list[bytes] = []
     loop = asyncio.get_running_loop()
@@ -635,22 +551,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     if action == "new":
         await engine.create_new_session()
     elif action == "resume":
-        # Falls back to a new session if the ID is unknown.
         await engine.resume_session(data.get("session_id", ""))
     elif engine.active_session_id is None:
-        # "auto" on a fresh boot — nothing to keep, start a new one.
         await engine.create_new_session()
-    # "auto" with an active session: keep it. Reconnects (the frontend
-    # retries every 3s) must NOT mint a new session each time.
+    # "auto" with an active session keeps it — reconnects must not mint a new one.
 
-    # Any audio that raced ahead of the negotiation belongs to this
-    # session — feed it through now (unless the user is muted, or audio
-    # isn't ready yet: no ears until the STT model has loaded).
     if not engine.mic_muted and engine.audio_ready:
         for chunk in stashed_audio:
             await engine.audio_input_queue.put(chunk)
 
-    # Take-over: if another connection is active, politely evict it.
+    # Take-over: evict any other active connection.
     for conn in engine.active_connections:
         if conn != websocket and conn.client_state == WebSocketState.CONNECTED:
             try:
@@ -659,18 +569,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 pass
     engine.active_connections = [websocket]
 
-    # --- Phase 2: Normal audio / command loop ---
+    # Phase 2: audio / command loop.
     try:
         while True:
             message = await websocket.receive()
 
-            # Starlette *returns* the disconnect message rather than
-            # raising; calling receive() again after it is a
-            # RuntimeError, so break out here.
+            # Starlette returns (not raises) disconnect; calling receive() again would RuntimeError.
             if message.get("type") == "websocket.disconnect":
                 break
 
-            # JSON text commands from the frontend
             if "text" in message:
                 try:
                     payload = json.loads(message["text"])
@@ -678,21 +585,13 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
                     if msg_type == "command":
                         cmd = payload.get("command", "")
-                        # Inject the command into the transcription queue
-                        # so the engine's command handler can process it.
                         await engine.transcription_queue.put(cmd)
 
-                    # Manual mic mute from the orb. The frontend also
-                    # stops sending audio; this makes the engine drop
-                    # anything already in flight and reset the capture.
                     elif msg_type == "mic_mute":
                         await engine.set_mic_muted(
                             bool(payload.get("muted", False))
                         )
 
-                    # PR 4: HITL confirmation reply from the browser.
-                    # The engine is awaiting the future registered
-                    # under ``request_id``; we just resolve it.
                     elif msg_type == "confirmation_response":
                         request_id = payload.get("request_id", "")
                         approved = bool(payload.get("approve", False))
@@ -702,9 +601,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     pass
                 continue
 
-            # Binary audio chunk from the browser. Dropped while muted or
-            # before audio is ready — the frontend gates too; this covers
-            # stale in-flight frames.
+            # Audio in — dropped while muted or before audio is ready.
             if "bytes" in message:
                 if not engine.mic_muted and engine.audio_ready:
                     await engine.audio_input_queue.put(message["bytes"])
@@ -712,8 +609,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        # Every exit path — clean disconnect, eviction, error — must
-        # drop the connection from the broadcast list.
         if websocket in engine.active_connections:
             engine.active_connections.remove(websocket)
 
@@ -721,12 +616,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 # ---------------------------------------------------------------------------
 # Static files
 # ---------------------------------------------------------------------------
-# Yumii is a desktop application: the orb window is rendered by the
-# Tauri shell from its own bundled assets, NOT served from here. The
-# backend serves exactly one page — dashboard.html, loaded by the
-# shell's dashboard window. The old catch-all mount that made the orb
-# reachable in any browser at / is gone (browser mode was retired with
-# the desktop pivot; it lives on in the ``cli-launch`` branch).
+# The backend serves one page — dashboard.html for the shell's dashboard window.
 
 _pkg_dir = Path(__file__).parent.parent
 _webui_dir = _pkg_dir / "assets" / "webui"
@@ -736,7 +626,7 @@ def _find_avatar_dir() -> str | None:
     """Resolve the user's Live2D avatar directory (future companion mode)."""
     candidates = [
         Path.home() / ".yumii" / "avatar",
-        _pkg_dir.parent.parent / "assets" / "avatar",  # repo root fallback
+        _pkg_dir.parent.parent / "assets" / "avatar",
     ]
     for candidate in candidates:
         try:

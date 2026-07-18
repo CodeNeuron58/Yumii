@@ -1,18 +1,7 @@
 """Session summaries + time sense — Yumii's episodic memory.
 
-Writes the ``session_summaries`` table (schema in memory_db) from the
-searchable transcript, and builds the "shared history" block the
-engine injects into the system prompt at session start:
-
-    You last spoke with them 2 days ago.
-    Recent conversations:
-    - 2 days ago, "Kyoto trip": user booked Kyoto for October 12th …
-    Earlier in this conversation: …
-
-Summaries are produced by the same cheap LLM the memory review uses,
-watermarked by transcript message count so an unchanged session is
-never re-summarized. Facts answer "what is true about the user";
-summaries answer "what happened between us, and when".
+Facts answer "what is true about the user"; summaries answer "what
+happened between us, and when". Both use the cheap extractor LLM.
 """
 
 from __future__ import annotations
@@ -26,14 +15,12 @@ from yumii.core.memory_db import execute, fetchall, fetchone
 
 log = get_logger(__name__)
 
-# Re-summarize a live session every this many transcript messages
-# (20 messages = 10 spoken turns), so a long conversation's summary
-# stays current and carries what slid out of the history window.
+# Re-summarize a live session every N transcript messages (10 turns).
 SUMMARY_REFRESH_MESSAGES = 20
 
 # Bounds on what the summarizer LLM sees / returns.
-_MAX_ROWS = 80          # most recent transcript rows fed to the LLM
-_MAX_ROW_CHARS = 400    # per-message cap
+_MAX_ROWS = 80
+_MAX_ROW_CHARS = 400
 _MAX_SUMMARY_CHARS = 600
 
 _SUMMARY_SYSTEM_PROMPT = """\
@@ -56,11 +43,7 @@ def _utc_now() -> str:
 
 
 def humanize_ago(ts: str | None) -> str:
-    """'2026-07-13 09:15:00(.123)' → 'two days ago'-style phrasing.
-
-    Voice-first: returns words the TTS can speak naturally, never raw
-    timestamps. Unparseable input degrades to 'a while ago'.
-    """
+    """Speakable relative time ('two days ago'); 'a while ago' on unparseable input."""
     if not ts:
         return "a while ago"
     parsed = None
@@ -97,13 +80,7 @@ def humanize_ago(ts: str | None) -> str:
 
 
 async def summarize_session(session_id: str) -> str | None:
-    """Summarize a session's transcript into ``session_summaries``.
-
-    Watermarked: if the stored summary already covers the current
-    transcript length, this is a no-op. Returns the summary text, or
-    None when there was nothing (new) to summarize or the LLM failed —
-    a failed summary must never disturb anything.
-    """
+    """Summarize a session's transcript into session_summaries (watermarked; safe on failure)."""
     if not session_id:
         return None
 
@@ -119,7 +96,7 @@ async def summarize_session(session_id: str) -> str | None:
         (session_id,),
     )
     if existing and existing["message_count"] >= len(rows):
-        return None  # nothing new since the last summary
+        return None
 
     lines = [
         f"[{'User' if r['role'] == 'user' else 'Yumii'}]: {r['content'][:_MAX_ROW_CHARS]}"
@@ -168,12 +145,7 @@ async def build_session_context(
     include_current: bool = False,
     max_recent: int = 3,
 ) -> str:
-    """Assemble the shared-history block for the system prompt.
-
-    ``include_current`` adds this session's own summary ("Earlier in
-    this conversation…") — used on resume and for long live sessions
-    whose early turns have slid out of the history window.
-    """
+    """Assemble the shared-history block for the system prompt (recent summaries + time sense)."""
     parts: list[str] = []
 
     last = await fetchone(

@@ -1,34 +1,4 @@
-"""Tool registry for Yumii's agent loop.
-
-A single, uniform place to register tools regardless of where they came
-from — a native ``@tool`` function defined in this codebase, a tool
-returned by :class:`langchain_mcp_adapters.client.MultiServerMCPClient`,
-or a hand-rolled ``BaseTool`` subclass. The registry stores the tool
-plus its :class:`~yumii.tools.policy.ToolPolicy` and exposes the
-combined list for the LangGraph ``ToolNode`` to execute.
-
-The registry is a module-level singleton (see ``registry`` at the
-bottom of this file). All access goes through helper functions so
-tests can substitute their own instance.
-
-Typical usage:
-
-.. code-block:: python
-
-    from langchain_core.tools import tool
-    from yumii.tools.policy import ToolCategory, ToolPolicy
-    from yumii.tools.registry import register, bind_to_llm
-
-    @tool
-    def get_weather(city: str) -> str:
-        \"\"\"Get the weather for a city.\"\"\"
-        return f\"Sunny in {city}\"
-
-    register(get_weather, ToolPolicy(category=ToolCategory.EXTERNAL))
-
-    # Later, in the agent:
-    llm_with_tools = bind_to_llm(base_llm)
-"""
+"""Uniform registry for agent tools + their ToolPolicy; a module-level singleton."""
 
 from __future__ import annotations
 
@@ -44,14 +14,7 @@ log = get_logger(__name__)
 
 
 class ToolRegistry:
-    """In-memory store of tools + their policies.
-
-    The registry is intentionally dumb: it has no LLM, no graph, no
-    state. It just holds a ``{name: (BaseTool, ToolPolicy)}`` mapping
-    and answers questions about it. The agent graph (``graph.py``) and
-    the synthesizer (``synthesizer.py``) read from it; nothing else
-    mutates it after startup.
-    """
+    """In-memory {name: (BaseTool, ToolPolicy)} store — no LLM, no graph, just data."""
 
     def __init__(self) -> None:
         self._tools: dict[str, BaseTool] = {}
@@ -68,25 +31,7 @@ class ToolRegistry:
         *,
         overwrite: bool = False,
     ) -> None:
-        """Register a tool with an optional policy.
-
-        Args:
-            tool: A LangChain ``BaseTool`` instance. This is what
-                ``@tool`` returns, and what ``MultiServerMCPClient.get_tools()``
-                returns for MCP-loaded tools.
-            policy: The :class:`ToolPolicy` to associate with this tool.
-                If None, defaults to a READ-category policy with no
-                confirmation gate.
-            overwrite: If False (the default), re-registering a tool
-                with the same name raises ``ValueError``. This is a
-                safety net against accidental shadowing in startup
-                code. Set to True for tests that need to swap tools in
-                and out.
-
-        Raises:
-            ValueError: If a tool with the same name is already
-                registered and ``overwrite`` is False.
-        """
+        """Register a tool with an optional policy (raises on duplicate unless overwrite)."""
         name = tool.name
         if not overwrite and name in self._tools:
             raise ValueError(
@@ -110,26 +55,13 @@ class ToolRegistry:
         *,
         overwrite: bool = False,
     ) -> None:
-        """Register a batch of tools.
-
-        Args:
-            tools: Iterable of ``BaseTool`` instances.
-            policies: Optional dict mapping tool name to its policy.
-                Tools without an entry in ``policies`` get the default
-                policy. If ``policies`` is None, all tools get the
-                default policy.
-            overwrite: Forwarded to :meth:`register`.
-        """
+        """Register a batch of tools (policies optional per name)."""
         policies = policies or {}
         for tool in tools:
             self.register(tool, policies.get(tool.name), overwrite=overwrite)
 
     def unregister(self, name: str) -> None:
-        """Remove a single tool (no-op if absent).
-
-        Used by runtime tool reloads (e.g. the Composio loader swapping
-        its tool set after the user connects an app in the dashboard).
-        """
+        """Remove a tool (no-op if absent) — used by runtime tool reloads."""
         self._tools.pop(name, None)
         self._policies.pop(name, None)
 
@@ -143,11 +75,7 @@ class ToolRegistry:
     # ------------------------------------------------------------------
 
     def get(self, name: str) -> BaseTool:
-        """Return the tool registered under ``name``.
-
-        Raises:
-            KeyError: If no tool is registered under that name.
-        """
+        """Return the tool registered under ``name`` (raises KeyError if absent)."""
         if name not in self._tools:
             raise KeyError(
                 f"No tool named {name!r}. "
@@ -156,11 +84,7 @@ class ToolRegistry:
         return self._tools[name]
 
     def get_policy(self, name: str) -> ToolPolicy:
-        """Return the policy for the tool registered under ``name``.
-
-        Raises:
-            KeyError: If no tool is registered under that name.
-        """
+        """Return the policy for ``name`` (raises KeyError if absent)."""
         if name not in self._policies:
             raise KeyError(
                 f"No policy for tool {name!r}. "
@@ -195,8 +119,7 @@ class ToolRegistry:
 # Module-level singleton + helper functions
 # ----------------------------------------------------------------------
 
-# All access from the rest of the codebase goes through this singleton.
-# Tests that need isolation can call ``registry.clear()`` in a fixture.
+# All access goes through this singleton.
 registry = ToolRegistry()
 
 
@@ -246,15 +169,11 @@ def tools_requiring_confirmation() -> list[str]:
 
 
 def _make_null_defaults_nullable(node: dict) -> None:
-    """In-place: let every null-defaulted property actually accept null.
+    """Widen null-defaulted schema properties to accept null.
 
-    Composio (and other third-party) schemas declare optional fields as
-    bare ``{"type": "string", "default": null}`` — not nullable. Llama
-    models fill optionals with explicit ``null``, and Groq validates
-    tool calls against the schema server-side, so the combination
-    rejects semantically perfect calls with ``tool_use_failed``
-    ("/query: expected string, but got null"). Widening the type to
-    ``["string", "null"]`` makes the model's behaviour legal.
+    Composio schemas declare optionals as ``{"type": "string", "default": null}``;
+    Llama fills them with explicit null and Groq validates server-side, 400ing
+    with ``tool_use_failed``. Widening to ``["string", "null"]`` makes it legal.
     """
     for prop in node.get("properties", {}).values():
         if not isinstance(prop, dict):
@@ -268,16 +187,11 @@ def _make_null_defaults_nullable(node: dict) -> None:
                 for o in prop["anyOf"]
             ):
                 prop["anyOf"].append({"type": "null"})
-        # Qwen-family models write tool calls in an XML dialect with
-        # Python-cased booleans ("True"); Groq's parser forwards those
-        # as strings and its validator then rejects the call. Accept
-        # the string form — pydantic lax-coerces "True"/"false" back to
-        # real booleans at execution time.
+        # Qwen writes booleans as "True"; accept the string form (pydantic coerces at execution).
         if prop.get("type") == "boolean":
             prop["type"] = ["boolean", "string"]
         elif isinstance(prop.get("type"), list) and "boolean" in prop["type"] and "string" not in prop["type"]:
             prop["type"] = [*prop["type"], "string"]
-        # Recurse into nested object schemas wherever they may hide.
         if isinstance(prop.get("properties"), dict):
             _make_null_defaults_nullable(prop)
         items = prop.get("items")
@@ -295,13 +209,7 @@ def _make_null_defaults_nullable(node: dict) -> None:
 
 
 def bind_to_llm(llm: BaseChatModel) -> BaseChatModel:
-    """Bind the global registry's tools to an LLM via ``bind_tools``.
-
-    Tools are bound as sanitized OpenAI-format schema dicts (see
-    :func:`_make_null_defaults_nullable`) rather than raw ``BaseTool``
-    objects — the LLM only needs names and schemas; the ``ToolNode``
-    still dispatches to the registered tool objects by name.
-    """
+    """Bind the registry's tools to an LLM as sanitized OpenAI-format schemas."""
     from langchain_core.utils.function_calling import convert_to_openai_tool
 
     schemas = []

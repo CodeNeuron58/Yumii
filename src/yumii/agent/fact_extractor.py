@@ -1,14 +1,7 @@
-"""Fact extraction & memory review for Yumii's long-term memory.
+"""Fact extraction + memory review for long-term memory (two cheap structured-JSON LLM passes).
 
-Two LLM passes live here, both cheap and structured-JSON:
-
-* :func:`extract_facts` — the original add-only extractor over a short
-  snippet (kept for compatibility; no longer called per turn).
-* :func:`review_facts` — the periodic reviewer. Sees the last few
-  conversation turns AND the facts already stored, and returns delta
-  operations (add / replace / remove), so memory gets corrected and
-  pruned instead of only growing. This is what the engine's
-  every-N-turns memory review runs.
+``extract_facts`` adds facts from a snippet; ``review_facts`` sees existing
+facts too and returns add/replace/remove deltas (the periodic review).
 """
 
 from __future__ import annotations
@@ -89,11 +82,7 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
 
 
 def _get_extractor_llm() -> Any:
-    """Return a cheap LLM instance suitable for fact extraction.
-
-    Uses the configured provider but picks a cheaper/faster model variant so
-    the cost of one extra call per conversation turn is negligible.
-    """
+    """A cheap LLM for extraction — the configured provider's fast/cheap tier."""
     provider = settings.llm_provider.lower()
 
     if provider == "openai":
@@ -115,8 +104,7 @@ def _get_extractor_llm() -> Any:
         )
 
     if provider == "ollama":
-        # No separate cheap tier on Ollama Cloud — reuse the configured
-        # model at temperature 0 for the extraction pass.
+        # Ollama Cloud has no cheap tier — reuse the configured model at temp 0.
         from yumii.agent.llm import build_ollama_llm
 
         return build_ollama_llm(settings.ollama_model, temperature=0.0)
@@ -146,12 +134,11 @@ def _parse_extraction_json(raw: str) -> list[dict[str, Any]]:
     """Robustly parse the LLM's JSON response, handling markdown fences."""
     text = raw.strip()
 
-    # Try to find JSON inside markdown fences
     match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
     if match:
         text = match.group(1).strip()
 
-    # Some models wrap the JSON in extra prose — try the first { ... } block
+    # Some models wrap JSON in prose — grab the first {...} block.
     if not text.startswith("{"):
         brace_match = re.search(r"(\{.*\})", text, re.DOTALL)
         if brace_match:
@@ -178,11 +165,7 @@ def _parse_extraction_json(raw: str) -> list[dict[str, Any]]:
 async def extract_facts(
     messages: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
-    """Analyse *messages* and return a list of extracted fact dicts.
-
-    Each fact dict contains ``fact``, ``category``, and ``confidence`` keys.
-    Returns an empty list when no new facts are found or parsing fails.
-    """
+    """Extract fact dicts (fact/category/confidence) from messages; [] on none or parse failure."""
     if not messages:
         return []
 
@@ -302,14 +285,7 @@ async def review_facts(
     turns: list[dict[str, str]],
     existing_facts: list[str],
 ) -> list[dict[str, Any]]:
-    """Review recent *turns* against *existing_facts*; return delta operations.
-
-    Each operation dict has ``action`` (add/replace/remove), ``fact``,
-    ``old`` (substring of an existing fact, for replace/remove),
-    ``category``, and ``confidence``. Returns an empty list when nothing
-    should change or the LLM/parsing fails — a failed review must never
-    hurt the conversation.
-    """
+    """Review recent turns against existing facts; return add/replace/remove ops ([] on failure)."""
     if not turns:
         return []
 

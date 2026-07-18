@@ -1,13 +1,4 @@
-"""Kokoro local TTS provider for Yumii.
-
-Runs Kokoro-82M fully offline via ONNX Runtime on CPU — no API key, no
-cloud. Model files (~120 MB for the default int8 variant) are downloaded
-to ``~/.yumii/models/kokoro`` on first use.
-
-Output is 24 kHz signed 16-bit PCM, the same raw format the orb
-frontend's streaming decoder expects, so chunks flow through the
-engine's ``audio_chunk`` protocol unchanged.
-"""
+"""Kokoro-82M local TTS via ONNX (CPU, offline, no API key). Output: 24 kHz PCM16."""
 
 from __future__ import annotations
 
@@ -30,26 +21,21 @@ log = get_logger(__name__)
 
 DEFAULT_VOICE = "af_heart"
 
-# Pause inserted between chunks (each is synthesized separately and
-# silence-trimmed, so without this they run into each other).
+# Gap between separately-synthesized chunks so they don't run together.
 _CHUNK_GAP_SEC = 0.08
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?…])\s+")
 _CLAUSE_SPLIT = re.compile(r"(?<=[,;:])\s+")
 _CONJ_SPLIT = re.compile(r"\s+(?=(?:and|but|so|because|while|or|then)\b)", re.IGNORECASE)
 
-# Chunk sizing for incremental synthesis. Latency vs stalls: the first
-# chunk is small so the voice starts fast, but each later chunk may only
-# be ~1.4x the audio already delivered (≈ 1/RTF on this class of CPU) or
-# synthesis falls behind playback and the voice stalls mid-reply.
-_FIRST_CHUNK_BUDGET = 48  # chars — roughly a second of speech
+# First chunk small (start fast); later chunks grow but stay ~1.4x delivered so playback doesn't outrun synthesis.
+_FIRST_CHUNK_BUDGET = 48
 _BUDGET_GROWTH = 1.4
 _MIN_BUDGET = 60
 
 
 def _atoms(text: str) -> list[str]:
-    """Break text into the smallest natural speech units: sentences,
-    then clauses at , ; : — and run-on clauses at conjunctions."""
+    """Break text into sentences, then clauses, then run-on clauses at conjunctions."""
     out: list[str] = []
     for s in _SENTENCE_SPLIT.split(text.strip()):
         for c in _CLAUSE_SPLIT.split(s.strip()):
@@ -64,14 +50,7 @@ def _atoms(text: str) -> list[str]:
 
 
 def _split_speech_chunks(text: str) -> list[str]:
-    """Pack atoms into chunks under a growing size budget.
-
-    Kokoro's own batching only splits near 510 phonemes, so a normal
-    reply would otherwise synthesize as one block — seconds of silence
-    before the first sound at RTF 0.7. Splitting must respect pacing
-    both ways: small enough up front to start fast, big enough later
-    that playback never outruns synthesis.
-    """
+    """Pack atoms into chunks under a growing budget so speech starts fast without stalling."""
     atoms = _atoms(text)
     if not atoms:
         t = text.strip()
@@ -121,9 +100,7 @@ class KokoroSpeaker(BaseSpeaker):
         self.voice = voice
         log.info("kokoro_ready", voice=self.voice, sample_rate=self.sample_rate)
 
-        # The first ONNX run is ~30% slower than steady state; warm up in
-        # the background during boot so the first real reply isn't the
-        # one paying for it.
+        # Warm up in the background — the first ONNX run is ~30% slower.
         threading.Thread(target=self._warmup, daemon=True).start()
 
     def _warmup(self) -> None:
@@ -134,13 +111,7 @@ class KokoroSpeaker(BaseSpeaker):
             log.warning("kokoro_warmup_failed", error=str(e))
 
     async def stream_speak(self, text: str) -> AsyncGenerator[Any, None]:
-        """Yield metadata, then base64 PCM16 chunks — one per sentence.
-
-        Each sentence is synthesized in a worker thread and yielded as
-        soon as it's ready, so the first sentence plays while the rest
-        are still generating. With RTF < 1 synthesis stays ahead of
-        playback, so there are no mid-reply gaps.
-        """
+        """Yield metadata, then base64 PCM16 chunks — one per sentence, so the first plays while the rest generate."""
         if not text or not text.strip():
             return
 
@@ -166,11 +137,7 @@ class KokoroSpeaker(BaseSpeaker):
             raise
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
-        """Blocking synthesis returning base64 WAV (legacy non-streaming path).
-
-        WAV (not raw PCM) because the frontend's legacy path decodes via
-        ``decodeAudioData``, which needs a container.
-        """
+        """Blocking synthesis returning base64 WAV (legacy non-streaming path; WAV needs a container)."""
         if not text:
             return None, 0.0
         try:

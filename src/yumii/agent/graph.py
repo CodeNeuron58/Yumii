@@ -1,33 +1,7 @@
-"""Reasoning graph definition for Yumii.
+"""Reasoning graph for Yumii: a ReAct-style agent → tools → agent loop over SQLite checkpoints.
 
-Defines the LangGraph workflow that orchestrates the LLM interaction loop
-and maintains the conversational state using **persistent** SQLite checkpoints.
-
-The graph is a classic ReAct-style loop:
-
-.. code-block:: text
-
-    START
-      │
-      ▼
-    ┌────────┐   no tool calls    ┌──────┐
-    │ agent  │ ─────────────────► │ END  │
-    └────────┘                    └──────┘
-      │ tool calls
-      ▼
-    ┌────────┐
-    │ tools  │ (gated ToolNode — see _build_gated_tools_node)
-    └────────┘
-      │
-      └────────► back to agent
-
-The ``tools`` node is wrapped with a HITL confirmation gate. Tools
-whose :class:`ToolPolicy.requires_confirmation` is ``True`` (and that
-are not opted-out by ``settings.hitl_mode``) pause execution,
-broadcast a ``confirmation_request`` event, and resume only when the
-user approves (or the timeout fires). The gate is implemented in
-:meth:`_build_gated_tools_node` so LangGraph itself stays oblivious
-to the user / WS layer.
+The ``tools`` node is wrapped in a HITL confirmation gate (see
+:func:`_build_gated_tools_node`) so LangGraph stays oblivious to the WS layer.
 """
 
 from __future__ import annotations
@@ -52,24 +26,16 @@ from yumii.tools.registry import list_policies, list_tools, tools_requiring_conf
 
 log = get_logger(__name__)
 
-# LangGraph checkpoints live in their own SQLite file.
 _CHECKPOINT_DB = Path.home() / ".yumii" / "memory" / "checkpoints.db"
 
-# Request-size guards, tuned per provider. Free-tier Groq rejects any
-# single request over 8–12k tokens (413), and tool results (a fetched
-# inbox!) persist into the checkpointed history, poisoning every later
-# turn of the session — so Groq gets tight budgets. Every other
-# provider (Ollama Cloud's minimax-m3 has a 1M context) gets room to
-# actually work: full inboxes, longer conversations.
-_GROQ_MAX_TOOL_RESULT_CHARS = 3000  # ≈750 tokens per tool result
+# Per-provider request budgets: free-tier Groq 413s over ~12k tokens (and tool
+# results persist into history), so it gets tight caps; roomy providers get more.
+_GROQ_MAX_TOOL_RESULT_CHARS = 3000
 _GROQ_HISTORY_WINDOW = 12
-_MAX_TOOL_RESULT_CHARS = 20000  # ≈5k tokens
+_MAX_TOOL_RESULT_CHARS = 20000
 _HISTORY_WINDOW = 40
 
-# A tool run (Composio → provider API → back) with no bound would hang
-# the turn forever if the HTTP call stalls; the conversation dies until
-# an app restart. On timeout the model gets an error ToolMessage and
-# can say so out loud instead.
+# Bound tool runs so a stalled HTTP call can't hang the turn forever.
 _TOOL_EXECUTION_TIMEOUT_SEC = 90.0
 
 
@@ -101,13 +67,10 @@ def _truncate_tool_results(result: Any, max_chars: int | None = None) -> Any:
 
 
 def _repair_dangling_tool_calls(messages: list) -> list:
-    """Answer tool calls that never got a result with a synthetic ToolMessage.
+    """Answer unanswered tool_calls with a synthetic ToolMessage.
 
-    A barge-in or crash between the model requesting a tool and the
-    result landing leaves an AIMessage with ``tool_calls`` and no
-    matching ToolMessage in the checkpoint. Providers require every
-    tool_call_id to be answered, so without this repair one interrupted
-    turn poisons every later request in the session.
+    An interrupted turn leaves a tool_call with no result; providers require
+    every tool_call_id answered, or every later request in the session errors.
     """
     answered = {
         m.tool_call_id for m in messages if isinstance(m, ToolMessage)
@@ -132,17 +95,7 @@ def _repair_dangling_tool_calls(messages: list) -> list:
 
 
 def _window_history(history: list, window: int | None = None) -> list:
-    """Return the most recent slice of history for the LLM request.
-
-    The checkpoint keeps everything; this only bounds what each request
-    carries. The window never starts on an orphaned ToolMessage (a
-    ToolMessage without its preceding tool-calling AIMessage is an API
-    error on strict providers), and dangling tool calls left by
-    interrupted turns are answered with synthetic results. Trade-off:
-    when the window slides, the request prefix changes and provider
-    caching misses once — fitting under the request cap beats a cache
-    hit.
-    """
+    """Recent history slice for the request; never starts on an orphaned ToolMessage, repairs dangling calls."""
     if window is None:
         _, window = _request_budgets()
     windowed = history[-window:]
@@ -152,58 +105,31 @@ def _window_history(history: list, window: int | None = None) -> list:
 
 
 def _build_state_class() -> type:
-    """Combine :class:`MessagesState` with Yumii's MainState fields.
-
-    We need both the standard ``messages`` reducer (so ``add_messages``
-    works) and the Yumii-specific fields (``input``, ``response``,
-    ``expression``, ``motion``, ``session_id``, ``session_name``,
-    ``user_facts``) that the engine writes into the state on every turn.
-    """
+    """Combine MessagesState (the ``messages`` reducer) with Yumii's own state fields."""
 
     class YumiiMainState(MessagesState, total=False):
         """Yumii's full graph state. Inherits ``messages`` from MessagesState."""
 
-        # ``messages`` is inherited from MessagesState with the
-        # ``add_messages`` reducer.
         input: str
         turn_id: str
         response: str
-        # turn_id of the turn that produced ``response`` — lets the
-        # engine tell a fresh response apart from a stale one when it
-        # reads the checkpoint after a streaming failure.
+        # turn_id that produced ``response`` — lets the engine tell a fresh reply from a stale one.
         response_turn_id: str
         expression: str
         motion: str
         session_id: str
         session_name: str
         user_facts: list[str]
-        # Episodic block: time since last talk + recent conversation
-        # summaries. Built by the engine at session start (summarizer.py).
         session_context: str
 
     return YumiiMainState
 
 
-# Module-level schema for the graph. Tests that need isolation can
-# import this and use it directly.
 YumiiState: type = _build_state_class()
 
 
 async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Run the LLM with bound tools and return its decision.
-
-    The LLM may either:
-      * emit a plain ``AIMessage`` (no tool calls) — we route to END.
-      * emit an ``AIMessage`` with ``tool_calls`` — we route to ``tools``.
-
-    Personality switching is handled in-place by rewriting the user's
-    input (the model sees a system-prompt-friendly version of the
-    request and acknowledges the switch in style).
-
-    On the **final** turn (no tool calls), we also run the synthesizer
-    to derive ``expression`` and ``motion`` from the agent text. PR 3
-    replaces the placeholder synthesizer with a heuristic classifier.
-    """
+    """Run the tool-bound LLM; route to tools or END, running the synthesizer on the final turn."""
     user_input: str = state.get("input", "")
     history: list = state.get("messages", []) or []
     session_id: str = state.get("session_id", "")
@@ -223,7 +149,6 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
             "Acknowledge this personality switch warmly in your new style."
         )
 
-    # Build the LLM (with tools bound) for the active personality.
     facts_text = "\n".join(f"  - {f}" for f in facts)
     bound = get_agent_llm(
         session_id=session_id,
@@ -232,29 +157,16 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
         session_context=session_context or None,
     )
 
-    # NOTE: no per-turn time message. The old layout injected "The
-    # current time is 11:42 PM..." as the second message — before the
-    # entire history — so the request prefix changed every minute and
-    # provider prefix (KV) caching missed on every turn. Today's DATE
-    # now lives at the tail of the system prompt (one cache break per
-    # day); precise time is a ``get_current_time`` tool call away.
+    # No per-turn time message — it would break provider prefix caching every
+    # minute; the date lives at the tail of the system prompt instead.
 
-    # The HumanMessage ID must be stable across multiple agent passes
-    # within the same turn (agent -> tools -> agent) so the
-    # add_messages reducer dedupes the re-added message — but unique
-    # across turns, or repeating the same phrase later would overwrite
-    # the earlier history entry instead of appending. The engine mints
-    # a per-turn UUID; the hash fallback covers direct invocations.
+    # Stable HumanMessage ID within a turn (dedupe re-adds) but unique across turns.
     turn_id: str = state.get("turn_id") or f"{session_id}_{hash(user_input)}"
     human_id = f"hum_{turn_id}"
     new_human = HumanMessage(content=user_input, id=human_id)
     messages: list = _window_history(list(history)) + [new_human]
 
-    # ``BoundLLM.ainvoke`` prepends the system prompt itself.
-    # Llama on Groq occasionally emits a malformed tool call and the
-    # whole request 400s with ``tool_use_failed`` — retry once (usually
-    # transient at temperature 0.7), then degrade to a spoken apology
-    # instead of crashing the turn.
+    # Groq/Llama sometimes 400 with tool_use_failed — retry once, then apologize instead of crashing.
     try:
         response: AIMessage = await bound.ainvoke(messages)
     except Exception as e:
@@ -274,13 +186,8 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
                 )
             )
 
-    # If the agent finished without calling a tool, run the synthesizer
-    # to derive the YumiiResponse shape the engine expects.
     if not getattr(response, "tool_calls", None):
         yumii_resp = synthesize(response.content or "")
-        # Each pass appends exactly one new AIMessage, so its ID only
-        # needs to be unique — providers usually set one; this is the
-        # fallback.
         if not response.id:
             response = AIMessage(
                 content=response.content,
@@ -294,9 +201,6 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
             "motion": yumii_resp.motion,
         }
 
-    # Otherwise, return the AIMessage with tool_calls; routing will
-    # send us to the ``tools`` node. The HumanMessage is appended
-    # here so the message history is consistent on the next turn.
     if not response.id:
         response = AIMessage(
             content=response.content,
@@ -309,55 +213,27 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 # ----------------------------------------------------------------------
-# Gated tools node (PR 4 — HITL confirmation)
+# Gated tools node — HITL confirmation
 # ----------------------------------------------------------------------
 
 
 def _tool_needs_confirmation(tool_name: str) -> bool:
-    """Return ``True`` if the given tool requires a user confirmation
-    under the current :data:`settings.hitl_mode`.
-
-    Modes:
-
-    * ``"never"`` — never gate any tool.
-    * ``"external"`` (default) — gate only tools whose policy says
-      :attr:`ToolPolicy.requires_confirmation` is True (i.e. EXTERNAL
-      by default).
-    * ``"always"`` — gate every tool call.
-    """
+    """Whether a tool needs confirmation under settings.hitl_mode (never / external / always)."""
     mode = (settings.hitl_mode or "external").lower()
     if mode == "never":
         return False
     if mode == "always":
         return True
-    # "external" (or any unrecognised value — fail safe to external)
+    # "external" (and any unknown value — fail safe).
     return tool_name in set(tools_requiring_confirmation())
 
 
 def _build_gated_tools_node(tools: list) -> Any:
-    """Wrap LangGraph's prebuilt :class:`ToolNode` with a HITL gate.
-
-    The returned callable mirrors the ToolNode signature: it receives
-    the agent's state, inspects the last AIMessage's ``tool_calls``,
-    and for each one whose policy demands a confirmation it pauses
-    execution and asks the engine (via the module-level
-    :data:`_gated_tools_hook`) to wait for the user's reply.
-
-    If the user approves, the tool runs normally. If they deny, the
-    timeout fires, or the user barge-ins, a synthetic
-    :class:`ToolMessage` is returned to the LLM so the conversation
-    can continue gracefully ("OK, I won't do that.").
-    """
+    """Wrap ToolNode with a HITL gate: gated calls pause for the engine's confirmation hook."""
     inner = ToolNode(tools)
 
     async def run_tools(state: dict[str, Any], calls: list[dict]) -> dict[str, Any]:
-        """Dispatch to the inner ToolNode with a hard execution timeout.
-
-        On timeout every pending call gets an error ToolMessage so the
-        history stays valid and the model can tell the user it failed.
-        (The underlying worker thread may still finish in the
-        background; its result is simply discarded.)
-        """
+        """Dispatch to the inner ToolNode with a hard timeout (errored ToolMessages on timeout)."""
         try:
             result = await asyncio.wait_for(
                 inner.ainvoke(state), timeout=_TOOL_EXECUTION_TIMEOUT_SEC
@@ -385,9 +261,6 @@ def _build_gated_tools_node(tools: list) -> Any:
 
     async def gated_tools_node(state: dict[str, Any]) -> dict[str, Any]:
         messages = list(state.get("messages") or [])
-        # Find the most recent AIMessage with tool_calls. The LangGraph
-        # ``tools_condition`` guarantees this is the last message when
-        # we enter this node, but we search defensively.
         last_ai: AIMessage | None = None
         for m in reversed(messages):
             if isinstance(m, AIMessage) and getattr(m, "tool_calls", None):
@@ -406,14 +279,7 @@ def _build_gated_tools_node(tools: list) -> Any:
             args = call.get("args", {}) or {}
             call_id = call.get("id", "")
 
-            # Some models (minimax, llama) emit the SAME call several
-            # times in one message. Execute the first occurrence only:
-            # duplicates of a send-email would fire it N times, and
-            # gated duplicates would stack N confirmation popups for
-            # what the user perceives as one action. Runs BEFORE the
-            # HITL gate so duplicates never even prompt. Each duplicate
-            # still gets a ToolMessage — every tool_call_id must be
-            # answered or the history is invalid.
+            # Drop duplicate calls (some models repeat one) — would fire a send N times / stack N popups.
             call_key = (name, json.dumps(args, sort_keys=True, default=str))
             if call_key in seen_calls:
                 log.info("duplicate_tool_call_dropped", tool=name)
@@ -431,11 +297,10 @@ def _build_gated_tools_node(tools: list) -> Any:
             seen_calls.add(call_key)
 
             if not _tool_needs_confirmation(name):
-                # Not gated. Let the inner node handle it.
                 approved_calls.append(call)
                 continue
 
-            # Gated: ask the engine's hook.
+            # Gated — ask the engine's hook.
             approved = False
             if hook is not None:
                 request_id = uuid.uuid4().hex
@@ -466,16 +331,12 @@ def _build_gated_tools_node(tools: list) -> Any:
                 )
 
         if not denied_messages:
-            # No denials — let the inner node dispatch everything.
             return await run_tools(state, list(last_ai.tool_calls))
 
         if not approved_calls:
-            # All gated calls were denied.
             return {"messages": denied_messages}
 
-        # Mixed: run the inner node for the approved subset, then
-        # append the denial messages so every tool_call_id has a
-        # matching ToolMessage in the history.
+        # Mixed: run approved calls, then append denials (every tool_call_id must be answered).
         trimmed_ai = AIMessage(
             content=last_ai.content,
             tool_calls=approved_calls,
@@ -493,37 +354,17 @@ def _build_gated_tools_node(tools: list) -> Any:
     return gated_tools_node
 
 
-# Module-level slot for the engine to inject its HITL hook. The
-# graph builder doesn't know about the engine, so we use this
-# indirection: the engine calls :func:`set_confirmation_hook` at
-# startup, and :func:`_build_gated_tools_node` reads the hook on
-# every call.
+# The engine injects its HITL hook here via set_confirmation_hook (avoids importing the engine).
 _gated_tools_hook: dict[str, Any] = {"fn": None}
 
 
 def set_confirmation_hook(fn) -> None:
-    """Register the engine's HITL confirmation hook.
-
-    The hook is awaited with ``(request_id, tool_name, tool_args)``
-    and must return ``True`` (approved) or ``False`` (denied /
-    timed out). Pass ``None`` to clear it.
-    """
+    """Register the engine's HITL confirmation hook (awaited; returns approved bool; None clears)."""
     _gated_tools_hook["fn"] = fn
 
 
 async def build_graph(checkpointer: AsyncSqliteSaver | None = None) -> Any:
-    """Build and return the compiled LangGraph for Yumii's reasoning engine.
-
-    Uses :class:`AsyncSqliteSaver` so conversation history survives
-    server restarts. Each session gets its own ``thread_id`` checkpoint
-    namespace automatically.
-
-    The ``tools`` node runs LangGraph's prebuilt :class:`ToolNode`, which
-    dispatches to the right tool based on the ``AIMessage.tool_calls``
-    list. PR 4 will add ``interrupt_before=["tools"]`` plus an engine
-    handler that emits a ``confirmation_request`` to the browser and
-    waits for the user's response.
-    """
+    """Build the compiled LangGraph (AsyncSqliteSaver checkpoints; HITL-gated tools node)."""
     tools = list_tools()
     if not tools:
         log.warning("graph_build_no_tools", hint="registry empty — agent will never call tools")
@@ -537,11 +378,9 @@ async def build_graph(checkpointer: AsyncSqliteSaver | None = None) -> Any:
 
     workflow = StateGraph(YumiiState)
 
-    # Nodes
     workflow.add_node("agent", agent_node)
     workflow.add_node("tools", _build_gated_tools_node(tools))
 
-    # Edges
     workflow.set_entry_point("agent")
     workflow.add_conditional_edges(
         "agent",

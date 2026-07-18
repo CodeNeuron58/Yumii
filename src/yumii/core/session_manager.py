@@ -1,10 +1,4 @@
-"""Session management for Yumii.
-
-Each browser conversation is a **session** identified by a UUID.  Sessions are
-stored in SQLite and survive server restarts.  The LangGraph checkpoint
-saver (AsyncSqliteSaver) stores per-session conversation history in a
-separate database file; this module only stores the session *metadata*.
-"""
+"""Session metadata (UUID, name, activity) in SQLite; survives restarts."""
 
 from __future__ import annotations
 
@@ -21,16 +15,9 @@ log = get_logger(__name__)
 
 
 def _utc_now() -> str:
-    """UTC timestamp with microsecond precision.
-
-    SQLite's CURRENT_TIMESTAMP only has 1-second resolution, so sessions
-    created/touched within the same second got identical ``last_active_at``
-    values and ``ORDER BY last_active_at`` became nondeterministic (flaky
-    ordering test on fast CI machines). Same format prefix as the old
-    values ("YYYY-MM-DD HH:MM:SS"), so old and new rows still sort
-    correctly against each other as strings.
-    """
+    """UTC timestamp with microsecond precision (SQLite's 1s resolution broke ordering)."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -133,13 +120,7 @@ class SessionManager:
             )
 
     async def bump_after_turn(self, session_id: str, user_text: str) -> None:
-        """Book-keeping after a completed conversation turn.
-
-        Bumps ``message_count`` by 2 (user + assistant), touches
-        ``last_active_at``, and — if the session still has the default
-        name — titles it from the user's first utterance so the history
-        UI shows something recognisable instead of a wall of "New Chat".
-        """
+        """After a turn: +2 message_count, touch activity, auto-title from the first utterance."""
         session = await self.get_session(session_id)
         if session is None:
             return
@@ -175,8 +156,7 @@ class SessionManager:
             "DELETE FROM session_summaries WHERE session_id = ?",
             (session_id,),
         )
-        # Searchable transcript rows too — deleting a conversation must
-        # really delete it (the FTS index rows go via trigger).
+        # Delete the searchable transcript too (FTS rows go via trigger).
         await execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
         log.info("session_deleted", session_id=session_id)
 
@@ -186,5 +166,5 @@ class SessionManager:
         return rows[0] if rows else None
 
 
-# Global singleton — safe because all methods are async and stateless.
+# Global singleton (async, stateless).
 session_manager = SessionManager()

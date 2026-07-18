@@ -1,6 +1,4 @@
-"""
-CAMB.ai TTS (Text-to-Speech) provider for Yumii.
-"""
+"""CAMB.ai TTS (Text-to-Speech) provider for Yumii."""
 
 
 import base64
@@ -13,6 +11,7 @@ from yumii.core.config import settings
 from yumii.core.interfaces import BaseSpeaker
 
 from yumii.core.logging import get_logger
+
 log = get_logger(__name__)
 
 
@@ -27,7 +26,7 @@ class CambSpeaker(BaseSpeaker):
         if not self.api_key or not self.voice_id:
             msg = (
                 "\n\n  ❌  No CAMB.ai API Key or Voice ID configured.\n"
-                "  Run 'yumii attune' or open ⚙️ Configure Senses and set them up.\n"
+                "  Open the ⚙️ dashboard and set a CAMB.ai API Key and Voice ID.\n"
                 "  Find your Voice ID at: https://client.camb.ai/\n"
             )
             raise ValueError(msg)
@@ -97,18 +96,16 @@ class CambSpeaker(BaseSpeaker):
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
         """Perform blocking synthesis using the streaming generator."""
-        # This is a bridge for the interface.
-        # In a production-grade version, we would handle the loop here or avoid sync speak.
+        # Bridge for the sync BaseSpeaker interface — CAMB is streaming-first, so this
+        # drains the async generator and bails when an event loop is already running.
         import asyncio
 
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # We are already in a loop, cannot run another.
-                # Returning None as we can't easily block here.
+                # Already in a loop — can't block; return None.
                 return None, 0.0
 
-            # Accumulate the stream into a single block
             chunks = []
 
             async def collect() -> None:
@@ -117,7 +114,7 @@ class CambSpeaker(BaseSpeaker):
                         chunks.append(chunk)
 
             loop.run_until_complete(collect())
-            full_audio = ",".join(chunks)  # Simplified
+            full_audio = ",".join(chunks)
         except Exception as e:
             log.error("camb_sync_speak_error", error=str(e), exc_info=True)
             return None, 0.0

@@ -1,8 +1,4 @@
-"""
-Voice Activity Detection (VAD) and Speech-to-Text (STT) pipeline.
-
-Captures audio streams, detects speech boundaries, and processes utterances.
-"""
+"""VAD + STT pipeline: capture audio, detect speech boundaries, transcribe utterances."""
 
 
 import asyncio
@@ -15,6 +11,7 @@ from yumii.audio.silero_vad import SileroVAD
 from yumii.audio.stt_factory import get_stt_provider
 
 from yumii.core.logging import get_logger
+
 log = get_logger(__name__)
 
 RATE = 16000
@@ -25,10 +22,7 @@ SPEECH_TRIGGER_FRAMES = 8
 SILENCE_END_FRAMES = 12
 MIN_SPEECH_DURATION_SEC = 0.7
 SILERO_THRESHOLD = 0.5
-# Energy floor before we even run the VAD on a frame. Raised slightly from
-# 0.008 so faint background noise (fans, hum) doesn't start a capture. Note:
-# this does NOT stop humming/singing (those are loud + voiced) — the Groq
-# confidence gate in stt_providers.py handles that.
+# Energy floor before running the VAD — skips faint noise; humming is handled by the Groq confidence gate.
 RMS_ENERGY_GATE = 0.012
 NO_SPEECH_PROB_THRESHOLD = 0.45
 
@@ -54,10 +48,7 @@ def rms_energy(audio_float32: np.ndarray) -> float:
 
 
 class AudioPipeline:
-    """Voice-activity-detection + Transcription pipeline.
-
-    Uses Silero VAD for speech detection and a pluggable BaseSTTProvider for transcription.
-    """
+    """VAD (Silero) + pluggable STT transcription pipeline."""
 
     def __init__(
         self,
@@ -66,11 +57,10 @@ class AudioPipeline:
         groq_api_key: str | None = None,
     ) -> None:
         """Initialize the audio pipeline, loading VAD and STT models."""
-        # VAD is always local — bundled ONNX model, no torch, no download.
+        # VAD is always local — bundled ONNX, no torch, no download.
         log.info("silero_vad_loading")
         self._silero_model = SileroVAD()
 
-        # Transcription provider is pluggable
         self.transcriber = get_stt_provider()
         log.info("audio_pipeline_ready")
 
@@ -84,12 +74,7 @@ class AudioPipeline:
     async def stream_capture(
         self, queue: asyncio.Queue, on_speech_start: Callable[[], None] | None = None
     ) -> np.ndarray:
-        """Continuously consume audio chunks from a queue until a speech segment completes.
-
-        A ``None`` chunk is the engine's mute sentinel: abandon any
-        in-flight capture and keep waiting, so words spoken just before
-        the user muted can't complete into a turn after unmute.
-        """
+        """Consume audio until a speech segment completes; a None chunk is the mute sentinel (resets capture)."""
         self._reset_vad()
         recording = []
         pre_buffer: collections.deque = collections.deque(maxlen=15)
@@ -146,18 +131,12 @@ class AudioPipeline:
         return np.array([], dtype=np.int16)
 
     async def stream_capture_and_transcribe(
-        self, 
-        queue: asyncio.Queue, 
+        self,
+        queue: asyncio.Queue,
         on_speech_start: Callable[[], None] | None = None,
         on_partial: Callable[[str], Any] | None = None
     ) -> str | None:
-        """Continuously consume audio chunks, streaming them to the transcriber.
-
-        A ``None`` chunk is the engine's mute sentinel — see
-        :meth:`stream_capture`. The streaming transcriber's partial
-        state is discarded too so pre-mute words don't leak into the
-        next utterance.
-        """
+        """Like stream_capture but streams chunks to a partial-capable transcriber (None = mute sentinel)."""
         self._reset_vad()
         pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
@@ -197,7 +176,7 @@ class AudioPipeline:
                         log.debug("speech_started")
                         if on_speech_start:
                             on_speech_start()
-                        
+
                         if hasattr(self.transcriber, "process_chunk"):
                             for f, _ in pre_buffer:
                                 event = await asyncio.to_thread(self.transcriber.process_chunk, f.tobytes())
@@ -210,11 +189,9 @@ class AudioPipeline:
                                         on_partial(event["text"])
                         pre_buffer.clear()
                 else:
-                    # Stream to transcriber
                     if hasattr(self.transcriber, "process_chunk"):
                         event = await asyncio.to_thread(self.transcriber.process_chunk, pcm16.tobytes())
                         if event and event.get("type") == "partial_transcript" and on_partial:
-                            # Debug log to terminal
                             log.info("partial_transcript_generated", text=event["text"])
                             import inspect
                             if inspect.iscoroutinefunction(on_partial):

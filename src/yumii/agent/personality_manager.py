@@ -1,8 +1,4 @@
-"""
-Personality management system for Yumii.
-
-Handles loading, switching, and listing available AI personalities from local files.
-"""
+"""Load, switch, and list Yumii's personalities from prompt files."""
 
 import os
 from typing import Dict
@@ -24,12 +20,8 @@ class PersonalityManager:
     """Manages personality prompt loading and switching."""
 
     def __init__(self) -> None:
-        """Initialize the manager and set up personality file paths."""
-        # Resolve prompts relative to this file — works both in development
-        # and when installed as a package via pip / uv tool install.
-        # __file__ = .../yumii/agent/personality_manager.py
-        # .parent       = .../yumii/agent/
-        # .parent.parent = .../yumii/           (package root)
+        """Set up personality prompt paths and cache."""
+        # Resolve prompts relative to this file (works installed or from a dev checkout).
         from pathlib import Path
         self._prompts_dir: str = str(
             Path(__file__).parent.parent / "assets" / "prompts"
@@ -37,13 +29,7 @@ class PersonalityManager:
         self._cache: Dict[PERSONALITY_TYPE, str] = {}
 
     def load_core_prompt(self) -> str:
-        """Load the shared companion core prompt (``_core.txt``).
-
-        The core carries everything common to all personalities —
-        voice-first speaking rules, memory usage, tool etiquette,
-        honesty boundaries — so the personality files stay purely
-        about character.
-        """
+        """Load the shared companion core prompt (_core.txt), cached."""
         if "_core" in self._cache:
             return self._cache["_core"]
         core_path = os.path.join(self._prompts_dir, "_core.txt")
@@ -72,7 +58,6 @@ class PersonalityManager:
         config = load_global_config()
         personality = config.get("PERSONALITY", "caring")
 
-        # Validate personality type
         if personality not in PERSONALITY_DESCRIPTIONS:
             personality = "caring"
 
@@ -88,5 +73,5 @@ class PersonalityManager:
         return PERSONALITY_DESCRIPTIONS.copy()
 
 
-# Global instance
+# Global instance.
 personality_manager = PersonalityManager()

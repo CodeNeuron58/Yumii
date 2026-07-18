@@ -1,8 +1,4 @@
-"""Core reasoning and execution engine for Yumii.
-
-This module orchestrates the background tasks for audio capture, LLM reasoning,
-and TTS synthesis, passing data between them using asyncio Queues.
-"""
+"""Core engine: orchestrates audio capture, LLM reasoning, and TTS over asyncio queues."""
 
 
 from __future__ import annotations
@@ -31,18 +27,10 @@ from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
 
-# How many completed turns accumulate before the background memory
-# review runs (Hermes's "nudge"). The reviewer sees the buffered turns
-# plus existing facts and emits add/replace/remove deltas — periodic
-# review over a window beats the old per-turn add-only extractor on
-# both quality and LLM-call count. The buffer also flushes on session
-# switch and shutdown so trailing turns aren't lost.
+# Completed turns between background memory reviews (also flushed on switch/shutdown).
 _MEMORY_REVIEW_INTERVAL = 5
 
-# Spoken when the model calls a tool without saying anything alongside
-# it (some models emit bare tool calls). Short and personality-neutral
-# — the prompt asks her to narrate in her own voice, so these are only
-# the safety net that keeps a tool turn from ever being dead air.
+# Spoken when the model calls a tool with no text of its own — never leave dead air.
 _TOOL_NARRATION_FILLERS = (
     "Let me check that for you.",
     "One moment.",
@@ -51,20 +39,10 @@ _TOOL_NARRATION_FILLERS = (
 
 
 def _derive_tool_narration(output: Any, *, allow_filler: bool = True) -> str | None:
-    """Spoken line for an agent pass that decided to call tools.
+    """Spoken line for a tool-calling pass: the model's narration, a filler, or None.
 
-    A tool turn takes seconds (LLM pass → confirmation → tool call →
-    final pass) and used to be dead air: the model's narration ("let
-    me check your inbox") was discarded and only the final reply was
-    spoken. Returns that narration (think-blocks stripped), a filler
-    when the model stayed silent, or ``None`` when this pass isn't a
-    tool pass / already carries the final response.
-
-    ``allow_filler`` is True only for the FIRST tool pass of a turn:
-    models sometimes chain several silent tool passes back-to-back,
-    and narrating a canned filler for each ("On it… one moment… on
-    it…") is worse than the silence it replaces. Later passes speak
-    only words the model actually produced.
+    ``allow_filler`` is True only for the first tool pass of a turn, so
+    chained silent passes don't chant "on it… one moment… on it…".
     """
     if not isinstance(output, dict) or output.get("response"):
         return None
@@ -86,12 +64,7 @@ def _derive_tool_narration(output: Any, *, allow_filler: bool = True) -> str | N
 
 
 def _classify_turn_error(exc: Exception) -> tuple[str, str]:
-    """Map a reasoning failure to (kind, user-facing message).
-
-    So the orb can show a clear, actionable card instead of a frozen
-    'Thinking…' — the #1 first-run failure (bad or missing LLM key)
-    finally says what's wrong.
-    """
+    """Map a reasoning failure to (kind, user-facing message) for the orb's error card."""
     text = str(exc).lower()
     if any(
         s in text
@@ -128,44 +101,27 @@ def _classify_turn_error(exc: Exception) -> tuple[str, str]:
 
 
 class YumiiEngine:
-    """The central orchestration engine for Yumii.
-
-    This class encapsulates the state and logic required to run the real-time
-    interaction loop, decoupling the audio processing and reasoning from
-    the transport layer (FastAPI).
-    """
+    """Central orchestration engine: runs the real-time loop, decoupled from FastAPI."""
 
     def __init__(self) -> None:
-        """Initialize the Yumii Engine, including audio pipelines and reasoning graph."""
+        """Set up queues, events, and state; the graph and audio pipeline are built later."""
         self.transcription_queue: asyncio.Queue[str] = asyncio.Queue()
         self.tts_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        # ``None`` is the mute sentinel — it tells an in-flight capture
-        # in the audio pipeline to reset (see AudioPipeline.stream_capture).
+        # None is the mute sentinel — resets an in-flight capture.
         self.audio_input_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
         self.interrupt_event: asyncio.Event = asyncio.Event()
         self.active_connections: List[WebSocket] = []
         self.is_speaking: bool = False
-        # Manual mic mute (user-controlled from the orb). Gates listening
-        # only — speaking, reasoning, and the WS all keep running.
         self.mic_muted: bool = False
         self.active_session_id: str | None = None
         self.active_session_name: str = "New Chat"
 
-        # PR 4: HITL confirmation gate. Pending confirmations are
-        # keyed by request_id (a UUID minted when the engine asks the
-        # browser). The future is set by the WS server when the user
-        # replies (or auto-resolved to False on timeout). See
-        # :meth:`request_confirmation` and
-        # :meth:`resolve_confirmation`.
+        # Pending HITL confirmations, keyed by request_id; resolved by the WS server.
         self.pending_confirmations: dict[str, "asyncio.Future[bool]"] = {}
 
-        # Turns since the last background memory review, and the buffer
-        # of (role, content) dicts the reviewer will see.
         self._memory_turn_buffer: list[dict[str, str]] = []
 
-        # Episodic block injected into the system prompt: time since
-        # last talk + recent conversation summaries. Rebuilt at session
-        # start and refreshed as the live session grows (summarizer.py).
+        # Episodic block for the system prompt (time since last talk + recent summaries).
         self.session_context: str = ""
         self._session_msg_count: int = 0
 
@@ -173,15 +129,10 @@ class YumiiEngine:
         self.model_size: str = settings.whisper_model_size
         self.groq_api_key: str | None = settings.groq_api_key
 
-        # Audio (STT + TTS) is prepared AFTER the server is up, so the
-        # first launch can download the local models behind a progress
-        # screen in the orb instead of stalling boot (or the first spoken
-        # word). ``pipeline`` and ``speaker`` stay None until then.
+        # Audio (STT/TTS) is built after boot so first-launch model downloads show progress.
         self.pipeline: AudioPipeline | None = None
         self.speaker: BaseSpeaker | None = None
         self.audio_ready: bool = False
-        # Consumed by /api/status and shown by the orb. ``progress`` is
-        # 0..1; ``indeterminate`` marks a stage with no byte-level %.
         self.model_status: dict[str, Any] = {
             "ready": False,
             "stage": "starting",
@@ -189,10 +140,7 @@ class YumiiEngine:
             "indeterminate": False,
         }
 
-        # graph_app is initialized lazily via initialize() because
-        # AsyncSqliteSaver requires an async context. The saver is kept
-        # so reload_tools() can rebuild the graph on the same
-        # checkpoint store.
+        # Built in initialize() (needs async); saver kept so reload_tools can rebuild.
         self.graph_app: Any | None = None
         self._conn: aiosqlite.Connection | None = None
         self._saver: AsyncSqliteSaver | None = None
@@ -202,54 +150,33 @@ class YumiiEngine:
         log.info("engine_initializing")
         await init_db()
 
-        # Load Composio tools for the user's connected apps BEFORE the
-        # graph is built, so bind_tools sees them. Every Composio tool
-        # is HITL-gated by default; failures are logged inside the
-        # loader and never block boot.
+        # Load Composio tools before building the graph so bind_tools sees them.
         from yumii.tools.composio_loader import load_and_register_composio_tools
 
         composio_tools = await load_and_register_composio_tools()
         if composio_tools:
             log.info("composio_ready", count=len(composio_tools))
 
-        # Open the SQLite connection directly and keep it alive for the
-        # engine lifetime.  AsyncSqliteSaver.from_conn_string() is a
-        # short-lived context manager; using it here would GC-close the
-        # connection after the first turn and crash on restart.
+        # Keep one long-lived connection; from_conn_string() would GC-close it after one turn.
         _CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
         self._conn = await aiosqlite.connect(str(_CHECKPOINT_DB))
         self._saver = AsyncSqliteSaver(self._conn)
         self.graph_app = await build_graph(checkpointer=self._saver)
-        # PR 4: install the HITL confirmation hook so the gated
-        # tools node knows who to ask when a tool needs approval.
         set_confirmation_hook(self._confirmation_hook)
 
-        # One-time transcript backfill: conversations that predate the
-        # searchable transcript live only in LangGraph checkpoints, which
-        # can't be searched. Copy them over once so recall covers the
-        # user's whole history, not just turns after this upgrade.
+        # One-time backfill: copy pre-transcript checkpoint history so recall covers it.
         try:
             await self._backfill_transcript_once()
         except Exception:
             log.warning("transcript_backfill_failed", exc_info=True)
 
-        # Prepare audio (download local models, build STT + TTS, start
-        # the interaction loops) in the background so the server is
-        # already responding to /health and /api/status while the orb
-        # shows download progress.
+        # Prepare audio in the background so /health and /api/status respond immediately.
         asyncio.create_task(self._prepare_audio())
 
         log.info("engine_ready")
 
     async def _prepare_audio(self) -> None:
-        """Download local models (with progress), build the STT pipeline
-        and TTS speaker, then start the three interaction loops.
-
-        Runs off the boot path so the server stays responsive during the
-        first-launch model download. Retries on failure so a flaky
-        download never leaves her permanently deaf — the orb keeps
-        showing progress and she recovers on her own.
-        """
+        """Download models (with progress), build STT+TTS, start the loops; retries on failure."""
         from yumii.core.models import ensure_models_ready
 
         def on_progress(stage: str, frac: float | None) -> None:
@@ -263,7 +190,6 @@ class YumiiEngine:
         while not self.audio_ready:
             try:
                 await asyncio.to_thread(ensure_models_ready, on_progress)
-                # Models are on disk now — load them (heavy, off-loop).
                 self.pipeline = await asyncio.to_thread(self._build_pipeline)
                 self.speaker = await asyncio.to_thread(get_speaker)
                 self.audio_ready = True
@@ -296,13 +222,7 @@ class YumiiEngine:
         )
 
     async def _backfill_transcript_once(self) -> None:
-        """Populate the transcript from checkpoints, first boot only.
-
-        Runs only when the transcript is completely empty (fresh upgrade)
-        — any recorded message means backfill already happened or normal
-        recording is underway. Timestamps are approximated with each
-        session's created_at (checkpoints don't store per-message times).
-        """
+        """Populate the transcript from checkpoints, first boot only (fresh-upgrade gate)."""
         from langchain_core.messages import AIMessage, HumanMessage
 
         from yumii.core import transcript
@@ -346,21 +266,12 @@ class YumiiEngine:
             )
 
     async def reload_tools(self) -> list[str]:
-        """Re-fetch Composio tools and rebuild the agent graph in place.
-
-        Called by the dashboard endpoints after the user connects or
-        disables a toolkit, so tool changes apply without an app
-        restart. Conversation history is untouched (same checkpointer);
-        an in-flight turn keeps the old graph object and finishes on it.
-
-        Returns the Composio tool names now registered.
-        """
+        """Re-fetch Composio tools and rebuild the graph in place (no restart; history kept)."""
         from yumii.agent.llm import clear_llm_cache
         from yumii.tools.composio_loader import load_and_register_composio_tools
 
         registered = await load_and_register_composio_tools()
-        # The shared tool binding caches the old tool list — drop it so
-        # the next turn binds the new registry contents.
+        # Drop the cached tool binding so the next turn binds the new registry.
         clear_llm_cache()
         if self._saver is not None:
             self.graph_app = await build_graph(checkpointer=self._saver)
@@ -392,15 +303,11 @@ class YumiiEngine:
             self.session_context = ""
 
     async def _finalize_session(self, session_id: str) -> None:
-        """Summarize an ended session, then refresh the episodic block
-        so the just-finished conversation shows up in it."""
+        """Summarize an ended session, then refresh the episodic block to include it."""
         from yumii.core.summarizer import summarize_session
 
         try:
             await summarize_session(session_id)
-            # include_current is harmless when the active session has no
-            # summary row yet — the "Earlier in this conversation" line
-            # is simply omitted.
             await self._rebuild_session_context(include_current=True)
         except Exception:
             log.warning("session_finalize_failed", session_id=session_id, exc_info=True)
@@ -409,9 +316,7 @@ class YumiiEngine:
         """Clean shutdown: close SQLite connections and memory store."""
         log.info("engine_shutting_down")
 
-        # Review any turns still buffered — quitting the app must not
-        # lose what the user just told her. Bounded so a slow provider
-        # can't hang the exit.
+        # Review buffered turns before exit (bounded so a slow provider can't hang quit).
         if self._memory_turn_buffer:
             turns, self._memory_turn_buffer = self._memory_turn_buffer, []
             try:
@@ -424,8 +329,7 @@ class YumiiEngine:
             except Exception:
                 log.warning("shutdown_memory_review_failed", exc_info=True)
 
-        # Summarize the session that's ending so the next boot's
-        # "Recent conversations" block includes it. Same bound.
+        # Summarize the ending session for next boot's "Recent conversations".
         if self.active_session_id and self._session_msg_count > 0:
             try:
                 from yumii.core.summarizer import summarize_session
@@ -449,16 +353,7 @@ class YumiiEngine:
     # ------------------------------------------------------------------
 
     async def set_mic_muted(self, muted: bool) -> None:
-        """Gate the listening pipeline without disturbing the active loop.
-
-        The mic stream, WebSocket, and all three engine tasks keep
-        running — muting only stops audio from entering the pipeline.
-        Muting also abandons any half-captured utterance (drain the
-        queue, then push the ``None`` sentinel that resets the capture
-        state), so words spoken just before the mute can't complete
-        into a turn when the user unmutes later. Speaking and
-        reasoning are unaffected: she can finish her reply while muted.
-        """
+        """Gate listening without disturbing the loop; drops any half-captured utterance."""
         if muted == self.mic_muted:
             return
         self.mic_muted = muted
@@ -477,7 +372,6 @@ class YumiiEngine:
 
     async def create_new_session(self, name: str | None = None) -> str:
         """Create a new session, clear all queues, and set it active."""
-        # Review + summarize what the outgoing session left behind.
         previous_session = self.active_session_id
         self._flush_memory_review()
         await self._clear_all_queues()
@@ -508,7 +402,6 @@ class YumiiEngine:
             log.warning("session_not_found", session_id=session_id)
             return await self.create_new_session(name=f"Resumed-{session_id[:8]}")
 
-        # Review + summarize what the outgoing session left behind.
         previous_session = self.active_session_id
         self._flush_memory_review()
         await self._clear_all_queues()
@@ -519,8 +412,6 @@ class YumiiEngine:
         self.active_session_name = session.name
         self._session_msg_count = 0
         await session_manager.update_session_activity(session.id)
-        # include_current: on resume, "Earlier in this conversation: …"
-        # bridges whatever the history window no longer carries.
         await self._rebuild_session_context(include_current=True)
         if previous_session and previous_session != session.id:
             asyncio.create_task(self._finalize_session(previous_session))
@@ -545,11 +436,7 @@ class YumiiEngine:
         log.debug("queues_cleared")
 
     # ------------------------------------------------------------------
-    # Broadcast
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-    # HITL confirmation gate (PR 4)
+    # HITL confirmation gate
     # ------------------------------------------------------------------
 
     async def _confirmation_hook(
@@ -558,17 +445,8 @@ class YumiiEngine:
         tool_name: str,
         tool_args: dict,
     ) -> bool:
-        """Bridge between the gated tools node and the WS layer.
-
-        The graph calls this with a freshly-minted ``request_id``.
-        We delegate to :meth:`request_confirmation` (which broadcasts
-        the WS event and awaits the reply). If the user barge-ins
-        mid-confirmation, we resolve as a deny so the LLM gets
-        feedback and the loop can short-circuit.
-        """
-        # Pre-check: if the user has already interrupted (e.g. they
-        # said "stop" while the gate was being prepared), deny
-        # immediately.
+        """Bridge the gated tools node to the WS layer; a barge-in resolves as deny."""
+        # Already interrupted (e.g. "stop") — deny immediately.
         if self.interrupt_event.is_set():
             log.info("confirmation_bypass_interrupt", tool=tool_name)
             return False
@@ -579,7 +457,7 @@ class YumiiEngine:
             tool_args=tool_args,
         )
 
-        # Post-check: a barge-in during the wait also counts as deny.
+        # Barge-in during the wait also counts as deny.
         if self.interrupt_event.is_set() and approved:
             log.info("confirmation_vetoed_by_interrupt", tool=tool_name)
             approved = False
@@ -593,17 +471,7 @@ class YumiiEngine:
         tool_args: dict,
         timeout: float | None = None,
     ) -> bool:
-        """Ask the browser to confirm a tool call; await the reply.
-
-        Broadcasts a ``confirmation_request`` event with the tool
-        name + args + request_id, then blocks (with optional timeout)
-        until :meth:`resolve_confirmation` is called by the WS server
-        or the timeout fires.
-
-        Returns ``True`` if the user approved, ``False`` on deny,
-        timeout, or barge-in interrupt. Caller is responsible for
-        checking the active ``interrupt_event`` after this returns.
-        """
+        """Broadcast a confirmation_request and await the reply (False on deny/timeout/barge-in)."""
         if timeout is None:
             timeout = settings.hitl_timeout_seconds
 
@@ -639,9 +507,7 @@ class YumiiEngine:
         return approved
 
     def resolve_confirmation(self, request_id: str, approved: bool) -> bool:
-        """Resolve a pending confirmation. Returns ``True`` if a pending
-        future was found and set, ``False`` otherwise (e.g. the
-        request already timed out or was never issued)."""
+        """Resolve a pending confirmation; True if a pending future was found and set."""
         future = self.pending_confirmations.get(request_id)
         if future is None or future.done():
             return False
@@ -666,20 +532,10 @@ class YumiiEngine:
     # ------------------------------------------------------------------
 
     async def audio_listener_task(self) -> None:
-        """Continuously monitors the audio input queue.
-
-        Triggers the global interrupt event and notifies the frontend when speech is detected,
-        and pushes completed transcriptions to the reasoning queue.
-        """
+        """Consume audio, trigger interrupts on speech, push transcriptions to the reasoning queue."""
 
         def on_speech_start() -> None:
-            # We allow interrupts even while speaking to achieve a "Gemini Live" feel.
-            # The browser's `echoCancellation` and Silero VAD handle the filtering
-            # of Yumii's own voice, but we *also* suppress the interrupt event
-            # while audio is actively playing on the TTS speaker. This is a
-            # belt-and-suspenders defense against the feedback loop that would
-            # otherwise occur when the user's mic picks up Yumii's spoken output
-            # on speakers without headphones.
+            # Suppress barge-in while she's speaking — guards the mic/speaker feedback loop.
             if self.is_speaking:
                 log.debug("interrupt_suppressed_yumii_speaking")
                 return
@@ -696,12 +552,11 @@ class YumiiEngine:
                             "type": "partial_transcript",
                             "text": text
                         })
-                    
+
                     transcribed_text = await self.pipeline.stream_capture_and_transcribe(
                         self.audio_input_queue, on_speech_start, on_partial
                     )
                     if transcribed_text and transcribed_text.strip():
-                        # Let the text remain on screen until Yumii starts speaking.
                         log.info("transcription_complete", text=transcribed_text)
                         await self.transcription_queue.put(transcribed_text)
                 else:
@@ -711,9 +566,7 @@ class YumiiEngine:
                     if audio_segment is not None and len(audio_segment) > 0:
                         processed_audio = self.pipeline.process_audio(audio_segment)
                         if len(processed_audio) > 0:
-                            # Whisper inference / the Groq HTTP call can take
-                            # seconds — run it off the event loop so the WS,
-                            # TTS streaming, and interrupts stay responsive.
+                            # Run STT off the event loop — inference can take seconds.
                             transcribed_text = await asyncio.to_thread(
                                 self.pipeline.transcribe, processed_audio
                             )
@@ -725,27 +578,13 @@ class YumiiEngine:
                 await asyncio.sleep(1)
 
     async def reasoning_engine_task(self) -> None:
-        """Execute the main reasoning loop.
-
-        Waits for transcribed text, clears any active interruptions,
-        and invokes the LangGraph reasoning engine to generate a response.
-
-        PR 3 wiring:
-          * Streams graph events via ``astream_events(version="v3")``
-            and broadcasts ``thinking_start`` / ``thinking_delta`` /
-            ``thinking_end`` / ``tool_status`` so the frontend can show
-            a responsive "thinking…" / "Searching the web…" indicator.
-          * The actual spoken YumiiResponse is still produced by the
-            synthesizer at the end of the graph run — we don't TTS
-            streamed tokens (TTS synthesizes the full final text).
-        """
+        """Main reasoning loop: stream the graph, broadcast thinking/tool events, then TTS the reply."""
         log.info("reasoning_task_started")
         while True:
             try:
                 user_text = await self.transcription_queue.get()
                 self.interrupt_event.clear()
 
-                # Clear pending speech queue on new input
                 while not self.tts_queue.empty():
                     try:
                         self.tts_queue.get_nowait()
@@ -762,17 +601,11 @@ class YumiiEngine:
                     "configurable": {"thread_id": self.active_session_id}
                 }
 
-                # Pre-load long-term facts into state so chat_node can use them.
                 facts = await memory_manager.get_facts_raw()
 
-                # Notify frontend that reasoning has begun.
                 await self.broadcast_payload({"type": "thinking_start"})
 
-                # Initial state for the graph. turn_id scopes message
-                # IDs: stable across agent passes within this turn (so
-                # add_messages dedupes the re-added HumanMessage) but
-                # unique across turns (so repeating the same phrase
-                # later doesn't overwrite the earlier message).
+                # turn_id scopes message IDs: stable within a turn (dedupe), unique across turns.
                 turn_id = uuid.uuid4().hex
                 initial_state = {
                     "input": user_text,
@@ -800,11 +633,7 @@ class YumiiEngine:
                         kind = event.get("event")
                         name = event.get("name", "")
 
-                        # Token-by-token chat-model streaming. We
-                        # surface these as ``thinking_delta`` so the
-                        # UI can show a live typing indicator. We
-                        # don't accumulate them — the graph itself
-                        # finalises the AIMessage on the agent node.
+                        # Stream tokens as thinking_delta; the graph finalizes the AIMessage itself.
                         if kind == "on_chat_model_stream":
                             chunk = event.get("data", {}).get("chunk")
                             token = getattr(chunk, "content", None) if chunk else None
@@ -814,36 +643,23 @@ class YumiiEngine:
                                     {"type": "thinking_delta", "text": token}
                                 )
 
-                        # Tool starting — show what the agent is up to.
                         elif kind == "on_tool_start":
                             await self.broadcast_payload(
                                 {"type": "tool_status", "tool": name, "status": "running"}
                             )
 
-                        # Tool finished — handy for "found N results" etc.
                         elif kind == "on_tool_end":
                             await self.broadcast_payload(
                                 {"type": "tool_status", "tool": name, "status": "done"}
                             )
 
-                        # Graph node finished — we capture the final
-                        # node output (the agent's final delta) for
-                        # TTS. LangGraph emits ``on_chain_end`` for
-                        # each node, with the node's output in
-                        # ``data["output"]``.
+                        # Capture the agent node's final output for TTS.
                         elif kind == "on_chain_end" and event.get("metadata", {}).get("langgraph_node") == "agent":
                             output = event.get("data", {}).get("output")
                             if isinstance(output, dict) and output.get("response"):
                                 reasoning_result = output
                             else:
-                                # Tool pass: speak the model's narration
-                                # (or, on the first pass only, a short
-                                # filler) NOW, while the tools run — the
-                                # queue is FIFO, so the real answer
-                                # follows right after. A 20-second Gmail
-                                # fetch is no longer dead air. Repeats
-                                # of the same line are suppressed so a
-                                # model looping on a tool doesn't chant.
+                                # Tool pass: speak narration/filler now (FIFO queue) so a slow tool isn't dead air.
                                 narration = _derive_tool_narration(
                                     output,
                                     allow_filler=tool_passes_narrated == 0,
@@ -881,10 +697,7 @@ class YumiiEngine:
                     log.info("reasoning_interrupted")
                     continue
 
-                # A hard failure with nothing to say: surface a clear,
-                # actionable card (never a silent frozen "Thinking…").
-                # Skip the spoken generic apology — the card is clearer,
-                # and an auth error means she couldn't think at all.
+                # Hard failure with nothing to say: show an actionable error card, not a frozen "Thinking".
                 if reasoning_result is None and turn_error is not None:
                     kind, message = turn_error
                     log.info("turn_error_surfaced", kind=kind)
@@ -893,13 +706,7 @@ class YumiiEngine:
                     )
                     continue
 
-                # Fallback: the stream ended without capturing the
-                # agent's final output. NEVER re-invoke the graph here
-                # — the stream may already have executed tools before
-                # failing, and a re-run would execute them again
-                # (double email send). Instead read what the
-                # checkpoint recorded; response_turn_id tells a fresh
-                # response apart from last turn's leftovers.
+                # Stream ended without output: read the checkpoint — NEVER re-invoke (would re-run tools, e.g. double-send).
                 if reasoning_result is None:
                     log.warning("reasoning_no_streamed_output_reading_state")
                     try:
@@ -932,15 +739,11 @@ class YumiiEngine:
                     response_len=len(reasoning_result.get("response", "")),
                 )
 
-                # Book-keeping after a successful turn: bump the message
-                # count, touch activity, and auto-title the session from
-                # the first utterance.
                 await session_manager.bump_after_turn(
                     self.active_session_id, user_text
                 )
 
-                # Append the turn to the searchable transcript so the
-                # recall tool can find it in any future conversation.
+                # Append to the searchable transcript for future recall.
                 try:
                     from yumii.core import transcript
 
@@ -952,9 +755,7 @@ class YumiiEngine:
                 except Exception:
                     log.warning("transcript_record_failed", exc_info=True)
 
-                # Long-session continuity: refresh this session's summary
-                # every SUMMARY_REFRESH_MESSAGES so early turns that slid
-                # out of the history window survive in the prompt block.
+                # Refresh this session's summary periodically so slid-out turns survive in the prompt.
                 self._session_msg_count += 2
                 from yumii.core.summarizer import SUMMARY_REFRESH_MESSAGES
 
@@ -969,12 +770,7 @@ class YumiiEngine:
                     if refreshed:
                         self.active_session_name = refreshed.name
 
-                # Buffer the turn for the periodic memory review. Every
-                # _MEMORY_REVIEW_INTERVAL turns a background reviewer
-                # sees the buffer + existing facts and emits deltas
-                # (replaces the old per-turn add-only extraction — the
-                # agent can also write memory directly via the
-                # manage_memory tool for "remember this" moments).
+                # Buffer the turn for the periodic memory review.
                 self._memory_turn_buffer.extend(
                     [
                         {"role": "user", "content": user_text},
@@ -990,11 +786,7 @@ class YumiiEngine:
                 await asyncio.sleep(1)
 
     async def tts_speaker_task(self) -> None:
-        """Run the voice synthesis loop.
-
-        Consumes reasoning results and uses the active TTS provider to
-        stream audio chunks to the frontend.
-        """
+        """Voice loop: consume reasoning results and stream TTS audio to the orb."""
         log.info("speaker_task_started")
         while True:
             try:
@@ -1010,7 +802,6 @@ class YumiiEngine:
 
                 self.is_speaking = True
 
-                # Handle providers that support the streaming interface
                 if hasattr(self.speaker, "stream_speak"):
                     try:
                         async for chunk_data in self.speaker.stream_speak(
@@ -1050,7 +841,7 @@ class YumiiEngine:
                             }
                         )
                 else:
-                    # Fallback for non-streaming providers
+                    # Fallback for non-streaming providers.
                     audio_b64, duration = await asyncio.to_thread(
                         self.speaker.speak, response_text
                     )

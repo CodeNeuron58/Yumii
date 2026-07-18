@@ -1,10 +1,4 @@
-"""Long-term memory (user facts) manager for Yumii.
-
-Uses LangGraph's native ``AsyncSqliteStore`` (``langgraph.store.sqlite``) so
-facts are persisted as JSON documents in a local SQLite database.  Facts
-survive across sessions and are injected into the system prompt on every new /
-resumed session.
-"""
+"""Long-term user facts via LangGraph's AsyncSqliteStore (survive across sessions)."""
 
 from __future__ import annotations
 
@@ -162,9 +156,7 @@ class MemoryManager:
     ) -> list[UserFact]:
         """Retrieve facts, optionally filtered by category and confidence."""
         store = await self._ensure_store()
-        # The SQLite store supports equality filters but not range operators
-        # (e.g. ``confidence >= 0.5``).  Because the fact corpus is small
-        # (typically <1 000 items) we fetch generously and filter in-memory.
+        # Store lacks range filters; fetch generously and filter in memory (corpus is small).
         items = await store.asearch(self._NAMESPACE, limit=limit * 2 if categories else limit)
         facts: list[UserFact] = []
         for item in items:
@@ -177,7 +169,7 @@ class MemoryManager:
             if len(facts) >= limit:
                 break
 
-        # Newest first (consistent with the previous custom schema)
+        # Newest first.
         facts.sort(key=lambda f: f.created_at, reverse=True)
         return facts
 
@@ -224,12 +216,7 @@ class MemoryManager:
         return [f for f in facts if needle in f.fact.lower()]
 
     async def replace_fact_by_text(self, old_substring: str, new_fact: str) -> str:
-        """Replace the single fact matching *old_substring* with *new_fact*.
-
-        Returns "replaced" on success, "not_found" when nothing matches,
-        or "ambiguous" when several facts match (caller should retry with
-        a more specific substring).
-        """
+        """Replace the fact matching *old_substring*; returns replaced/not_found/ambiguous."""
         matches = await self.find_facts_matching(old_substring)
         if not matches:
             return "not_found"
@@ -239,7 +226,7 @@ class MemoryManager:
         return "replaced"
 
     async def remove_fact_by_text(self, old_substring: str) -> str:
-        """Delete the single fact matching *old_substring* (same contract)."""
+        """Delete the fact matching *old_substring*; returns removed/not_found/ambiguous."""
         matches = await self.find_facts_matching(old_substring)
         if not matches:
             return "not_found"
@@ -253,13 +240,7 @@ class MemoryManager:
         ops: list[dict[str, Any]],
         session_id: str | None = None,
     ) -> dict[str, int]:
-        """Apply reviewer delta operations; returns counts per outcome.
-
-        Adds are still deduplicated against existing facts (the reviewer
-        is told not to re-add, but a cheap model will sometimes try).
-        Ambiguous/missing replace-remove targets are skipped and counted —
-        a background review must never guess at which fact to overwrite.
-        """
+        """Apply reviewer delta ops (add/replace/remove); dedupes adds; returns counts."""
         counts = {"added": 0, "replaced": 0, "removed": 0, "skipped": 0}
         if not ops:
             return counts
@@ -306,13 +287,7 @@ class MemoryManager:
         turns: list[dict[str, str]],
         session_id: str | None = None,
     ) -> dict[str, int]:
-        """The periodic memory review: LLM delta pass over recent turns.
-
-        Runs as a fire-and-forget background task every N turns (see the
-        engine). Replaces the old per-turn add-only extractor: the
-        reviewer sees existing facts, so it can correct and prune, not
-        just append. Failures are logged and swallowed.
-        """
+        """Periodic memory review: LLM delta pass over recent turns (fire-and-forget; swallows errors)."""
         if not turns:
             return {"added": 0, "replaced": 0, "removed": 0, "skipped": 0}
         try:
@@ -336,14 +311,7 @@ class MemoryManager:
         messages: list[Any],
         session_id: str,
     ) -> list[str]:
-        """Analyse a list of messages and extract new facts about the user.
-
-        Uses a cheap LLM to extract atomic facts, deduplicates them against
-        existing memory, and stores each new fact.  Runs as a fire-and-forget
-        background task so it never blocks the conversation.
-
-        Returns the list of newly stored fact texts.
-        """
+        """Extract new facts from messages, dedupe against existing, store them (returns new texts)."""
         if not messages:
             return []
 
@@ -356,7 +324,6 @@ class MemoryManager:
         if not extracted:
             return []
 
-        # Deduplicate against existing facts (simple substring match)
         existing = await self.get_facts_raw(limit=500)
         existing_lower = [e.lower() for e in existing]
 
@@ -365,7 +332,6 @@ class MemoryManager:
             fact_text: str = item["fact"]
             fact_lower = fact_text.lower()
 
-            # Skip if this fact (or a very similar one) already exists
             if any(fact_lower in existing or existing in fact_lower for existing in existing_lower):
                 log.debug("fact_deduplicated", fact_preview=fact_text[:60])
                 continue
@@ -383,6 +349,5 @@ class MemoryManager:
         return stored
 
 
-# Global singleton — safe because all methods are async and the store is
-# lazily connected on first use.
+# Global singleton (async; store connects lazily).
 memory_manager = MemoryManager()

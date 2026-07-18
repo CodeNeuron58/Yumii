@@ -1,28 +1,8 @@
-"""Synthesizer — converts a plain LLM response into a YumiiResponse.
+"""Synthesizer: derive expression + motion from the agent's text via ordered regex heuristics.
 
-Uses deterministic, regex-based heuristics over the agent's text to
-derive facial expression and body motion. Runs in microseconds, never
-calls the LLM, and is provider-agnostic — the same input text always
-yields the same YumiiResponse.
-
-Design rules:
-
-* The classifier is order-sensitive: the **first** matching pattern
-  wins. More specific patterns come first (e.g. ``angry`` before
-  ``surprise``, so ``!!`` overrides a bare ``!``).
-* Punctuation matters: a bare ``!`` or ``?`` boosts surprise
-  (astonishment / curiosity), ``!!`` boosts angry (escalation =
-  frustration), ``...`` boosts sad (trailing off).
-* Words drive the emotion: positive-valence words ("wonderful",
-  "thanks", "yay") → ``smile``; hesitations ("um", "shy", "secret")
-  → ``shy``; fear words → ``scared``; negation → ``shakehead`` /
-  ``sad`` motion.
-* Greeting openers ("Hi!", "Hello!", "Good morning!") always produce
-  a ``greeting`` motion regardless of tone.
-
-Allowed label values are pinned by :class:`yumii.agent.llm.YumiiResponse`
-and must stay in lock-step with the personality prompt files and the
-Live2D animation map in the frontend.
+Deterministic, no LLM — the same text always yields the same result. First
+matching pattern wins (most specific first). Labels are pinned by
+:class:`yumii.agent.llm.YumiiResponse` and must match the personality prompts.
 """
 
 from __future__ import annotations
@@ -40,10 +20,7 @@ MotionLabel = Literal[
     "greeting", "idle",
 ]
 
-# Allowed sets, frozen for runtime validation. Keeping the lists
-# separate from the Literal types means a bad runtime value (from
-# user-tuned prompt) can be coerced back to "normal"/"idle" rather
-# than crashing the frontend.
+# Frozen sets for runtime validation — a bad value coerces to normal/idle, never crashes.
 VALID_EXPRESSIONS: frozenset[str] = frozenset(
     {"smile", "angry", "sad", "surprise", "scared", "shy", "normal"},
 )
@@ -55,22 +32,8 @@ VALID_MOTIONS: frozenset[str] = frozenset(
 # ----------------------------------------------------------------------
 # Pattern tables
 # ----------------------------------------------------------------------
-#
-# Each list is scanned in order; the first list whose pattern matches
-# the input wins. Order matters: the most specific patterns live first.
-#
-# Patterns are case-insensitive (re.IGNORECASE) because emotion
-# detection is tone-driven, not literal-match-driven. We don't
-# normalise the text first; the original casing is preserved for
-# the frontend.
-
-# (label, regex). Label is the expression to return on a match.
-# Order matters: more specific patterns come first. Punctuation-only
-# patterns (bare `!` or `?`) belong to *surprise* — putting `!` in
-# smile would drag every exclamation into smile and shadow the
-# angry/sad detectors behind it. ``!!`` belongs to *angry*, so angry
-# must come BEFORE surprise (otherwise the bare `!` in `!!` would
-# always win and we'd never see angry).
+# Scanned in order; first match wins, most specific first. Case-insensitive.
+# angry before surprise so "!!" (angry) isn't stolen by surprise's bare "!".
 _EXPRESSION_PATTERNS: list[tuple[ExpressionLabel, re.Pattern[str]]] = [
     # Anger / frustration — `!!` is a strong tell, must beat surprise's `!`
     ("angry", re.compile(
@@ -187,8 +150,6 @@ _MOTION_PATTERNS: list[tuple[MotionLabel, re.Pattern[str]]] = [
         r")\b",
         re.IGNORECASE,
     )),
-    # Shy / lookaway — must come BEFORE fidget so the lookaway pattern
-    # is still found (the previous reorder put it earlier in the list).
     # Fidget / energy (genki-style)
     ("fidget", re.compile(
         r"\b("
@@ -221,11 +182,7 @@ def _classify(text: str, patterns: list[tuple[str, re.Pattern[str]]]) -> str:
 
 
 def _expression_for(text: str) -> ExpressionLabel:
-    """Pick an expression label from the agent text.
-
-    Uses the regex table above. Falls back to ``"normal"`` if nothing
-    matches.
-    """
+    """Pick an expression label from the agent text (``normal`` if nothing matches)."""
     if not text:
         return "normal"
     label = _classify(text, _EXPRESSION_PATTERNS)
@@ -233,11 +190,7 @@ def _expression_for(text: str) -> ExpressionLabel:
 
 
 def _motion_for(text: str) -> MotionLabel:
-    """Pick a motion label from the agent text.
-
-    Uses the regex table above. Falls back to ``"idle"`` if nothing
-    matches.
-    """
+    """Pick a motion label from the agent text (``idle`` if nothing matches)."""
     if not text:
         return "idle"
     label = _classify(text, _MOTION_PATTERNS)
@@ -246,31 +199,14 @@ def _motion_for(text: str) -> MotionLabel:
 
 # Public entry point ----------------------------------------------------
 
-# Reasoning models (minimax-m3, qwen, deepseek-r1, …) normally return
-# their chain-of-thought in a separate field, but some provider/model
-# combos inline it as <think>…</think> in the content. That must never
-# reach TTS — the orb would speak the model's private reasoning aloud.
+# Strip <think>…</think> so a model's private reasoning never reaches TTS.
 _THINK_BLOCK = re.compile(
     r"<think(?:ing)?>.*?</think(?:ing)?>\s*", re.DOTALL | re.IGNORECASE
 )
 
 
 def synthesize(agent_text: str) -> YumiiResponse:
-    """Convert a plain agent response into a YumiiResponse.
-
-    The synthesizer runs in microseconds, never calls the LLM, and is
-    provider-agnostic — the same input text always yields the same
-    YumiiResponse.
-
-    Args:
-        agent_text: The raw text the agent emitted. May be empty (e.g.
-            if the LLM returned a tool_calls-only AIMessage). Empty
-            text returns a safe default.
-
-    Returns:
-        A :class:`YumiiResponse` with the three fields the engine and
-        the frontend both consume.
-    """
+    """Convert agent text into a YumiiResponse (deterministic; empty text → safe default)."""
     text = _THINK_BLOCK.sub("", agent_text or "").strip()
     if not text:
         return YumiiResponse(

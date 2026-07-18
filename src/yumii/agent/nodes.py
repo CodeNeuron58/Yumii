@@ -1,10 +1,4 @@
-"""Per-turn helpers for Yumii's LangGraph.
-
-Currently exposes the personality-switch detector used by
-:mod:`yumii.agent.graph`'s ``agent_node``. The old ``chat_node`` has
-been replaced by the graph's built-in ``agent`` + ``tools`` nodes
-(PR 2 of the v1.0 redesign); see :func:`yumii.agent.graph.build_graph`.
-"""
+"""Per-turn LangGraph helpers — currently the personality-switch detector."""
 
 from __future__ import annotations
 
@@ -17,19 +11,8 @@ log = get_logger(__name__)
 
 
 def check_personality_switch(user_input: str) -> tuple[bool, str | None]:
-    """Detect an in-band request to switch the active personality.
-
-    The set of recognized phrasings is intentionally tiny — Yumii is
-    a voice companion, and the user is expected to say things like
-    "switch to tsundere" or just "tsundere". Anything more elaborate
-    routes through normal LLM conversation.
-
-    Returns:
-        A tuple of ``(True, new_personality)`` if a switch was
-        requested, else ``(False, None)``.
-    """
-    # STT output carries punctuation and stray casing ("Switch to
-    # tsundere.") — normalise to bare lowercase words before matching.
+    """Detect an in-band 'switch to <personality>' request; returns (True, name) or (False, None)."""
+    # STT text has punctuation/casing — normalize to bare lowercase words.
     lowered = re.sub(r"[^a-z0-9\s]", "", user_input.lower())
     lowered = re.sub(r"\s+", " ", lowered).strip()
     for personality in personality_manager.list_personalities():

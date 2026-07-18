@@ -1,7 +1,4 @@
-"""Concrete implementations of Speech-to-Text (STT) providers.
-
-Includes a local CPU-based `faster-whisper` provider and a cloud-based `Groq` provider.
-"""
+"""STT providers: local faster-whisper (CPU) and cloud Groq Whisper."""
 
 
 import numpy as np
@@ -9,12 +6,10 @@ import numpy as np
 from yumii.core.interfaces import BaseSTTProvider
 
 from yumii.core.logging import get_logger
+
 log = get_logger(__name__)
 
-# Confidence gates for the cloud (Groq) Whisper path. Whisper will happily
-# transcribe humming, singing, and background noise into words; these
-# thresholds drop segments it isn't confident are real speech, mirroring the
-# `no_speech_prob` filter the local path already applies.
+# Confidence gates for Groq Whisper — drop humming/noise it would transcribe into words.
 NO_SPEECH_THRESHOLD = 0.6        # drop if Whisper thinks it isn't speech
 MIN_AVG_LOGPROB = -1.0           # drop low-confidence guesses (humming / gibberish)
 MAX_COMPRESSION_RATIO = 2.4      # drop repetitive hallucinations (common on music)
@@ -28,14 +23,7 @@ def _seg_field(seg: object, key: str, default: object) -> object:
 
 
 class LocalSTT(BaseSTTProvider):
-    """Transcription using faster-whisper on CPU.
-
-    Loads the model from a local directory (Yumii mirrors the
-    faster-whisper models on its own GitHub release — see
-    ``audio/whisper_model.py`` — so HuggingFace is never contacted). If
-    no ``model_dir`` is given it falls back to the size string, which
-    lets faster-whisper resolve/download from HuggingFace itself.
-    """
+    """faster-whisper on CPU, loaded from a local dir (mirrored on GitHub; HF never contacted)."""
 
     def __init__(self, model_size: str = "base", model_dir: str | None = None) -> None:
         """Initialize the local Whisper model."""
@@ -48,7 +36,7 @@ class LocalSTT(BaseSTTProvider):
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:
         """Transcribe an audio array using the local Whisper model."""
-        # faster-whisper expects float32 in [-1, 1]
+        # faster-whisper expects float32 in [-1, 1].
         audio_float = audio_data.astype(np.float32) / 32768.0
 
         segments, _ = self._whisper.transcribe(
@@ -56,7 +44,6 @@ class LocalSTT(BaseSTTProvider):
             beam_size=1,
             condition_on_previous_text=False,
             suppress_blank=True,
-            # Threshold from original pipeline
             no_speech_threshold=0.45,
         )
 
@@ -81,7 +68,6 @@ class GroqSTT(BaseSTTProvider):
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:
         """Transcribe an audio array using the Groq Whisper API."""
-        # Helper to encode as WAV bytes
         import io
         import wave
 
@@ -96,8 +82,7 @@ class GroqSTT(BaseSTTProvider):
             result = self._groq_client.audio.transcriptions.create(
                 file=("audio.wav", buf.getvalue()),
                 model="whisper-large-v3-turbo",
-                # verbose_json gives per-segment confidence so we can reject
-                # non-speech (humming, singing, noise) instead of voicing it.
+                # verbose_json gives per-segment confidence for the gates below.
                 response_format="verbose_json",
                 language="en",
             )
@@ -121,8 +106,7 @@ class GroqSTT(BaseSTTProvider):
             avg_logprob = float(_seg_field(seg, "avg_logprob", 0.0))
             comp_ratio = float(_seg_field(seg, "compression_ratio", 1.0))
 
-            # Logged at info so a user watching the console can tell a
-            # discarded utterance apart from a slow one.
+            # Log drops at info so a discarded utterance is distinguishable from a slow one.
             if no_speech > NO_SPEECH_THRESHOLD:
                 log.info("stt_dropped", reason="no_speech", no_speech=round(no_speech, 2), text=text[:40])
                 continue

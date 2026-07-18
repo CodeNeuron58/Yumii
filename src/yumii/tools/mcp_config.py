@@ -1,34 +1,4 @@
-"""MCP (Model Context Protocol) server configuration loader.
-
-Reads a list of MCP server entries from ``~/.yumii/config.json`` under
-the ``MCP_SERVERS`` key and returns them in a shape suitable for
-:class:`langchain_mcp_adapters.client.MultiServerMCPClient`.
-
-This module is intentionally thin — it does not import the MCP
-adapter (that would force a hard dep on the package even for users
-who don't use MCP). The engine imports the adapter lazily when it
-actually wants to connect.
-
-Expected config shape (``~/.yumii/config.json``):
-
-.. code-block:: json
-
-    {
-        "MCP_SERVERS": [
-            {
-                "name": "weather",
-                "command": "python",
-                "args": ["/path/to/weather_server.py"],
-                "transport": "stdio",
-                "env": {"API_KEY": "..."}
-            }
-        ]
-    }
-
-Each entry is forwarded to ``MultiServerMCPClient`` as-is, with the
-exception of ``name`` (used for logging) and ``env`` (optional,
-forwarded as subprocess env vars).
-"""
+"""Load MCP server entries from config.json for MultiServerMCPClient (thin; no adapter import)."""
 
 from __future__ import annotations
 
@@ -44,20 +14,7 @@ log = get_logger(__name__)
 
 @dataclass(frozen=True)
 class MCPServerConfig:
-    """A single MCP server entry from the user's config.
-
-    Attributes:
-        name: Human-readable label. Used for log messages and as the
-            key in ``MultiServerMCPClient``'s dict. Does not need to
-            be unique, but if two servers share a name the second one
-            wins when tools are loaded.
-        command: Executable to spawn (e.g. ``"python"``, ``"node"``).
-        args: Command-line arguments. Empty list is fine.
-        transport: One of ``"stdio"``, ``"sse"``, ``"websocket"``,
-            ``"streamable_http"``. Forwarded verbatim to the adapter.
-        env: Optional environment variables for the subprocess. Merged
-            on top of ``os.environ`` at spawn time.
-    """
+    """One MCP server entry (name, command, args, transport, env)."""
 
     name: str
     command: str
@@ -66,11 +23,7 @@ class MCPServerConfig:
     env: dict[str, str] | None = None
 
     def to_adapter_dict(self) -> dict[str, Any]:
-        """Render this config in the shape ``MultiServerMCPClient`` expects.
-
-        The adapter takes a ``{name: {command, args, transport, env}}``
-        dict. We use ``self.name`` as the key.
-        """
+        """Render this config as the {command, args, transport, env} dict the adapter expects."""
         out: dict[str, Any] = {
             "command": self.command,
             "args": list(self.args),
@@ -125,12 +78,7 @@ def _parse_server_entry(raw: dict[str, Any]) -> MCPServerConfig | None:
 
 
 def load_mcp_servers() -> list[MCPServerConfig]:
-    """Read ``~/.yumii/config.json`` and return the configured MCP servers.
-
-    Returns an empty list if the config file doesn't exist, doesn't
-    have an ``MCP_SERVERS`` key, or the key is malformed. Errors are
-    logged but never raised — MCP is opt-in.
-    """
+    """Read config.json and return the configured MCP servers ([] if none/malformed; never raises)."""
     if not CONFIG_FILE.exists():
         log.debug("mcp_config_file_missing", path=str(CONFIG_FILE))
         return []
@@ -154,11 +102,7 @@ def load_mcp_servers() -> list[MCPServerConfig]:
 
 
 def adapter_dicts() -> dict[str, dict[str, Any]]:
-    """Return the configs in the shape ``MultiServerMCPClient`` expects.
-
-    Convenience wrapper so the engine can do
-    ``MultiServerMCPClient(adapter_dicts())`` in one line.
-    """
+    """Return the configs as the {name: {...}} dict MultiServerMCPClient expects."""
     return {cfg.name: cfg.to_adapter_dict() for cfg in load_mcp_servers()}
 
 

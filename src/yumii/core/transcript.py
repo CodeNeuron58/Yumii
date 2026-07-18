@@ -1,22 +1,4 @@
-"""Searchable conversation transcript — the recall layer.
-
-Every spoken user/assistant turn is appended to the ``messages`` table
-(see :mod:`yumii.core.memory_db` for the schema) and indexed by FTS5.
-This is what lets Yumii answer "what did we talk about last week?" —
-the LangGraph checkpoints hold history per session but cannot be
-searched across sessions; this table can.
-
-Three read shapes, mirroring what the search tool exposes:
-
-* :func:`search` — full-text query, BM25-ranked, deduped to the best
-  hit per session.
-* :func:`window_around` — the messages surrounding one hit, for
-  reading the context of a match ("scroll").
-* :func:`recent_sessions` — latest conversations with a preview
-  ("browse").
-
-Zero LLM cost anywhere: every function returns stored text.
-"""
+"""Searchable conversation transcript (FTS5) — the cross-session recall layer."""
 
 from __future__ import annotations
 
@@ -30,11 +12,10 @@ from yumii.core.memory_db import execute, fetchall, fetchone, transaction
 
 log = get_logger(__name__)
 
-# Discover mode: how many FTS rows to scan before deduping by session,
-# and how many distinct sessions to return.
+# FTS rows to scan before deduping by session, distinct sessions to return,
+# and messages shown around a hit (each side).
 _SCAN_LIMIT = 60
 _MAX_SESSIONS = 3
-# Messages shown around a hit (each side).
 _WINDOW = 3
 
 
@@ -112,14 +93,7 @@ async def is_empty() -> bool:
 
 
 def _fts_query(raw: str) -> str:
-    """Turn free text into a safe FTS5 MATCH expression.
-
-    FTS5 has its own query syntax (AND/OR/NEAR, quotes, column filters) and
-    raises a syntax error on unbalanced quotes or stray operators — user
-    speech goes straight in here, so every token is individually quoted.
-    Tokens are joined with AND (FTS5's implicit operator); the caller
-    retries with OR when AND finds nothing.
-    """
+    """Turn free text into a safe FTS5 MATCH expression (each token quoted; AND semantics)."""
     tokens = re.findall(r"[A-Za-z0-9_]+", raw)
     return " ".join(f'"{t}"' for t in tokens)
 
@@ -141,12 +115,7 @@ async def _window(session_id: str, anchor_id: int, span: int = _WINDOW) -> list[
 
 
 async def search(query: str, max_sessions: int = _MAX_SESSIONS) -> list[TranscriptHit]:
-    """Full-text search across every conversation, best hit per session.
-
-    BM25-ranked (FTS5's built-in relevance). AND semantics first for
-    precision; if nothing matches and the query has several words, retry
-    with OR so partial matches still surface.
-    """
+    """Full-text search across all conversations, best hit per session (BM25; AND then OR)."""
     match = _fts_query(query)
     if not match:
         return []
@@ -166,7 +135,7 @@ async def search(query: str, max_sessions: int = _MAX_SESSIONS) -> list[Transcri
     if not rows and " " in match:
         rows = await fetchall(sql, (match.replace(" ", " OR "), _SCAN_LIMIT))
 
-    # Dedupe: keep the best-ranked hit per session (rows arrive ranked).
+    # Keep the best-ranked hit per session (rows arrive ranked).
     hits: list[TranscriptHit] = []
     seen_sessions: set[str] = set()
     for r in rows:

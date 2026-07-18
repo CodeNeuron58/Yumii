@@ -1,11 +1,6 @@
-"""Helper for downloading and resolving Kokoro TTS model files.
+"""Download Kokoro TTS model files to ~/.yumii/models/kokoro on first use.
 
-Mirrors :mod:`yumii.audio.vosk_model`: files live under
-``~/.yumii/models/kokoro`` and are fetched on first use. Two model
-variants are offered — ``fp32`` (~325 MB, default) and ``int8``
-(~92 MB). Counterintuitively, int8 measured ~3.7x SLOWER than fp32 on
-x86 CPUs (quantized ops hit onnxruntime fallback kernels), so fp32 is
-the default despite the bigger download.
+fp32 (~325 MB) is the default: int8 measured ~3.7x slower on x86 CPUs (fallback kernels).
 """
 
 import os
@@ -46,9 +41,7 @@ def _hook_into(on_progress: ProgressFn | None, lo: float, hi: float):
 
 
 def _download(url: str, target: Path, reporthook=None) -> None:
-    """Download *url* to *target* atomically (.part rename) so an
-    interrupted download never leaves a truncated file that would be
-    mistaken for a complete model on the next start."""
+    """Download *url* to *target* atomically (.part rename) so an interrupt can't leave a truncated file."""
     part = target.with_suffix(target.suffix + ".part")
     log.info("downloading_kokoro_file", url=url, target=str(target))
     urllib.request.urlretrieve(url, str(part), reporthook=reporthook)
@@ -56,14 +49,7 @@ def _download(url: str, target: Path, reporthook=None) -> None:
 
 
 def _bundled_paths(model_size: str) -> tuple[str, str] | None:
-    """Return bundled model paths if the installer shipped them.
-
-    The desktop installer bundles the Kokoro files and the Tauri shell
-    points ``YUMII_MODELS_DIR`` at ``<resources>/models`` — so a fresh
-    install needs no download or setup. Returns ``None`` when unset or
-    incomplete (dev / source runs), which falls through to the
-    download path below.
-    """
+    """Return bundled model paths if the installer shipped them (YUMII_MODELS_DIR), else None."""
     root = os.environ.get("YUMII_MODELS_DIR")
     if not root:
         return None
@@ -79,10 +65,7 @@ def _bundled_paths(model_size: str) -> tuple[str, str] | None:
 def get_kokoro_model_paths(
     model_size: str = "int8", on_progress: ProgressFn | None = None
 ) -> tuple[str, str]:
-    """Return ``(model_path, voices_path)``, using bundled files or
-    downloading if needed. ``on_progress`` (0..1) drives the first-run
-    download screen; the model file is the bulk of it, the voices file
-    a short tail."""
+    """Return (model_path, voices_path), using bundled files or downloading (on_progress drives the bar)."""
     if model_size not in KOKORO_MODELS:
         log.warning("invalid_kokoro_model_size_fallback", size=model_size)
         model_size = "fp32"

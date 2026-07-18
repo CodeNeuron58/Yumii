@@ -1,9 +1,4 @@
-"""SQLite database layer for Yumii's persistent memory.
-
-Manages the local SQLite database at ``~/.yumii/memory/yumii.db``.
-All other memory modules (session_manager, memory_manager) build on top of
-this low-level layer.
-"""
+"""SQLite layer for Yumii's local memory at ~/.yumii/memory/yumii.db."""
 
 from __future__ import annotations
 
@@ -19,13 +14,8 @@ DB_PATH = MEMORY_DIR / "yumii.db"
 # ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
-# The ``messages`` table is the searchable transcript: every spoken
-# user/assistant turn is appended here (the LangGraph checkpoint remains
-# the source of truth for the agent's own history — this table exists so
-# past conversations can be *searched*, which checkpoints can't do).
-# ``messages_fts`` is an FTS5 full-text index over it, using external
-# content (content='messages') so the text is stored once; the triggers
-# keep the index in sync. Porter stemming so "running" matches "run".
+# messages is the searchable transcript; messages_fts is an FTS5
+# (external-content, porter-stemmed) index over it, kept in sync by triggers.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -78,7 +68,6 @@ async def _get_connection() -> aiosqlite.Connection:
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
-    # Enable foreign keys (good practice, even if we don't use FKs yet)
     await db.execute("PRAGMA foreign_keys = ON")
     return db
 
@@ -97,12 +86,7 @@ async def execute(
     sql: str,
     parameters: tuple[Any, ...] | list[Any] | None = None,
 ) -> aiosqlite.Cursor:
-    """Execute a single statement and return the cursor.
-
-    The caller is responsible for calling ``db.commit()`` and ``db.close()``
-    if they hold onto the connection.  In most cases you should use
-    :func:`transaction` instead.
-    """
+    """Execute one statement, commit, and return the cursor (prefer transaction())."""
     db = await _get_connection()
     try:
         cursor = await db.execute(sql, parameters or ())
@@ -142,15 +126,7 @@ async def fetchall(
 
 @asynccontextmanager
 async def transaction() -> AsyncGenerator[aiosqlite.Connection, None]:
-    """Async context manager that yields a connection with an open transaction.
-
-    Usage::
-
-        async with transaction() as db:
-            await db.execute("INSERT ...")
-            await db.execute("UPDATE ...")
-            await db.commit()
-    """
+    """Async context manager yielding a connection with an open transaction."""
     db = await _get_connection()
     try:
         yield db
