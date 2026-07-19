@@ -1,6 +1,6 @@
 # Yumii — the AI companion that's actually yours
 
-[![Version](https://img.shields.io/badge/version-0.12.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.13.0-orange.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![Tauri](https://img.shields.io/badge/desktop-Tauri%20v2-24C8DB.svg)](https://tauri.app/)
 [![Runs on CPU](https://img.shields.io/badge/runs%20on-CPU-informational.svg)](#)

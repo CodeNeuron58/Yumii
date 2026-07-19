@@ -5,6 +5,43 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] — 2026-07-19
+
+The polish release — sharper search, a tidier orb, and an installer
+that survives clean laptops.
+
+### Added
+- **Native web search.** The DuckDuckGo search was rebuilt directly on
+  the ddgs engine (modeled on Hermes Agent's provider): a hard
+  20-second timeout so a rate-limited search can never hang a turn,
+  clean numbered results, and failures returned as sentences she can
+  say out loud. The tool the model sees is now `web_search` with a real
+  description — including "never read URLs aloud."
+
+### Changed
+- **The orb, refined.** Slightly smaller; the mic and settings buttons
+  moved from the window corners to small round satellites flanking it;
+  crisp SVG icons replace the emoji; and the window now moves by
+  grabbing the orb itself — a plain tap still starts the conversation.
+- **README + roadmap repositioned.** "She helps you do things — and
+  helps you through things." Status is experimental preview; next up
+  are screen awareness and proactiveness; the Live2D avatar is the
+  long-term dream with no timeline.
+- **Leaner codebase.** A minimal-comment pass across the whole backend
+  (−1,455 lines, token-verified as comment-only) and
+  langchain-community dropped from the dependencies.
+
+### Fixed
+- **Installer works on locked-down Windows.** uv's installer now runs
+  in a Bypass child process, so machines with a Restricted PowerShell
+  execution policy (most consumer laptops) install cleanly — and a
+  failure prints its message and leaves the window open instead of
+  closing it unread.
+
+### Notes
+- **245 tests.** Experimental preview. Install with one command at
+  https://yumii.me.
+
 ## [0.12.0] — 2026-07-17
 
 The first-run release — the experimental preview. A fresh install now
