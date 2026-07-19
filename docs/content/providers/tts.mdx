@@ -4,18 +4,17 @@ description: "Her voice: local Kokoro by default (bundled, offline), or ElevenLa
 sidebarTitle: "Speaking"
 ---
 
-Yumii's voice is where "local-first" is most visible: the default engine runs
-entirely on your CPU, ships inside the Windows installer, and works offline on
-the very first run. Pick the provider in **Dashboard → Settings → Voice
-(TTS)**.
+Yumii's voice is where "local-first" is most visible: the default engine
+runs entirely on your CPU and needs no key. Pick the provider in
+**Dashboard → Settings → Voice (TTS)**.
 
 ## Kokoro — the local default
 
 [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) is a small,
 remarkably natural neural voice that Yumii runs via ONNX on the CPU:
 
-* **Bundled with the installer** — nothing to download, no key, works offline.
-  (Source installs download it once, ~350 MB, to `~/.yumii/models/`.)
+* **Downloads once on first launch** (~330 MB, with a progress bar in the
+  orb) to `~/.yumii/models/` — after that it works fully offline, forever.
 * **54 voices** — the default is `af_heart`; the dashboard offers a curated
   picker, and any voice name can be set via `KOKORO_VOICE` in the config.
 * **Fast enough to feel live.** Yumii splits her reply at sentence and clause

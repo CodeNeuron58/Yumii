@@ -6,70 +6,57 @@ sidebarTitle: "Working on Yumii"
 
 ## Prerequisites
 
-* **Python 3.12+** and [`uv`](https://docs.astral.sh/uv/) — the only package
-  manager the project supports (dependencies are pinned to CPU-only builds
-  that plain `pip` mangles).
-* For the **desktop shell** only: Rust (stable) and, on Windows, the MSVC C++
-  Build Tools. The orb also runs in a plain browser without any of this.
+* **[`uv`](https://docs.astral.sh/uv/)** — the only package manager the
+  project supports (dependencies are pinned to CPU-only builds that plain
+  `pip` mangles). It brings its own Python 3.12.
+* **Rust** (stable) and — on Windows — the MSVC C++ Build Tools, for the
+  desktop shell. WebView2 ships with Windows 10/11.
 
-## Backend + browser orb (the quick loop)
+## The setup
 
 ```bash
 git clone https://github.com/CodeNeuron58/Yumii.git
 cd Yumii
-uv sync                # installs everything, ~a minute
-uv run yumii           # interactive CLI → "Wake Yumii Up" opens the browser orb
+uv sync                              # everything, ~a minute
+
+cd desktop && npx @tauri-apps/cli dev    # the desktop app — the only way to run Yumii
 ```
 
-Or headless:
+`tauri dev` compiles the shell, opens the orb window, and spawns the backend
+**from your live Python source** — edit Python, relaunch, see changes. On a
+machine without `~/.yumii`, the full first-run flow (model downloads +
+onboarding) runs exactly as it does for users.
+
+Headless backend only (for API work):
 
 ```bash
-uv run yumii server    # backend on 127.0.0.1:8000
-# orb:       http://127.0.0.1:8000/
-# dashboard: http://127.0.0.1:8000/dashboard.html
+uv run yumii server    # FastAPI on 127.0.0.1:8000 (walks to 8011 if taken)
+# serves /health, the REST API, /ws, and /dashboard.html — there is no browser orb
 ```
-
-First run downloads the Kokoro voice model (~350 MB) to `~/.yumii/models/`.
-Configuration is the same as the packaged app — same `~/.yumii` files, same
-dashboard.
-
-## The desktop shell
-
-```bash
-cd desktop
-npx @tauri-apps/cli dev
-```
-
-`tauri dev` compiles the Rust shell and launches the orb window; the shell
-spawns the backend for you **from your live Python source** — edit Python,
-relaunch, see changes. (Release builds instead run a frozen backend bundled
-as a resource; dev deliberately never uses it.)
 
 ## Checks
 
 ```bash
 uv run ruff check .                          # lint
 uv run pytest tests/                         # test suite — runs keyless, no API needed
-python .github/scripts/check_versions.py     # the 4 version strings must agree
+python .github/scripts/check_versions.py     # the version strings must agree
 cargo build --manifest-path desktop/src-tauri/Cargo.toml   # shell compiles
 ```
 
-CI runs all of these on every push (Ubuntu + Windows). The suite is designed
-to pass with **no API keys present** — if you add a module that constructs a
-provider client at import time, collection will crash in CI; build clients
-lazily.
+CI runs all of these on every push. The suite passes with **no API keys
+present** — if you add a module that constructs a provider client at import
+time, collection crashes in CI; build clients lazily.
 
 ## Things that will save you an afternoon
 
-* **`uv sync`, never `pip install`.** Repeated because it's the #1 setup
-  failure.
+* **`uv sync`, never `pip install`.** The #1 setup failure.
 * **Your data is shared.** Source runs use the same `~/.yumii` as an
   installed copy — convenient, but a data wipe affects both.
-* **Port 8000 is the contract.** One backend at a time; a forgotten
-  `yumii server` in another terminal is the classic "why is my code not
-  running" (you're talking to the old process).
-* **Config loads at startup.** Changing providers/keys means restarting the
-  backend, in dev exactly as in production.
+* **One backend at a time.** A forgotten `yumii server` in another terminal
+  means your fresh code isn't the process you're talking to (the port walk
+  hides this well — check `~/.yumii/backend.port`).
+* **Config loads at startup.** Provider/key changes need a backend restart,
+  in dev exactly as in production.
 * **Structured logs are the debugger.** `YUMII_LOG_LEVEL=DEBUG uv run yumii
   server` — events are named (`stt_dropped`, `composio_load_failed`,
   `tool_result_truncated`) and usually point straight at the cause.

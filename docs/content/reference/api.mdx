@@ -4,17 +4,21 @@ description: "The local backend's REST endpoints and the realtime protocol the o
 sidebarTitle: "Interfaces"
 ---
 
-The backend serves a local API on `http://127.0.0.1:8000`. It's what the orb
-and dashboard use — and it's yours to script against. It binds to localhost
-only, and browsers are held to an origin allowlist (extendable via the
-`YUMII_ALLOWED_ORIGINS` environment variable).
+The backend serves a local API on `http://127.0.0.1:8000` — it prefers port
+8000 and walks up to 8011 if that's taken, writing its choice to
+`~/.yumii/backend.port`. It's what the orb and dashboard use — and yours to
+script against. It binds to localhost only; browsers are held to an origin
+allowlist and a loopback-only Host allowlist (extendable via
+`YUMII_ALLOWED_ORIGINS` / `YUMII_ALLOWED_HOSTS`).
 
 ## REST endpoints
 
-### Health
+### Health & status
 
 ```
 GET /health                    → {"status": "ok"}
+GET /api/status                → {configured, provider, audio_ready, models}
+                                 (first-run state: is a key set, are models downloaded)
 ```
 
 ### Sessions
@@ -89,7 +93,7 @@ frame types —
 | `audio_chunk` | `{data}` — base64 PCM16 at `sampleRate`; play back-to-back |
 | `audio_end` | The reply is fully delivered |
 | `interrupt` | You barged in — stop playback immediately |
-| `error` | `{error}` — something failed; she stays alive |
+| `error` | `{kind, message}` — kind is `auth` / `quota` / `network` / `generic`; she stays alive |
 
 A minimal client is therefore: open WS → send `session_select` → stream mic
 PCM16 → render events. The orb (`src/yumii/assets/webui/index.html`) is the

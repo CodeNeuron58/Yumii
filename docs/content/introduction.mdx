@@ -15,7 +15,7 @@ hideHero: true
     icon="rocket"
     href="/get-started/installation"
   >
-    One installer on Windows. Paste one API key, tap the orb, start talking.
+    One command on Windows. One API key. Tap the orb and start talking.
   </DocsCard>
   <DocsCard
     title="Using Yumii"
@@ -29,14 +29,14 @@ hideHero: true
     icon="cube"
     href="/guide/tools"
   >
-    Connect Gmail and other apps — Yumii always asks before acting.
+    Web search, Gmail, and more — Yumii always asks before acting.
   </DocsCard>
   <DocsCard
     title="Providers"
     icon="waveform-lines"
     href="/providers/llm"
   >
-    Swap the brain, ears, and voice: Groq, OpenAI, Anthropic, Ollama, Whisper, Kokoro.
+    Swap the mind, ears, and voice: Ollama, Groq, OpenAI, Anthropic, Whisper, Kokoro.
   </DocsCard>
 </FeatureList>
 
@@ -44,44 +44,37 @@ hideHero: true
 
 Yumii is an open-source AI companion that runs on your own machine. She
 listens through your microphone, thinks with the LLM provider you choose,
-answers out loud in a fully **local voice**, and shows up on your desktop as a
-small floating orb — always there, never in the way.
+answers out loud in a **local voice**, and shows up as a small floating orb —
+always there, never in the way.
 
-She is built around three promises:
+Three promises:
 
-* **Voice-first.** Real conversation, not a chat box. You can interrupt her
-  mid-sentence and she stops and listens, the way a person would.
-* **Private by design.** Conversations, memory, and API keys live in local
-  files on your disk. The only network traffic is to the AI providers you
-  explicitly configure. Her voice is synthesized locally on your CPU.
-* **She asks before she acts.** Yumii can use tools — read your email, search
-  the web — but every outside action goes through a permission prompt on your
-  screen first. You approve or deny, every time, until you decide otherwise.
+* **Voice-first.** Real conversation, not a chat box. Interrupt her
+  mid-sentence and she stops and listens.
+* **Private by design.** Conversations, memory, and API keys are local files
+  on your disk. The only network traffic goes to the providers you configure.
+* **She asks before she acts.** Every tool that touches the outside world
+  goes through an Approve / Deny prompt first.
 
 ## What she can do today
 
-* **Real-time voice conversation** with barge-in interruption and roughly a
-  second of reply latency on an ordinary CPU.
-* **Six personalities** — caring, tsundere, genki, kuudere, yandere, dandere —
-  switchable mid-conversation by just asking.
-* **Long-term memory.** She extracts facts about you from conversation and
-  brings them up naturally in later sessions. You can browse, edit, and delete
-  everything she knows from the dashboard.
-* **Tools with a permission gate.** Web search out of the box; Gmail and other
-  real apps via a [Composio](https://composio.dev) account.
-* **A dashboard** for settings, API keys, past conversations (with readable
-  transcripts), and memory.
-* **Local text-to-speech** (Kokoro-82M) bundled in the installer — her voice
-  works offline, on the first run, with nothing to download.
+| | |
+|---|---|
+| **Talk in real time** | Barge-in interruption, ~1s reply latency on an ordinary CPU |
+| **Six personalities** | caring · tsundere · genki · kuudere · yandere · dandere — switch by asking |
+| **Remember you** | Learns facts, searches every past conversation, knows *when* things happened |
+| **Do things** | Web search built in; Gmail, Calendar, Notion via Composio — all permission-gated |
+| **Stay inspectable** | A dashboard shows every conversation, every fact, every connected tool |
+| **Speak locally** | Kokoro-82M synthesizes her voice on your CPU — free, offline, no key |
 
-<Callout type="warning" title="Alpha software">
-Yumii is in active development and pre-1.0. The core experience works
-end-to-end, but expect rough edges — and expect things to improve fast.
-Found a bug? <a href="https://github.com/CodeNeuron58/Yumii/issues">Open an issue</a>.
+<Callout type="warning" title="Experimental preview">
+Yumii is pre-1.0 and moving fast. The core experience works end-to-end;
+expect rough edges. Found one?
+<a href="https://github.com/CodeNeuron58/Yumii/issues">Open an issue</a>.
 </Callout>
 
 ## Where to go next
 
-* **Just want to try her?** → [Installation](/get-started/installation), then the [Quickstart](/quickstart).
-* **Want to understand the philosophy first?** → [What is Yumii?](/get-started/what-is-yumii)
+* **Just want to try her?** → [Installation](/get-started/installation)
+* **Want the philosophy first?** → [What is Yumii?](/get-started/what-is-yumii)
 * **Curious how she works inside?** → [Architecture](/development/architecture)

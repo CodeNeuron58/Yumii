@@ -1,67 +1,59 @@
 ---
 title: "Quickstart"
-description: "From installed to talking in about two minutes."
+description: "First launch to first conversation, in about two minutes."
 sidebarTitle: "First Steps"
 icon: "rocket"
 ---
 
-You've [installed Yumii](/get-started/installation). Everything about her
-voice and ears already works locally — the one thing she needs from you is an
-API key for her *thinking*. The free [Groq](https://console.groq.com) tier is
-the recommended way to start: no card required, and it's fast enough for
-real-time conversation.
+You've [installed Yumii](/get-started/installation). Her first launch sets
+itself up — you make exactly one decision: which key powers her thinking.
 
 <StepsList>
-  <Step icon="star" title="Get a free Groq API key">
-    Sign up at console.groq.com → <strong>API Keys</strong> →
-    <strong> Create API Key</strong>. Copy it — it's shown only once.
+  <Step icon="download" title="She downloads her voice and ears">
+    On first launch the orb shows a progress bar while her local models
+    download — the voice (~330&nbsp;MB) and the ears (~130&nbsp;MB). One-time;
+    after this they run offline on your CPU.
   </Step>
-  <Step icon="layout-dashboard" title="Open the dashboard and paste the key">
-    Launch Yumii. When the orb appears, click the <strong>⚙ gear</strong> on
-    the orb window (or right-click the tray icon) → <strong>Dashboard</strong>.
-    In <strong>Settings → API Keys</strong>, paste your key into
-    <strong> Groq API key</strong> and hit <strong>Save settings</strong>.
-  </Step>
-  <Step icon="play" title="Restart Yumii">
-    Quit from the tray icon and launch her again — provider changes load at
-    startup. The dashboard tells you whenever a restart is needed.
+  <Step icon="star" title="One key wakes her up">
+    A card appears: <em>"I just need a mind to think with."</em> Click
+    <strong> Get a free Ollama key</strong> (opens in your browser), paste it,
+    and hit <strong>Wake her up</strong>. She restarts herself — no quitting,
+    no digging through settings. (Prefer Groq or another provider? "more
+    options" opens the dashboard.)
   </Step>
   <Step icon="face-smile" title="Tap the orb and talk">
-    Click the orb, allow microphone access, and say hello. She listens
-    continuously — no push-to-talk. Try interrupting her mid-sentence: she
-    stops and listens. That's not a bug, that's the point.
+    Allow microphone access and say hello. She listens continuously — no
+    wake word, no push-to-talk. Try interrupting her mid-sentence: she stops
+    and listens. That's not a bug, that's the point.
   </Step>
 </StepsList>
 
 ## Things to try in your first five minutes
 
 * **"Switch to tsundere."** — her whole personality changes on the spot.
-  There are six: caring (the default), tsundere, genki, kuudere, yandere,
-  dandere.
-* **Tell her something about yourself.** "I've got a job interview on
-  Friday." Then ask her about it tomorrow — she'll remember.
-* **"Search the web for…"** — her first tool. A small permission prompt
-  appears before she actually searches; that gate guards every external
-  action she ever takes.
-* **Press `Ctrl+Shift+Space`** — the global hotkey hides and summons the orb
-  from anywhere.
+* **Tell her something about yourself.** "I've got an interview Friday."
+  Ask her about it tomorrow — she'll remember.
+* **"Search the web for…"** — a permission prompt appears before she acts.
+  That gate guards every external action she ever takes.
+* **"What did we talk about yesterday?"** — she searches your past
+  conversations and tells you.
+* **Press `Ctrl+Shift+Space`** — the hotkey hides and summons the orb from
+  anywhere.
 
 ## Where everything lives
 
-* The **orb** is the conversation. Tap to start, talk naturally, interrupt
-  freely.
-* The **dashboard** (gear icon or tray → Dashboard) is the control room:
-  settings and keys, past conversations with readable transcripts, connected
-  tools, and everything she remembers about you.
-* The **tray icon** is lifecycle: show/hide, dashboard, quit.
+| Surface | What it's for |
+|---|---|
+| **The orb** | The conversation — tap to start, talk, interrupt freely. Drag it by grabbing it. |
+| **The dashboard** | ⚙ gear or tray → Dashboard: settings, keys, past chats, memory, tools |
+| **The tray icon** | Show/hide, dashboard, quit |
 
-<Callout type="info" title="On Groq's free tier">
-The free tier has daily token quotas and per-request size caps. Normal
-conversation fits comfortably; a heavy day of tool use can bump into them —
-she'll fail politely when it happens. See the
-[Troubleshooting](/reference/troubleshooting) page for what the
-limits look like and what your options are.
+<Callout type="info" title="Free tiers have limits">
+Ollama's free tier has a weekly quota, Groq's a daily one. Normal
+conversation fits comfortably; if she hits a limit she says so with a clear
+error card — switch providers in the dashboard or wait for the reset. See
+[Troubleshooting](/reference/troubleshooting).
 </Callout>
 
-**Next:** [Talking to Yumii](/guide/talking) for the conversation model, or
+**Next:** [Talking to Yumii](/guide/talking), or
 [Tools & Permissions](/guide/tools) to connect Gmail.

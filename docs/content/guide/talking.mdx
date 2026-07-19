@@ -6,62 +6,49 @@ sidebarTitle: "Daily Use"
 
 ## The conversation model
 
-Yumii listens **continuously** while the orb is active — there's no wake word
-and no button to hold. The pipeline runs in a loop:
+Yumii listens **continuously** while the orb is active — no wake word, no
+button. The loop:
 
-1. **You speak.** Local voice-activity detection (Silero, running on your CPU)
-   watches the mic and detects when speech starts and ends.
-2. **She transcribes.** Your finished utterance goes to speech-to-text — local
-   Whisper by default in source installs, Groq's cloud Whisper if configured
-   (faster and more accurate).
-3. **She thinks.** The transcription, her personality, today's date, and her
-   memory of you go to the LLM. If the request needs a tool, the
-   [permission gate](/guide/tools) may appear.
-4. **She speaks.** Her reply is synthesized locally, sentence-by-sentence, so
-   the first words arrive in about a second and the rest streams while she
-   talks.
+1. **You speak.** Local voice detection (Silero, on your CPU) notices when
+   speech starts and ends.
+2. **She transcribes.** Local Whisper by default; Groq's cloud Whisper if
+   configured (faster, more accurate).
+3. **She thinks.** Your words + her personality + her memory of you go to
+   the LLM. Tools may trigger the [permission gate](/guide/tools).
+4. **She speaks.** Synthesized locally, sentence-by-sentence — first words
+   in about a second.
 
 ## Interrupting her (please do)
 
-Barge-in is a core feature: **start talking while she's speaking and she
-stops.** Mid-sentence, mid-word, doesn't matter. There's no penalty and
-nothing breaks — her unspoken words are simply dropped and she listens to the
-new thing you're saying. Conversations flow much better once you stop treating
-her turns as sacred.
+**Start talking while she's speaking and she stops.** Mid-sentence,
+mid-word, doesn't matter — her unspoken words are dropped and she listens.
+Conversations flow much better once you stop treating her turns as sacred.
 
 ## The window
 
-* The orb window is frameless, always-on-top, and **draggable anywhere** on
-  screen. It skips the taskbar — it's a presence, not an app window.
-* **`Ctrl+Shift+Space`** toggles it from anywhere, even when another app has
-  focus.
-* The **tray icon** (bottom-right on Windows) has Show/Hide, Dashboard, and
-  Quit. Quitting from the tray also shuts down the backend cleanly.
-* The **⚙ gear** on the orb opens the mode menu — Dashboard lives there too.
+* **Drag the orb itself** to move her anywhere on screen. The window is
+  frameless, always-on-top, and skips the taskbar — a presence, not an app.
+* The **mic button** beside the orb mutes her ears; the **⚙ gear** opens
+  the mode menu and dashboard.
+* **`Ctrl+Shift+Space`** toggles her from anywhere.
+* The **tray icon** has Show/Hide, Dashboard, and Quit — quitting also shuts
+  the backend down cleanly.
 
 ## Sessions: conversations that persist
 
-Every conversation is a **session**, stored locally and titled automatically
-from your first words ("Help me plan a trip to Japan…"). Reconnections and
-app restarts don't scatter your history:
+Every conversation is a **session**, stored locally and titled from your
+first words:
 
-* The current session survives reconnects — a network blip won't split your
-  conversation in two.
-* Old sessions are browsable in the **dashboard → Chats**: read the full
-  transcript, resume any of them (your next spoken words continue that
-  thread), rename, or delete.
-* Long-term memory (facts about you) is **shared across all sessions** — a new
-  chat doesn't mean she forgot you. See [Memory](/guide/memory).
+* The current session survives reconnects and restarts — no fragmented
+  history.
+* **Dashboard → Chats** lists them all: read transcripts, resume any thread,
+  rename, delete.
+* Long-term memory is **shared across all sessions** — a new chat doesn't
+  mean she forgot you. And she can *search* every past session by content:
+  just ask "what did we say about the trip?" See [Memory](/guide/memory).
 
-## Speaking her language(s)
+## Languages
 
-Yumii speaks the language you speak to her, defaulting to English. Her local
-voice (Kokoro) is English-first; other languages work best with a cloud TTS
-provider — see [Providers → TTS](/providers/tts).
-
-## Browser mode
-
-The desktop orb is the primary experience, but the same UI runs in a plain
-browser: start the backend (`uv run yumii` → *Wake Yumii Up* from a source
-install) and open `http://127.0.0.1:8000/`. Same voice loop, same dashboard at
-`/dashboard.html` — useful on machines where you can't install the app.
+She speaks the language you speak to her, defaulting to English. Her local
+voice (Kokoro) is English-first; other languages sound best through a cloud
+voice — see [Providers → TTS](/providers/tts).

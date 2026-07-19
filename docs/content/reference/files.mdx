@@ -4,58 +4,56 @@ description: "Everything Yumii writes to your disk, and what each file is for."
 sidebarTitle: "Configuration"
 ---
 
-Yumii keeps all of her state in one folder in your home directory. Knowing the
-layout means you can back her up, move her to a new machine, or wipe her
-completely — with a file manager.
+Yumii keeps all of her state in one folder in your home directory. Knowing
+the layout means you can back her up, move her, or wipe her — with a file
+manager.
 
 ```
 ~/.yumii/
 ├── auth.json            # API keys (owner-only permissions)
 ├── config.json          # non-sensitive settings
+├── backend.port         # which local port the backend chose this run
 ├── memory/
-│   ├── yumii.db         # session list (titles, timestamps, counts)
-│   ├── checkpoints.db   # full conversation history per session
+│   ├── yumii.db         # sessions, summaries, searchable transcript
+│   ├── checkpoints.db   # full conversation state per session
 │   └── store.db         # long-term facts about you
-├── models/              # downloaded models (source installs)
-│   ├── kokoro/          # voice model + voice bank (~350 MB)
+├── models/              # downloaded on first launch, then offline forever
+│   ├── kokoro/          # her voice (~330 MB)
+│   ├── whisper/         # her ears (~130 MB for the default size)
 │   └── vosk/            # only if you selected the Vosk STT backend
-└── avatar/              # reserved for the future Live2D companion mode
+└── avatar/              # reserved for the future companion mode
 ```
 
 On Windows, `~` is `C:\Users\<you>`.
 
 ## The two config files
 
-**`auth.json` — secrets.** Every API key, written with owner-only permissions
-and atomic writes. Keys are only ever sent to the provider they belong to.
-This is the same storage model tools like Claude Code use. Treat this file
-like a password: don't commit it, don't screenshot it.
+**`auth.json` — secrets.** Every API key, owner-only permissions, atomic
+writes; each key is sent only to the provider it belongs to. The same
+storage model Claude Code uses. Treat it like a password.
 
-**`config.json` — preferences.** Plain, human-editable JSON: provider
-choices, personality, model names, connected toolkits. Safe to read, edit,
-or version. Every key is documented in the
-[Settings Reference](/reference/settings).
+**`config.json` — preferences.** Plain, human-editable JSON: providers,
+personality, model names, connected toolkits. Every key is documented in
+the [Settings Reference](/reference/settings).
 
-Editing either file by hand works — Yumii reads them at startup, so restart
-afterward. The [dashboard](/guide/dashboard) is the friendlier editor for
-both.
+Hand-editing works — Yumii reads both at startup, so restart afterward. The
+[dashboard](/guide/dashboard) is the friendlier editor.
 
 ## Practical recipes
 
-* **Back up your companion** — copy `~/.yumii` somewhere safe. That's her
-  entire memory of you, your settings, and your keys.
-* **Move to a new machine** — install Yumii there, copy `~/.yumii` over,
-  launch. She remembers you.
-* **Reset conversations but keep settings** — delete `memory/` while she's
-  closed.
-* **Factory reset** — delete `~/.yumii` entirely. The next launch recreates
-  it fresh (and the first-run wizard runs again).
-* **Uninstalling the app never touches `~/.yumii`** — your data outlives the
-  program, deliberately.
+| Want to… | Do |
+|---|---|
+| Back up your companion | Copy `~/.yumii` somewhere safe |
+| Move to a new machine | Install Yumii there, copy `~/.yumii` over, launch |
+| Reset conversations, keep settings | Delete `memory/` while she's closed |
+| Factory reset | Delete `~/.yumii` — next launch recreates it and onboarding runs again |
+
+**Uninstalling the app never touches `~/.yumii`** — your data outlives the
+program, deliberately. (The complete uninstall, including this folder, is in
+[Installation](/get-started/installation).)
 
 ## What's *not* on disk
 
-There is no telemetry file, no analytics ID, no cloud sync state. The
-complete list of network destinations is: the LLM/STT/TTS providers you
-configured, Composio if you connected apps, and (source installs only) model
-downloads from GitHub on first run.
+No telemetry file, no analytics ID, no cloud sync state. The complete list
+of network destinations: the LLM/STT/TTS providers you configured, Composio
+if you connected apps, and the one-time model downloads on first launch.

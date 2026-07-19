@@ -1,77 +1,65 @@
 ---
 title: "Language Models"
-description: "Yumii's brain is pluggable: Groq (default), OpenAI, Anthropic, or Ollama Cloud / local."
+description: "Yumii's mind is pluggable: Ollama Cloud (default), Groq, OpenAI, Anthropic — or a fully local Ollama."
 sidebarTitle: "Thinking"
 ---
 
-The LLM is the one part of Yumii that is (by default) a cloud call — her ears
-and voice can run entirely on your machine, but the thinking uses a provider
-you choose. Pick it in **Dashboard → Settings → Mind (LLM)**, paste the
-matching key under API Keys, save, and restart.
+The LLM is the one part of Yumii that is (by default) a cloud call — her
+ears and voice run on your machine, but the thinking uses a provider you
+choose. Pick it in **Dashboard → Settings → Mind (LLM)**, paste the matching
+key, save, and restart.
 
 ## The four providers
 
-| Provider | Model | Why pick it |
+| Provider | Default model | Why pick it |
 |---|---|---|
-| **Groq** *(default)* | configurable — `qwen/qwen3.6-27b` by default | Extremely fast inference (matters for voice!), generous free tier, no card required |
-| **OpenAI** | `gpt-4o` | Strongest general capability and tool-calling reliability |
+| **Ollama** *(default)* | `minimax-m3` | Free tier with a huge context window (1M) — tool schemas and long conversations fit without squeezing. Cloud with one key, or point it at a local Ollama |
+| **Groq** | `qwen/qwen3.6-27b` | Extremely fast inference (matters for voice), free tier, no card |
+| **OpenAI** | `gpt-4o` | Strongest general capability |
 | **Anthropic** | `claude-3-5-sonnet` | Most nuanced conversational quality |
-| **Ollama** | configurable — `gpt-oss:120b` by default | Ollama Cloud with one key — or point it at a local Ollama for fully-local thinking |
 
-For a voice companion, **latency is quality** — a brilliant reply that takes
-six seconds feels worse than a good one in one second. That's why Groq is the
-default: its inference speed keeps the conversation loop tight, and the free
-tier is enough for real daily use.
+For a voice companion, **latency is quality** — and so is context room.
+Ollama's default balances both; Groq is the speed play when your
+conversations are light on tools.
 
 ## Choosing the exact model
 
 Two providers take a free-text model name in the dashboard:
 
-* **Groq model** — any model Groq hosts (`qwen/qwen3.6-27b`,
-  `llama-3.3-70b-versatile`, `openai/gpt-oss-120b`, …). Different models have
-  separate free-tier quotas, so switching models also switches quota buckets.
-* **Ollama cloud model** — any model on your Ollama account
-  (`gpt-oss:120b`, `qwen3-coder:480b`, …).
+* **Ollama model** — any model on your Ollama account (`minimax-m3`,
+  `gpt-oss:120b`, …). Note: some models need a paid Ollama subscription and
+  will refuse on the free tier.
+* **Groq model** — any Groq-hosted model. Each model has its own free-tier
+  quota bucket, so switching models also switches quotas.
 
 ## Ollama: cloud or fully local
 
-The Ollama provider covers two very different setups with one switch:
-
 * **Ollama Cloud** (default): create a key at
-  [ollama.com](https://ollama.com), paste it as the Ollama API key, set your
-  cloud model name. Done.
-* **Local Ollama**: if you run Ollama on your own hardware, set
-  `OLLAMA_BASE_URL` in `~/.yumii/config.json` to your server (e.g.
-  `http://127.0.0.1:11434`) and leave the API key empty. This is the path to
-  a *fully* offline Yumii — voice, ears, and brain all local — if your
-  machine can carry a capable model.
+  [ollama.com](https://ollama.com), paste it, done.
+* **Local Ollama**: run Ollama on your own hardware, set `OLLAMA_BASE_URL`
+  in `~/.yumii/config.json` to your server (e.g. `http://127.0.0.1:11434`),
+  leave the key empty. This is the path to a *fully* offline Yumii — voice,
+  ears, and mind all local — if your machine can carry a capable model.
 
-## Free tiers: what to expect (honest section)
+## Free tiers: what to expect
 
-Free LLM tiers have two kinds of limits, and Yumii users hit both eventually:
-
-* **Daily token quotas.** A long day of conversation (or a testing spree)
-  can exhaust them; she'll start failing politely until the window resets.
-* **Per-request size caps.** Groq's free tier caps a single request at
-  roughly 8–12k tokens depending on the model. Yumii budgets carefully —
-  compact tool loading, truncated tool results, a bounded history window — so
-  normal use fits. Connecting several toolkits at once is what breaks the
-  budget first (see [Tools](/guide/tools)).
-
-If Yumii becomes part of your day, a paid tier on any provider removes both
-ceilings — Groq's is notably cheap for the speed.
+* **Quotas.** Ollama's free tier is a weekly allowance; Groq's is daily. A
+  heavy day (or a testing spree) can exhaust them — she says so with a clear
+  error card, and you can switch providers in the dashboard or wait for the
+  reset.
+* **Request-size caps (Groq).** Groq's free tier caps a single request at
+  roughly 8–12k tokens. Yumii budgets for it — compact tool loading,
+  truncated tool results, a bounded history window — but connecting several
+  toolkits at once is what breaks the budget first (see
+  [Tools](/guide/tools)). Ollama's 1M context makes this a non-issue there.
 
 ## Behind the scenes
 
-A few implementation details that affect what you experience:
-
-* **Prompt caching.** Yumii orders her context so the large static parts (the
-  personality, tool schemas) form a stable prefix that providers cache —
-  faster first tokens and lower effective cost on every turn.
-* **Tool-call resilience.** Different models make different mistakes when
-  calling tools; Yumii sanitizes tool schemas at bind time and retries once on
-  malformed calls, so a model hiccup degrades to a spoken apology instead of a
+* **Prompt caching.** Context is ordered so the static parts form a stable
+  prefix providers can cache — faster first tokens, every turn.
+* **Tool-call resilience.** Schemas are sanitized at bind time and malformed
+  calls retried once, so a model hiccup degrades to a spoken apology, not a
   crashed turn.
-* **A second, cheaper call.** Fact extraction (memory) runs as a background
-  pass after each turn, using a small fast model on your same provider — it's
-  part of your quota budget, not a separate account.
+* **A second, cheaper call.** Memory review runs in the background on a
+  small fast model from your same provider — part of the same quota, not a
+  separate account.

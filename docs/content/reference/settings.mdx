@@ -13,9 +13,9 @@ at the next launch unless noted.
 
 | Key | Default | Values / notes |
 |---|---|---|
-| `LLM_PROVIDER` | `"Groq"` | `Groq` · `OpenAI` · `Anthropic` · `Ollama` |
+| `LLM_PROVIDER` | `"Ollama"` | `Ollama` · `Groq` · `OpenAI` · `Anthropic` |
 | `GROQ_MODEL` | `"qwen/qwen3.6-27b"` | Any Groq-hosted model id |
-| `OLLAMA_MODEL` | `"gpt-oss:120b"` | Any model on your Ollama account/server |
+| `OLLAMA_MODEL` | `"minimax-m3"` | Any model on your Ollama account/server |
 | `OLLAMA_BASE_URL` | `"https://ollama.com"` | Point at `http://127.0.0.1:11434` for a local Ollama |
 | `TTS_PROVIDER` | `"Kokoro"` | `Kokoro` · `ElevenLabs` · `CAMB.ai` |
 | `STT_PROVIDER` | `"local"` | `local` (Whisper) · `groq` · `vosk` |
@@ -59,9 +59,10 @@ Set on the process that launches the backend; these are for unusual setups.
 
 | Variable | Purpose |
 |---|---|
-| `YUMII_MODELS_DIR` | Directory of pre-provisioned models — the installer sets this to its bundled copies; you can point it at your own |
+| `YUMII_MODELS_DIR` | Directory of pre-provisioned models — the backend checks it before downloading |
 | `YUMII_ALLOWED_ORIGINS` | Comma-separated extra origins allowed to reach the local API (e.g. a custom dev port) |
-| `YUMII_PYTHON` / `YUMII_REPO` | Desktop-shell dev overrides: which Python and repo the dev fallback uses |
+| `YUMII_ALLOWED_HOSTS` | Comma-separated extra Host headers accepted by the local API (loopback names only by default) |
+| `YUMII_PYTHON` | Desktop-shell dev override: which Python launches the backend |
 | `YUMII_LOG_LEVEL` | Backend log level, e.g. `DEBUG` |
 
 <Callout type="warning" title="A note on precedence">

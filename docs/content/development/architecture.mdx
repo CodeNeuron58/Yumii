@@ -46,9 +46,12 @@ The core is a deliberately small LangGraph state machine:
 * **Emotion is not model output.** The LLM speaks plain text; a fast
   regex-based classifier derives her expression and motion from the reply's
   tone. This keeps prompts clean and never leaks labels into speech.
-* **Memory is a side-channel**: after each turn a cheap LLM pass extracts
-  facts into SQLite; facts are injected into the system prompt on later
-  turns.
+* **Memory is layered.** A periodic background review (cheap LLM pass)
+  curates the fact store with add/replace/remove deltas; the agent can also
+  write memory directly via a `manage_memory` tool ("remember this" saves
+  instantly); every spoken turn lands in an FTS5-indexed transcript her
+  `search_past_conversations` tool can query; and session summaries with
+  time sense are injected at session start.
 
 ## Design decisions worth knowing
 
@@ -81,11 +84,13 @@ Every session is its own checkpoint thread; restarts lose nothing.
 
 ## Security posture
 
-The backend binds to `127.0.0.1` only. Browser access is held to an origin
-allowlist (the orb, the dashboard, the Tauri webview), and WebSocket
-handshakes from foreign origins are rejected — a malicious webpage can't
-read your memory off localhost. Keys live in an owner-only `auth.json`;
-nothing is logged or transmitted beyond the providers you configure.
+The backend binds to `127.0.0.1` only (preferring port 8000, walking to
+8011 if taken). Browser access is held to an origin allowlist, WebSocket
+handshakes from foreign origins are rejected, and a Host-header allowlist
+blocks DNS-rebinding — a malicious webpage can't read your memory off
+localhost even by resolving its own domain to 127.0.0.1. Keys live in an
+owner-only `auth.json`; nothing is logged or transmitted beyond the
+providers you configure.
 
 ## Code map
 

@@ -1,94 +1,69 @@
 ---
 title: "Installation"
-description: "One installer on Windows. From source everywhere else."
+description: "One command on Windows. macOS and Linux coming soon."
 sidebarTitle: "First Steps"
 ---
 
-## Windows — the installer (recommended)
+## Windows — one command
 
-The installer bundles everything: the backend, the speech engine, and Yumii's
-local voice model. **No Python, no dependencies, and the first run works
-offline** — the only thing you'll ever need to enter is one API key for her
-thinking.
+Open **PowerShell** and paste:
 
-<StepsList>
-  <Step icon="download" title="Download">
-    Grab the latest <code>Yumii_…_x64-setup.exe</code> from the{' '}
-    <a href="https://github.com/CodeNeuron58/Yumii/releases">Releases page</a>.
-    It's around 450&nbsp;MB — the voice model is inside, which is why the first
-    run needs no download.
-  </Step>
-  <Step icon="windows" title="Run it (and get past SmartScreen)">
-    Yumii is a new open-source project and isn't code-signed yet, so Windows
-    will likely show a blue <strong>"Windows protected your PC"</strong> screen.
-    This is what Windows shows for <em>any</em> unsigned installer — click{' '}
-    <strong>More info → Run anyway</strong>.
-  </Step>
-  <Step icon="play" title="Launch">
-    Start Yumii from the Start menu. A small floating orb appears and says
-    "Waking Yumii up…" while the backend boots (10–20 seconds on first launch).
-  </Step>
-</StepsList>
-
-<Callout type="info" title="Is the SmartScreen warning safe?">
-Yes. Code-signing certificates cost hundreds of dollars a year, which young
-open-source projects usually skip. The source code is public and the installer
-is built by a public GitHub Actions workflow you can inspect. If you'd rather
-not click through the warning, run from source instead.
-</Callout>
-
-An `.msi` package is also attached to each release for managed or enterprise
-installs.
-
-## macOS & Linux — from source
-
-There's no installer for macOS/Linux yet, but Yumii runs from source on both.
-You need **Python 3.12+** and [`uv`](https://docs.astral.sh/uv/):
-
-```bash
-# install uv if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-git clone https://github.com/CodeNeuron58/Yumii.git
-cd Yumii
-uv sync
-uv run yumii
+```powershell
+iex (irm https://yumii.me/install.ps1)
 ```
 
-`uv run yumii` opens the CLI; pick **Wake Yumii Up** and your browser opens to
-the orb. On first run, her voice model (~350&nbsp;MB) downloads automatically to
-`~/.yumii/models/`.
+That's the whole install. It sets up four things:
 
-<Callout type="warning" title="Use uv, not pip">
-The project pins <code>torch</code>-adjacent packages to CPU-only builds that
-plain <code>pip</code> doesn't resolve correctly. Always <code>uv sync</code>.
+| Step | What | Size |
+|---|---|---|
+| 1 | [uv](https://docs.astral.sh/uv/), the Python manager (skipped if present) | tiny |
+| 2 | A private Python 3.12 + Yumii's backend from PyPI | a few hundred MB, one-time |
+| 3 | The desktop app (`Yumii.exe`) | ~9 MB |
+| 4 | A Start Menu shortcut | — |
+
+No Python needed beforehand, no Rust, no build tools. When it finishes,
+launch **Yumii** from the Start Menu — the [Quickstart](/quickstart) covers
+what happens on first launch.
+
+**Updating:** re-run the same command. It upgrades the backend and app in
+place; your settings and memory are untouched.
+
+<Callout type="info" title="Locked-down machines">
+The installer handles PowerShell's <code>Restricted</code> execution policy
+automatically (common on fresh consumer laptops). If a very old copy of the
+script fails at step 1, just re-run the command — the current script is
+served live.
 </Callout>
 
-## The desktop app from source (developers)
+## macOS & Linux
 
-The frameless orb window is a Tauri (Rust) app. To run it from source you also
-need Rust and — on Windows — the MSVC C++ Build Tools:
+**Coming soon.** The desktop app ships for Windows today; the macOS and
+Linux shells are on the roadmap. (Developers: the backend itself is
+cross-platform — see [Running from Source](/development/from-source).)
 
-```bash
-cd desktop
-npx @tauri-apps/cli dev
+## Uninstalling — completely
+
+Quit Yumii from the tray first, then in PowerShell:
+
+```powershell
+uv tool uninstall yumii                                  # backend + command
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Yumii"    # the app
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\com.yumii.desktop"  # window (WebView2) data
+Remove-Item -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Yumii.lnk"
+Remove-Item -Recurse -Force "$env:USERPROFILE\.yumii"    # memory, keys, models
 ```
 
-This launches the orb window *and* starts the Python backend for you. Details
-in [Running from Source](/development/from-source).
+The last line is her memory and your keys — skip it if you might come back;
+everything survives a reinstall. Full layout in
+[File Locations](/reference/files).
 
-## What gets installed where
+<Callout type="info" title="If uv was installed only for Yumii">
+uv is a general Python tool other programs may use. If Yumii was the only
+reason you have it, you can also remove <code>%APPDATA%\uv</code>,
+<code>%LOCALAPPDATA%\uv</code>, and <code>uv.exe</code> /
+<code>uvx.exe</code> from <code>~\.local\bin</code> — after the
+<code>uv tool uninstall</code> step, never before.
+</Callout>
 
-| Thing | Location |
-|---|---|
-| The app (installer) | Standard Program Files install, with a Start-menu entry |
-| Your settings & API keys | `~/.yumii/` (survives uninstall/reinstall) |
-| Conversations & memory | `~/.yumii/memory/` |
-| Voice models (source installs) | `~/.yumii/models/` |
-
-Uninstalling the app never deletes `~/.yumii` — your memory, keys, and
-conversations are yours and stay put. Delete that folder yourself if you want
-a true clean slate. Full layout in [File Locations](/reference/files).
-
-**Next:** the [Quickstart](/quickstart) — one API key and your first
+**Next:** the [Quickstart](/quickstart) — first launch, one key, first
 conversation.

@@ -4,75 +4,62 @@ description: "How talking to Yumii actually works — the orb, interruption, and
 sidebarTitle: "First Steps"
 ---
 
-This page walks through one real conversation and explains what's happening at
-each moment, so the orb stops being a mystery.
+One real conversation, annotated — so the orb stops being a mystery.
 
 ## Reading the orb
-
-The orb is Yumii's face. Its state tells you exactly where the conversation is:
 
 | Orb | Meaning |
 |---|---|
 | Dim, slow pulse | Booting — the backend is loading her models |
-| Gentle breathing | Idle — she's ready and listening for you |
+| Gentle breathing | Idle — ready and listening for you |
 | Expanding rings | Hearing you speak |
 | Spinning shimmer | Thinking — your words are with the LLM |
 | Pulsing with sound, tinted | Speaking — the color reflects her emotion |
 
-Her emotional tint is real: a classifier reads the tone of her reply (warm,
-teasing, sad, surprised…) and colors the orb to match.
+The tint is real: a classifier reads the tone of her reply and colors the
+orb to match.
 
 ## A first exchange, annotated
 
 **You:** "Hey Yumii, how are you?"
 
-The moment you stop talking (about a third of a second of silence), local
-voice-activity detection closes your utterance and sends it to
-speech-to-text. Your transcribed words go to the LLM along with her
-personality, today's date, and everything she remembers about you. Her reply
-streams into the local voice engine sentence-by-sentence — which is why she
-starts speaking in about a second instead of waiting to compose the whole
-answer.
+The moment you stop talking, local voice detection closes your utterance and
+sends it to speech-to-text. Your words go to the LLM with her personality,
+today's date, and everything she remembers about you. Her reply streams to
+the voice engine sentence-by-sentence — she starts speaking in about a
+second.
 
-**You (while she's mid-sentence):** "Actually — wait."
+**You (mid-sentence):** "Actually — wait."
 
-She stops immediately. This is **barge-in**: the microphone stays live while
-she speaks, and your voice interrupts hers, exactly like a human conversation.
-You never need to wait for her to finish.
+She stops immediately. This is **barge-in**: the mic stays live while she
+speaks, and your voice interrupts hers, like a human conversation.
 
 **You:** "Remember that my sister's birthday is next month."
 
-After the turn ends, a background pass extracts *"user's sister has a birthday
-next month"* into her local memory. It's deduplicated against what she already
-knows and will surface naturally in future conversations. You can see and edit
-every stored fact in the [dashboard](/guide/dashboard).
+She saves it on the spot — "remember this" triggers her own memory tool.
+Every stored fact is visible and editable in the
+[dashboard](/guide/dashboard).
 
 **You:** "What's on the web about the weather tomorrow?"
 
-She decides to use her web-search tool — and a small prompt appears on
-screen: *"Allow Yumii to search the web?"* Nothing external happens until you
-click **Approve**. This gate is the core of how Yumii handles
-[tools](/guide/tools).
+She reaches for web search — and a prompt appears: *"Allow Yumii to search
+the web?"* Nothing happens until you click **Approve**. That gate is the
+core of [tools](/guide/tools).
 
-## Mic etiquette (what works best)
+## Mic etiquette
 
-* **Speak naturally.** No wake word, no push-to-talk — if the orb is idle or
-  ringing, she's listening.
-* **Pauses end your turn.** If you pause mid-thought for more than a moment,
-  she'll treat it as your turn ending. Keep the thought flowing, or just
-  continue — interrupting her reply works fine.
-* **Quiet-ish room helps.** Speech detection filters hums and fans, but a loud
-  TV with voices in it can trigger her. Headphones eliminate the echo of her
-  own voice entirely (though echo cancellation handles speakers well).
+* **Speak naturally** — no wake word, no push-to-talk.
+* **Pauses end your turn.** A moment of silence closes your utterance; keep
+  the thought flowing, or just continue — interrupting her works fine.
+* **A quiet-ish room helps.** Fans and hums are filtered; a loud TV with
+  voices can trigger her. Headphones make barge-in crispest.
 
 ## When something looks stuck
 
-* Orb stays on "Waking Yumii up…" for over a minute → the backend didn't
-  start; see [Troubleshooting](/reference/troubleshooting).
-* She thinks forever and gives up → almost always the LLM provider's rate
-  limit (free tiers have daily caps). Also in
-  [Troubleshooting](/reference/troubleshooting).
-* She heard you wrong repeatedly → consider switching speech-to-text to Groq
-  Whisper (faster, more accurate, cloud) in [Providers → STT](/providers/stt).
+| Symptom | Cause → fix |
+|---|---|
+| "Waking Yumii up…" for over a minute | Backend didn't start → [Troubleshooting](/reference/troubleshooting) |
+| An error card appears | It names the cause — bad key, rate limit, or network — and what to do |
+| She mishears repeatedly | Switch STT to Groq Whisper in [Providers → STT](/providers/stt) |
 
 **Next:** [Personalities](/guide/personalities) — meet the other five.

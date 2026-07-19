@@ -6,98 +6,108 @@ sidebarTitle: "Help"
 
 ## Installing
 
-### "Windows protected your PC" when running the installer
+### The install command stops at step 1 or the window closes
 
-Expected. Yumii isn't code-signed yet (certificates cost hundreds of dollars a
-year), and Windows shows this for *every* unsigned installer. Click
-**More info → Run anyway**. The source and the build workflow are public if
-you want to verify what you're running.
+Old copies of the install script could trip over PowerShell's `Restricted`
+execution policy (the default on many consumer laptops). The current script
+handles it automatically — just **re-run the command**; it's served live:
+
+```powershell
+iex (irm https://yumii.me/install.ps1)
+```
+
+### The install seems frozen at step 2
+
+Step 2 downloads a few hundred MB and can take 5–15 minutes. Two checks:
+
+* **Did you click inside the PowerShell window?** Windows pauses a running
+  program when you select text (QuickEdit mode). Click the window and press
+  **Enter** — it resumes.
+* Otherwise, watch Task Manager's network graph — if bytes are flowing,
+  it's working.
 
 ### Antivirus flags the app
 
-Unsigned new executables occasionally trip heuristic scanners
-(a false positive common to all young open-source apps). Add an exception, or
-run from source if you prefer.
+Unsigned new executables occasionally trip heuristic scanners — a false
+positive common to young open-source apps. The source and build workflow
+are public; add an exception or build from source.
 
-## Starting up
+## First launch
 
-### The orb says "Waking Yumii up…" forever
+### The progress bar is taking a while
 
-The backend didn't come up. In order:
+First launch downloads her voice (~330 MB) and ears (~130 MB), one-time,
+with a live progress bar. On a slow connection this is minutes, not
+seconds. If a download fails she retries on her own — leave her be.
 
-1. **Give it 20–30 seconds** on first launch — models are loading.
-2. **Is port 8000 taken?** Another app (or a leftover Yumii backend) may hold
-   it. Quit from the tray, check nothing is listening on 8000, relaunch.
-3. **Source installs:** run `uv run yumii server` in a terminal and read the
-   error directly — it's usually a missing key or a failed model download.
+### The orb says her backend couldn't start
 
-### First run is slow (source installs)
-
-The voice model (~350 MB) downloads once to `~/.yumii/models/`. The installer
-version skips this entirely — models are bundled.
+The error card names the likely cause. Usual suspects: the install didn't
+finish (re-run the install command) or something unusual is blocking local
+ports — she tries 8000 through 8011 before giving up.
 
 ## Talking
 
-### She thinks for a long time, then apologizes or errors
+### An error card appeared
 
-Almost always the LLM provider's **rate limits** on a free tier:
+That's her telling you exactly what's wrong — never a silent freeze:
 
-* **Daily quota exhausted** (`rate_limit_exceeded`, mentions *tokens per
-  day*): you've used the day's free tokens. Wait for the reset window,
-  switch the Groq model name (each model has its own quota bucket), or move
-  up a tier.
-* **Request too large** (mentions *tokens per minute* or *Request too
-  large*): a single request exceeded the free tier's size cap. This usually
-  means too many connected toolkits — each one adds schema weight to every
-  turn. Disable a toolkit in Dashboard → Tools, or see
-  [Tools & Permissions](/guide/tools) for the budget math.
+| Card | Meaning → fix |
+|---|---|
+| **Key problem** | The API key is missing/invalid — the card links to the dashboard |
+| **Thinking limit** | Free-tier quota hit (Ollama: weekly, Groq: daily). Wait for reset, or switch providers in Settings |
+| **Network** | She can't reach the provider — check the connection |
 
 ### She mishears me / cuts me off
 
-* Mishears → switch STT to **Groq Whisper** (Dashboard → Settings → Ears) —
-  markedly more accurate — or raise the local Whisper size to `small`.
+* Mishears → switch STT to **Groq Whisper** (Settings → Ears) — markedly
+  more accurate — or raise local Whisper to `small`.
 * Cuts you off mid-thought → she ends your turn after a brief silence; keep
-  the sentence flowing. Background voices (TV) can also steal turns — that's
-  the mic, not a setting.
+  the sentence flowing. Background voices (TV) can steal turns — that's the
+  mic, not a setting.
 
 ### Her voice never plays
 
-* Check the output device — she plays through the system default.
-* If you switched TTS providers, restart from the tray (provider changes
-  load at startup) and confirm the provider's key/voice-ID are set.
+* Check the output device — she uses the system default.
+* If you switched TTS providers, restart from the tray and confirm the
+  provider's key/voice-ID are set.
 
-### A tool call failed with "adjust your prompt" / tool errors
+### A tool call failed
 
-Free-tier models occasionally emit malformed tool calls. Yumii retries once
-automatically and then apologizes out loud. Just ask again — and if it's
-constant on an exotic model, switch back to a default model name.
+Free-tier models occasionally emit malformed tool calls; Yumii retries once
+and then apologizes out loud. Ask again — if it's constant on an exotic
+model, switch back to the default model name.
 
 ## Tools
 
 ### I connected Gmail but she says she can't access it
 
-1. Finish the browser sign-in completely (until Composio's success page).
-2. Wait ~10 seconds — the connection propagates on Composio's side.
-3. **Restart Yumii** — tools load at startup.
-4. Confirm the toolkit is listed in Dashboard → Tools.
+1. Finish the browser sign-in completely (to Composio's success page).
+2. Give it ~10 seconds to propagate, then ask again — tools load the moment
+   the connection lands, no restart needed.
+3. Confirm the toolkit shows in Dashboard → Tools.
 
 ### The permission prompt never appeared
 
-It shows on the **orb window**. If the orb is hidden (`Ctrl+Shift+Space`),
-bring it back. An unanswered prompt times out as a denial, so just ask again.
+It shows on the **orb window** — if the orb is hidden (`Ctrl+Shift+Space`),
+bring it back. An unanswered prompt times out as a denial; just ask again.
 
 ## Settings
 
 ### I changed a setting and nothing happened
 
 Provider, model, and key changes apply **at startup** — quit from the tray
-and reopen. Only personality switches apply live. The dashboard's save
-message tells you which kind you just made.
+and reopen. Personality applies live. The dashboard's save message tells
+you which kind you just made.
 
 ## When you're stuck
 
-Source installs: run `uv run yumii server` and read the structured log —
-errors name their cause (`rate_limit_exceeded`, `stt_dropped`,
-`composio_load_failed`…). Then
-[open an issue](https://github.com/CodeNeuron58/Yumii/issues) with the log
-tail — it's an alpha, reports genuinely help.
+Run the backend in a terminal and read the structured log — errors name
+their cause (`rate_limit_exceeded`, `stt_dropped`, `composio_load_failed`):
+
+```powershell
+yumii server
+```
+
+Then [open an issue](https://github.com/CodeNeuron58/Yumii/issues) with the
+log tail — it's an experimental preview, and reports genuinely help.

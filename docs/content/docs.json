@@ -15,7 +15,9 @@
     }
   },
   "styling": {
-    "css": ["globals.css"]
+    "css": [
+      "globals.css"
+    ]
   },
   "logo": {
     "dark": "/images/yumii-nav.png",
@@ -121,7 +123,6 @@
           {
             "group": "Interfaces",
             "pages": [
-              "reference/cli",
               "reference/api"
             ]
           },

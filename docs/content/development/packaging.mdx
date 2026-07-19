@@ -1,80 +1,68 @@
 ---
-title: "Building the Installer"
-description: "How the Windows installer is produced: freeze, bundle, ship."
+title: "Releases & Distribution"
+description: "How a Yumii release is produced: PyPI wheel + a small shell exe, glued by one install command."
 sidebarTitle: "Working on Yumii"
 ---
 
-The installer is built in three stages, each with a committed recipe. You can
-run the whole thing locally, and a GitHub Actions workflow runs it
-automatically on version tags.
+Yumii isn't distributed as a fat installer. A release is **two small
+artifacts** plus a live install script:
 
-## The three stages
+| Piece | What | Built by |
+|---|---|---|
+| `yumii` on PyPI | The Python backend as a normal wheel | `uv build` + trusted publishing (no tokens) |
+| `Yumii.exe` (~9 MB) | The Tauri shell, attached to the GitHub release | `cargo tauri build` on a Windows runner |
+| `install.ps1` | Served live from `master` via yumii.me | — it's just a file in the repo |
+
+The install command wires them together: it installs uv → the backend from
+PyPI → downloads the exe from the **latest** GitHub release → Start Menu
+shortcut. Local models aren't bundled anywhere — the app downloads them on
+first launch (Whisper from Yumii's own
+[model mirror release](https://github.com/CodeNeuron58/Yumii/releases/tag/whisper-models-v1),
+Kokoro from its upstream release).
+
+## Cutting a release
 
 <StepsList>
-  <Step icon="folder" title="Stage the models">
-    <code>uv run python packaging/fetch_models.py</code> — copies the Kokoro
-    voice model + voice bank (~350 MB) into <code>packaging/build-models/</code>
-    (from your local cache if present, else downloads). Bundling them is what
-    makes a fresh install work offline.
+  <Step icon="folder" title="Bump the version everywhere">
+    <code>pyproject.toml</code>, <code>desktop/src-tauri/tauri.conf.json</code>,
+    and <code>desktop/src-tauri/Cargo.toml</code> must agree —
+    <code>python .github/scripts/check_versions.py</code> enforces it in CI.
+    Also: <code>Cargo.lock</code>, <code>uv.lock</code> (<code>uv lock</code>),
+    the README badge, and a <code>CHANGELOG.md</code> entry.
   </Step>
-  <Step icon="package" title="Freeze the backend">
-    <code>uv run pyinstaller --noconfirm packaging/yumii-server.spec</code> —
-    produces <code>dist/yumii-server/</code>, a self-contained backend that
-    needs no Python on the target machine. The spec is the interesting file:
-    it collects everything PyInstaller can't infer — Yumii's assets, native
-    ML libraries (kokoro/espeak, whisper), data files buried in transitive
-    deps, and the package metadata that langchain reads at import.
+  <Step icon="package" title="Commit and tag">
+    <code>git tag v0.X.Y && git push origin master v0.X.Y</code>
   </Step>
-  <Step icon="windows" title="Build the installer">
-    <code>cd desktop && npx @tauri-apps/cli build --config
-    src-tauri/tauri.bundle.conf.json</code> — compiles the shell in release
-    mode and bundles the frozen backend + models as resources into an NSIS
-    <code>setup.exe</code> and an MSI (in
-    <code>desktop/src-tauri/target/release/bundle/</code>).
+  <Step icon="rocket" title="CI does the rest">
+    The tag triggers <code>release.yml</code>: it builds
+    <code>Yumii.exe</code>, publishes the wheel to PyPI via trusted
+    publishing, and creates the GitHub release marked <strong>latest</strong> —
+    which is what the install command serves from that moment on.
   </Step>
 </StepsList>
 
-Expect the full pipeline to take 20–40 minutes cold; the output installers
-are ~450 MB each.
+Users update by re-running the install command — `uv tool install --upgrade`
+pulls the new wheel, and the exe is re-downloaded from the latest release.
 
-## Why the overlay config
+## The model mirror
 
-The resource bundling lives in a **separate** `tauri.bundle.conf.json`
-overlay rather than the base config, deliberately: the resources point at
-build outputs (`dist/`, `build-models/`) that don't exist on a fresh clone or
-in CI's compile check — baking them into the base config would break
-`cargo build` and `tauri dev` everywhere. Base config = always buildable;
-overlay = applied only when actually producing an installer.
-
-Two runtime seams make the bundle work:
-
-* The shell launches `<resources>/yumii-server/yumii-server.exe` in release
-  builds (dev always runs your live Python instead).
-* The shell sets `YUMII_MODELS_DIR` to `<resources>/models`, and the backend
-  checks there before its download path — that's the offline first run.
-
-## Releases via GitHub Actions
-
-```bash
-git tag v0.10.0 && git push origin v0.10.0
-```
-
-The `release.yml` workflow runs the same three stages on a Windows runner and
-attaches both installers to a **draft** GitHub release — nothing goes public
-until you review the build and click Publish. The release notes template
-includes the SmartScreen explanation automatically.
+Local Whisper models are mirrored on a permanent, non-latest release
+(`whisper-models-v1`) because HuggingFace's CDN is blocked or throttled on
+some networks. The one-time `publish-models.yml` workflow (manual dispatch)
+repackages the upstream Systran models (MIT) as zips; the backend downloads
+and verifies completeness before ever using one. If you add a model size,
+re-run that workflow — never point it at the app's `v*` releases.
 
 ## Code signing (the missing stage)
 
-The installers are unsigned, so Windows shows SmartScreen's "unrecognized
-app" interstitial. Signing requires an OV code-signing certificate
-(~$200–400/year) — a deliberate deferral until the project's traction
-justifies it. Until then, the README and release notes explain the warning
-honestly.
+`Yumii.exe` is unsigned, so some machines show SmartScreen warnings on first
+run. Signing needs a paid certificate — deferred until traction justifies
+it. The install script clears the Mark-of-the-Web on the exe it downloads,
+which covers the common case.
 
-<Callout type="info" title="Testing a build like a stranger">
-The only honest test of an installer is a machine that has nothing: no
-Python, no repo, no <code>~/.yumii</code>. A fresh Windows VM is perfect.
-Install, launch, add one key, talk. Everything else is testing your dev
-environment by accident.
+<Callout type="info" title="Testing a release like a stranger">
+The only honest test is a machine with nothing on it: no Python, no repo,
+no <code>~/.yumii</code>. Run the install command, launch, watch the
+first-run downloads, paste one key, talk. Everything else is testing your
+dev environment by accident.
 </Callout>

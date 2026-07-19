@@ -4,82 +4,62 @@ description: "A companion, not a chatbot — and why local-first changes everyth
 sidebarTitle: "Overview"
 ---
 
-Most AI today is transactional: you open a tab, type a prompt, read an answer,
-close the tab. Nothing carries over. Nothing is *present*.
+Most AI is transactional: open a tab, type, read, close. Nothing carries
+over. Nothing is *present*.
 
-Yumii is an experiment in the opposite direction — an AI that behaves like a
-companion rather than a service. She sits on your desktop as a small glowing
-orb. You talk to her out loud. She remembers what you told her last week. She
-has a personality (six of them, actually). And when she does something in the
-real world — reads your inbox, searches the web — she asks you first.
+Yumii is the opposite experiment — an AI that behaves like a companion. She
+sits on your desktop as a small glowing orb. You talk to her out loud. She
+remembers last week. She has a personality (six, actually). And when she
+touches the real world — your inbox, the web — she asks you first.
 
 ## Companion, not assistant
 
-An assistant answers questions and waits. A companion notices things, follows
-up, teases, celebrates. That difference is baked into how Yumii is built:
+* **Persistent memory.** She learns durable facts about you, can search every
+  past conversation word-for-word, and knows *when* things happened —
+  "you mentioned that two days ago" is a real capability, not a bluff.
+* **Personality as a first-class feature.** Each persona is a fully written
+  character — speech patterns, emotional range, per-moment guidance. They're
+  plain text files you can read and edit.
+* **Presence.** The orb pulses as she speaks and shifts color with her mood.
+  `Ctrl+Shift+Space` summons or hides her from anywhere.
 
-* **Persistent memory.** After every conversation turn, a background pass
-  extracts facts about you ("has a cat named Mochi", "interviewing next
-  Tuesday") into a local database. Those facts are woven into her context in
-  every future conversation — she references them the way a friend uses
-  memory, not the way a database recites rows.
-* **Personality as a first-class feature.** Each of the six personas is a
-  detailed character — speech patterns, emotional range, how she reacts when
-  you're sad, proud, or teasing her. They are plain text files you can read
-  and edit.
-* **Presence.** The orb pulses while she speaks, shifts color with her mood,
-  and stays out of your way. A global hotkey (`Ctrl+Shift+Space`) summons or
-  hides her from anywhere.
-
-## Local-first, and what that actually means
-
-"Private" is an easy word to put on a landing page. Here is what it concretely
-means in Yumii:
+## Local-first, concretely
 
 | What | Where it lives |
 |---|---|
-| Conversations & memory | SQLite files in `~/.yumii/memory/` on your disk |
-| API keys | `~/.yumii/auth.json`, an owner-only file — never sent anywhere except the provider it belongs to |
-| Her voice | Synthesized locally on your CPU (Kokoro-82M, bundled with the installer) |
-| Speech detection | Local (Silero VAD, bundled) |
-| The backend | A local server bound to `127.0.0.1` only, with an origin allowlist |
+| Conversations & memory | SQLite files in `~/.yumii/memory/` |
+| API keys | `~/.yumii/auth.json` — an owner-only file, sent only to its own provider |
+| Her voice | Synthesized on your CPU (Kokoro-82M) |
+| Her ears | Local Whisper + always-local speech detection (Silero) |
+| The backend | Bound to `127.0.0.1` only, origin + host allowlists |
 
-The parts that *do* use the network are the ones you explicitly configure: the
-LLM (Groq by default — free tier works), cloud speech-to-text if you choose it
-over local Whisper, and any app you connect through Composio. Nothing else
-phones home. There is no account, no telemetry, no cloud copy of your life.
+The parts that *do* use the network are the ones you choose: the LLM
+(Ollama Cloud by default — free tier works), cloud speech-to-text if you
+prefer it, and apps you connect through Composio. No account, no telemetry,
+no cloud copy of your life.
 
 ## She asks before she acts
 
-Tool-calling AI is powerful and slightly terrifying. Yumii's answer is a
-**human-in-the-loop permission gate**: any tool that touches the outside world
-(sending email, searching the web) pauses and puts an Approve / Deny prompt on
-your screen before it runs. You can relax this per-category or turn it off
-entirely — but the default is that *nothing external happens without your
-click*. See [Tools & Permissions](/guide/tools).
+Any tool that touches the outside world pauses and puts **Approve / Deny**
+on your screen before it runs. You can relax this per-category or turn it
+off — but the default is that nothing external happens without your click.
+See [Tools & Permissions](/guide/tools).
 
 ## What Yumii is not (yet)
 
-Honesty section. As of the current alpha:
-
-* **No animated avatar yet.** The Live2D companion mode is planned; today she
-  is an orb. (The voice, memory, and personality are the product — the orb is
-  just how she shows up on screen.)
-* **She never speaks first.** Proactive check-ins are on the roadmap; today
-  she is fully reactive.
-* **Windows installer only.** macOS and Linux currently run
-  [from source](/development/from-source) — it works, it's just not
-  one-click yet.
-* **The LLM is (by default) a cloud call.** Her voice and ears can be fully
-  local, but the thinking uses a provider API — Groq's free tier by default.
-  You can point her at a local model via [Ollama](/providers/llm) if you have
-  the hardware.
+* **She can't see your screen yet** — screen awareness is next on the
+  roadmap, alongside **proactiveness** (today she never speaks first).
+* **No animated avatar.** The Live2D companion mode is the long-term dream;
+  today she's an orb.
+* **Windows only** for the desktop app — macOS and Linux are coming.
+* **The thinking is a cloud call by default.** Voice and ears are local; the
+  LLM uses a provider API. Point her at a local Ollama for a fully offline
+  brain — see [Providers → LLM](/providers/llm).
 
 ## The stack, in one paragraph
 
 A Python backend (FastAPI + LangGraph) runs the pipeline: Silero VAD detects
-your speech, Whisper transcribes it, a tool-calling LLM agent thinks, a
+your speech, Whisper transcribes it, a tool-calling agent thinks, a
 heuristic synthesizer derives her emotion, and Kokoro synthesizes her voice —
 streamed to a Tauri (Rust) desktop shell over a local WebSocket. Every piece
-is a pluggable provider. The details live in
-[Architecture](/development/architecture).
+is a pluggable provider. Details in [Architecture](/development/architecture).
