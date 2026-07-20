@@ -16,9 +16,11 @@ orb you **talk to out loud, in real time**. She helps you **do things**
 real support. She remembers your life together, and she runs entirely on
 **your** machine: no account, no cloud, nothing ever leaves your computer.
 
-<!-- Demo placeholder: a 15–20s screen recording goes here — you speak, the
+<!-- Demo: a 15–20s screen recording — you speak, the
      orb reacts, she answers out loud, you switch her personality. -->
-<p align="center"><em>Demo coming soon.</em></p>
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/f7a2a3c7-651d-4b08-ab42-e7e7adb0f48e" width="100%" controls></video>
+</p>
 
 > **Experimental preview.** The real-time voice loop, personalities,
 > persistent memory, and permission-gated tools all work end-to-end.
