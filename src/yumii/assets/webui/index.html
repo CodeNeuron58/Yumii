@@ -629,6 +629,7 @@
             let scheduledSources = [];
             let currentSampleRate = 24000;
             let replyCardActive = false; // a streaming reply already owns the card text
+            let currentSeq = 0;          // speech session id echoed back on playback_finished
 
             // ── Status pill ────────────────────────────────────────────
             const statusBar = document.getElementById('status-bar');
@@ -780,6 +781,7 @@
                     stopAllAudio();
                     isStreaming = true;
                     currentSampleRate = data.sampleRate || 24000;
+                    currentSeq = data.seq || 0;
                     nextPlayTime = audioContext.currentTime + 0.1;
                     setOrbColor(data.expression);
                     setOrbState('speaking');
@@ -817,8 +819,12 @@
                 }
                 if (data.type === "audio_end") {
                     const remaining = Math.max(0, nextPlayTime - audioContext.currentTime);
+                    const seq = currentSeq;
                     setTimeout(() => {
-                        if (!isStreaming) return;
+                        if (!isStreaming) return; // an interrupt already handled state
+                        // Tell the backend playback ACTUALLY finished — it keeps
+                        // the barge-in gate armed until now (mic hears the tail).
+                        socket.send(JSON.stringify({ type: "playback_finished", seq }));
                         isStreaming = false;
                         replyCardActive = false;
                         setOrbState('idle');

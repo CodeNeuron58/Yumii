@@ -32,6 +32,10 @@ log = get_logger(__name__)
 # Completed turns between background memory reviews (also flushed on switch/shutdown).
 _MEMORY_REVIEW_INTERVAL = 5
 
+# If the webui hasn't confirmed playback finished this long after audio_end,
+# assume it never will (closed tab / protocol drift) and disarm the gate.
+_PLAYBACK_FINISHED_TIMEOUT_SEC = 30.0
+
 # Spoken when the model calls a tool with no text of its own — never leave dead air.
 _TOOL_NARRATION_FILLERS = (
     "Let me check that for you.",
@@ -114,6 +118,9 @@ class YumiiEngine:
         self.interrupt_event: asyncio.Event = asyncio.Event()
         self.active_connections: List[WebSocket] = []
         self.is_speaking: bool = False
+        # Monotonic id of the current speech session; the webui echoes it back
+        # on playback_finished so a late report can't disarm a newer session.
+        self._speak_seq: int = 0
         self.mic_muted: bool = False
         self.active_session_id: str | None = None
         self.active_session_name: str = "New Chat"
@@ -378,7 +385,7 @@ class YumiiEngine:
         self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
-        self.is_speaking = False
+        self._disarm_speaking_gate()
 
         session_id = await session_manager.create_session(name)
         self.active_session_id = session_id
@@ -408,7 +415,7 @@ class YumiiEngine:
         self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
-        self.is_speaking = False
+        self._disarm_speaking_gate()
 
         self.active_session_id = session.id
         self.active_session_name = session.name
@@ -436,6 +443,50 @@ class YumiiEngine:
                 except asyncio.QueueEmpty:
                     break
         log.debug("queues_cleared")
+
+    # ------------------------------------------------------------------
+    # Speaking gate: barge-in arming + playback-finished handshake
+    # ------------------------------------------------------------------
+
+    def _arm_speaking_gate(self) -> None:
+        """While she speaks, interrupting her needs sustained high-confidence speech."""
+        self._speak_seq += 1
+        self.is_speaking = True
+        if self.pipeline is not None:
+            self.pipeline.set_speaking_gate(armed=True)
+
+    def _disarm_speaking_gate(self) -> None:
+        """Back to normal listening: short trigger, standard VAD threshold."""
+        self.is_speaking = False
+        if self.pipeline is not None:
+            self.pipeline.set_speaking_gate(armed=False)
+
+    def _arm_playback_watchdog(self, seq: int) -> None:
+        """Safety net if the webui's playback_finished never arrives."""
+
+        async def _guard() -> None:
+            await asyncio.sleep(_PLAYBACK_FINISHED_TIMEOUT_SEC)
+            if self._speak_seq == seq and self.is_speaking:
+                log.warning("playback_finished_timeout", seq=seq)
+                await self.on_playback_finished(seq)
+
+        asyncio.create_task(_guard())
+
+    async def on_playback_finished(self, seq: int | None = None) -> None:
+        """Webui reports real playback end — disarm the gate, reset capture.
+
+        The gate must stay armed until actual playback stops, not until the
+        last chunk is *sent*; otherwise the mic hears the playback tail and
+        self-interrupts (the old is_speaking race). Resetting the capture
+        also discards any half-utterance the leaked playback triggered.
+        """
+        if seq is not None and seq != self._speak_seq:
+            return  # a newer speech session is already live
+        if not self.is_speaking:
+            return
+        self._disarm_speaking_gate()
+        await self.audio_input_queue.put(None)
+        log.debug("playback_finished_disarmed", seq=seq)
 
     # ------------------------------------------------------------------
     # HITL confirmation gate
@@ -537,13 +588,19 @@ class YumiiEngine:
         """Consume audio, trigger interrupts on speech, push transcriptions to the reasoning queue."""
 
         def on_speech_start() -> None:
-            # Suppress barge-in while she's speaking — guards the mic/speaker feedback loop.
-            if self.is_speaking:
-                log.debug("interrupt_suppressed_yumii_speaking")
-                return
+            # Barge-in works in both states now: while she speaks, the
+            # pipeline's gate only triggers after sustained high-confidence
+            # speech (echo through AEC shouldn't survive it). A trigger during
+            # playback stops her mid-sentence; the utterance keeps capturing
+            # and becomes the next turn.
+            was_speaking = self.is_speaking
+            if was_speaking:
+                log.info("barge_in_accepted")
+            else:
+                log.debug("speech_started_interrupt")
+            self._disarm_speaking_gate()
             self.interrupt_event.set()
-            payload = {"type": "interrupt"}
-            asyncio.create_task(self.broadcast_payload(payload))
+            asyncio.create_task(self.broadcast_payload({"type": "interrupt"}))
 
         log.info("listener_task_started")
         while True:
@@ -852,7 +909,7 @@ class YumiiEngine:
                 payload = await self.tts_queue.get()
                 if self.interrupt_event.is_set():
                     # Interrupted turn: drop queued speech and go idle.
-                    self.is_speaking = False
+                    self._disarm_speaking_gate()
                     continue
 
                 kind = payload.get("kind", "utterance")
@@ -863,7 +920,9 @@ class YumiiEngine:
                 if kind == "stream_end":
                     if self.is_speaking:
                         await self.broadcast_payload({"type": "audio_end"})
-                    self.is_speaking = False
+                        # Gate stays armed until the webui confirms playback
+                        # actually finished (the mic can still hear the tail).
+                        self._arm_playback_watchdog(self._speak_seq)
                     continue
 
                 # A dropped stream_start (e.g. interrupt) leaves orphans — skip them.
@@ -871,10 +930,12 @@ class YumiiEngine:
                     continue
 
                 if kind in ("stream_start", "utterance"):
-                    self.is_speaking = True
+                    self._arm_speaking_gate()
                     log.info("yumii_response", text=response_text)
 
                 if not response_text or not response_text.strip():
+                    if kind == "utterance":
+                        self._disarm_speaking_gate()
                     continue
 
                 if hasattr(self.speaker, "stream_speak"):
@@ -893,20 +954,21 @@ class YumiiEngine:
                                     interrupted = True
                                     break
 
-                                if (
-                                    isinstance(chunk_data, dict)
-                                    and chunk_data.get("type") == "metadata"
-                                ):
-                                    if first:
-                                        await self.broadcast_payload(
-                                            {
-                                                "type": "audio_start",
-                                                "sampleRate": chunk_data["sampleRate"],
-                                                "text": response_text,
-                                                "expression": expression,
-                                                "motion": motion,
-                                            }
-                                        )
+                            if (
+                                isinstance(chunk_data, dict)
+                                and chunk_data.get("type") == "metadata"
+                            ):
+                                if first:
+                                    await self.broadcast_payload(
+                                        {
+                                            "type": "audio_start",
+                                            "sampleRate": chunk_data["sampleRate"],
+                                            "text": response_text,
+                                            "expression": expression,
+                                            "motion": motion,
+                                            "seq": self._speak_seq,
+                                        }
+                                    )
                                 else:
                                     await self.broadcast_payload(
                                         {"type": "audio_chunk", "data": chunk_data}
@@ -923,17 +985,18 @@ class YumiiEngine:
                                     "error": f"TTS failed: {stream_err}",
                                 }
                             )
-                            self.is_speaking = False
+                            self._disarm_speaking_gate()
                         continue
 
                     if interrupted:
-                        self.is_speaking = False
+                        self._disarm_speaking_gate()
                         continue
 
                     if kind == "utterance":
                         await self.broadcast_payload({"type": "audio_end"})
-                        self.is_speaking = False
-                    # stream_start / stream_text: session stays open until stream_end.
+                        self._arm_playback_watchdog(self._speak_seq)
+                    # stream_start / stream_text: gate stays armed until the
+                    # webui's playback_finished (or stream_end's watchdog).
                 else:
                     # Non-streaming provider: every payload speaks standalone (legacy).
                     if kind == "stream_end":
@@ -941,7 +1004,7 @@ class YumiiEngine:
                     audio_b64, duration = await asyncio.to_thread(
                         self.speaker.speak, response_text
                     )
-                    self.is_speaking = False
+                    self._disarm_speaking_gate()
                     if self.interrupt_event.is_set():
                         continue
                     await self.broadcast_payload(

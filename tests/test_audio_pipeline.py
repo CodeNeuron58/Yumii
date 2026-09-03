@@ -15,6 +15,7 @@ from yumii.audio.stt import (
     FRAME_SIZE,
     SILENCE_END_FRAMES,
     SPEECH_TRIGGER_FRAMES,
+    SILERO_THRESHOLD,
     AudioPipeline,
     float_to_pcm16,
     normalize_audio,
@@ -115,6 +116,8 @@ def _make_pipeline(transcriber=None) -> AudioPipeline:
     p = AudioPipeline.__new__(AudioPipeline)
     p._silero_model = FakeVAD()
     p.transcriber = transcriber or FakeStreamingTranscriber()
+    p.speech_trigger_frames = SPEECH_TRIGGER_FRAMES
+    p.speech_threshold = SILERO_THRESHOLD
     return p
 
 

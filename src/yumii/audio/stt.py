@@ -26,6 +26,12 @@ SILERO_THRESHOLD = 0.5
 RMS_ENERGY_GATE = 0.012
 NO_SPEECH_PROB_THRESHOLD = 0.45
 
+# Barge-in gate, armed while Yumii is speaking: her own voice leaks through
+# echo cancellation, so interrupting her requires longer sustained speech at a
+# higher confidence than an ordinary turn start. ~15 frames x 32ms = ~480ms.
+BARGE_IN_TRIGGER_FRAMES = 15
+SILERO_BARGE_THRESHOLD = 0.6
+
 
 def float_to_pcm16(audio: np.ndarray) -> np.ndarray:
     """Convert float32 audio data to PCM int16 format."""
@@ -61,12 +67,26 @@ class AudioPipeline:
         log.info("silero_vad_loading")
         self._silero_model = SileroVAD()
 
+        # Speech-gate parameters, adjusted live by the engine: normal values
+        # while listening, stricter barge-in values while she is speaking.
+        self.speech_trigger_frames = SPEECH_TRIGGER_FRAMES
+        self.speech_threshold = SILERO_THRESHOLD
+
         self.transcriber = get_stt_provider()
         log.info("audio_pipeline_ready")
 
+    def set_speaking_gate(self, armed: bool) -> None:
+        """Swap between normal listening and barge-in gating (called mid-capture)."""
+        if armed:
+            self.speech_trigger_frames = BARGE_IN_TRIGGER_FRAMES
+            self.speech_threshold = SILERO_BARGE_THRESHOLD
+        else:
+            self.speech_trigger_frames = SPEECH_TRIGGER_FRAMES
+            self.speech_threshold = SILERO_THRESHOLD
+
     def _is_speech_silero(self, audio_float32_frame: np.ndarray) -> bool:
         prob = self._silero_model(audio_float32_frame, RATE)
-        return prob >= SILERO_THRESHOLD
+        return prob >= self.speech_threshold
 
     def _reset_vad(self) -> None:
         self._silero_model.reset_states()
@@ -109,7 +129,7 @@ class AudioPipeline:
                 if not triggered:
                     pre_buffer.append((pcm16, is_speech))
                     speech_count = sum(1 for _, s in pre_buffer if s)
-                    if speech_count >= SPEECH_TRIGGER_FRAMES:
+                    if speech_count >= self.speech_trigger_frames:
                         triggered = True
                         log.debug("speech_started")
                         if on_speech_start:
@@ -171,7 +191,7 @@ class AudioPipeline:
                 if not triggered:
                     pre_buffer.append((pcm16, is_speech))
                     speech_count = sum(1 for _, s in pre_buffer if s)
-                    if speech_count >= SPEECH_TRIGGER_FRAMES:
+                    if speech_count >= self.speech_trigger_frames:
                         triggered = True
                         log.debug("speech_started")
                         if on_speech_start:

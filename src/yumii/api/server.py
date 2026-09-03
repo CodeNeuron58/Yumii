@@ -597,6 +597,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         approved = bool(payload.get("approve", False))
                         engine.resolve_confirmation(request_id, approved)
 
+                    elif msg_type == "playback_finished":
+                        await engine.on_playback_finished(payload.get("seq"))
+
                 except Exception:
                     pass
                 continue
