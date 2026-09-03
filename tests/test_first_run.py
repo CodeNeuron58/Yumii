@@ -165,6 +165,7 @@ def test_ensure_is_noop_when_present(monkeypatch):
     monkeypatch.setattr(config.settings, "stt_provider", "local")
     monkeypatch.setattr(models, "_kokoro_present", lambda: True)
     monkeypatch.setattr(models, "_whisper_present", lambda: True)
+    monkeypatch.setattr(models, "_prefetch_smart_turn", lambda report: None)
 
     stages: list[str] = []
     models.ensure_models_ready(lambda s, f: stages.append(s))

@@ -20,6 +20,11 @@ CHANNELS = 1
 
 SPEECH_TRIGGER_FRAMES = 8
 SILENCE_END_FRAMES = 12
+# With Smart Turn available, a shorter silence is enough to *ask* the model
+# whether the user finished; the fixed tail is only the fallback path.
+SILENCE_END_FRAMES_QUICK = 6
+SMART_TURN_RECHECK_STRIDE = 6
+_SMART_TURN_MAX_RECHECKS = 5
 MIN_SPEECH_DURATION_SEC = 0.7
 SILERO_THRESHOLD = 0.5
 # Energy floor before running the VAD — skips faint noise; humming is handled by the Groq confidence gate.
@@ -72,8 +77,14 @@ class AudioPipeline:
         self.speech_trigger_frames = SPEECH_TRIGGER_FRAMES
         self.speech_threshold = SILERO_THRESHOLD
 
+        # Smart Turn (optional): decides "paused mid-thought" vs "finished
+        # speaking" from prosody. Unavailable model -> legacy fixed tail.
+        from yumii.audio.smart_turn import get_smart_turn
+
+        self._smart_turn = get_smart_turn()
+
         self.transcriber = get_stt_provider()
-        log.info("audio_pipeline_ready")
+        log.info("audio_pipeline_ready", smart_turn=self._smart_turn is not None)
 
     def set_speaking_gate(self, armed: bool) -> None:
         """Swap between normal listening and barge-in gating (called mid-capture)."""
@@ -83,6 +94,42 @@ class AudioPipeline:
         else:
             self.speech_trigger_frames = SPEECH_TRIGGER_FRAMES
             self.speech_threshold = SILERO_THRESHOLD
+
+    async def _check_turn_end(
+        self, recording: list, consecutive_silence: int, rechecks: int
+    ) -> tuple[bool, int]:
+        """Decide whether the user's turn is over. Returns (should_end, new_rechecks).
+
+        ``consecutive_silence`` counts silent frames since the last speech
+        frame — absolute, not the 15-frame pre_buffer window, so recheck
+        thresholds can keep climbing. With Smart Turn: ~190ms of silence is
+        enough to ask the model; "incomplete" keeps listening, re-asking
+        every ~190ms of extra silence, force-closing after the cap (user
+        walked away mid-sentence). Without it: the legacy 12-frame (~384ms)
+        silent tail.
+        """
+        if self._smart_turn is None:
+            return consecutive_silence >= SILENCE_END_FRAMES, rechecks
+
+        if consecutive_silence < (
+            SILENCE_END_FRAMES_QUICK + rechecks * SMART_TURN_RECHECK_STRIDE
+        ):
+            return False, rechecks
+
+        if recording:
+            audio = np.concatenate(recording).astype(np.float32) / 32768.0
+        else:
+            audio = np.zeros(FRAME_SIZE, dtype=np.float32)
+        complete, prob = await asyncio.to_thread(self._smart_turn.is_complete, audio)
+
+        if complete:
+            log.debug("smart_turn_complete", prob=round(prob, 3), silence_frames=consecutive_silence)
+            return True, rechecks
+        if rechecks >= _SMART_TURN_MAX_RECHECKS:
+            log.debug("smart_turn_forced_end", rechecks=rechecks)
+            return True, rechecks
+        log.debug("smart_turn_incomplete", prob=round(prob, 3), rechecks=rechecks + 1)
+        return False, rechecks + 1
 
     def _is_speech_silero(self, audio_float32_frame: np.ndarray) -> bool:
         prob = self._silero_model(audio_float32_frame, RATE)
@@ -99,6 +146,8 @@ class AudioPipeline:
         recording = []
         pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
+        rechecks = 0
+        consecutive_silence = 0
         accumulation_buffer = np.array([], dtype=np.float32)
 
         while True:
@@ -108,6 +157,8 @@ class AudioPipeline:
                 recording = []
                 pre_buffer.clear()
                 triggered = False
+                rechecks = 0
+                consecutive_silence = 0
                 accumulation_buffer = np.array([], dtype=np.float32)
                 log.debug("capture_reset_by_mute")
                 continue
@@ -138,9 +189,14 @@ class AudioPipeline:
                         pre_buffer.clear()
                 else:
                     recording.append(pcm16)
-                    pre_buffer.append((pcm16, is_speech))
-                    silence_count = sum(1 for _, s in pre_buffer if not s)
-                    if silence_count >= SILENCE_END_FRAMES:
+                    if is_speech:
+                        consecutive_silence = 0
+                    else:
+                        consecutive_silence += 1
+                    should_end, rechecks = await self._check_turn_end(
+                        recording, consecutive_silence, rechecks
+                    )
+                    if should_end:
                         log.debug("speech_ended")
                         return (
                             np.concatenate(recording)
@@ -160,6 +216,9 @@ class AudioPipeline:
         self._reset_vad()
         pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
+        rechecks = 0
+        recording: list[np.ndarray] = []
+        consecutive_silence = 0
         accumulation_buffer = np.array([], dtype=np.float32)
 
         while True:
@@ -168,6 +227,9 @@ class AudioPipeline:
                 self._reset_vad()
                 pre_buffer.clear()
                 triggered = False
+                rechecks = 0
+                recording = []
+                consecutive_silence = 0
                 accumulation_buffer = np.array([], dtype=np.float32)
                 if hasattr(self.transcriber, "get_final"):
                     self.transcriber.get_final()  # discard the half-utterance
@@ -209,6 +271,11 @@ class AudioPipeline:
                                         on_partial(event["text"])
                         pre_buffer.clear()
                 else:
+                    recording.append(pcm16)
+                    if is_speech:
+                        consecutive_silence = 0
+                    else:
+                        consecutive_silence += 1
                     if hasattr(self.transcriber, "process_chunk"):
                         event = await asyncio.to_thread(self.transcriber.process_chunk, pcm16.tobytes())
                         if event and event.get("type") == "partial_transcript" and on_partial:
@@ -219,9 +286,10 @@ class AudioPipeline:
                             else:
                                 on_partial(event["text"])
 
-                    pre_buffer.append((pcm16, is_speech))
-                    silence_count = sum(1 for _, s in pre_buffer if not s)
-                    if silence_count >= SILENCE_END_FRAMES:
+                    should_end, rechecks = await self._check_turn_end(
+                        recording, consecutive_silence, rechecks
+                    )
+                    if should_end:
                         log.debug("speech_ended")
                         if hasattr(self.transcriber, "get_final"):
                             return self.transcriber.get_final()

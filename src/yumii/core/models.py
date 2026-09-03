@@ -56,6 +56,20 @@ def needs_download() -> bool:
     return False
 
 
+def _prefetch_smart_turn(report: Any) -> None:
+    """Best-effort: Smart Turn is optional, so never fail boot over it."""
+    try:
+        from yumii.audio.smart_turn import is_present, prefetch
+
+        if is_present():
+            return
+        report("Tuning her listening", 0.0)
+        prefetch(on_progress=lambda f: report("Tuning her listening", f))
+        log.info("smart_turn_prefetched")
+    except Exception as e:
+        log.warning("smart_turn_prefetch_failed", error=str(e))
+
+
 def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
     """Download any missing local models. Blocking — call in a thread; raises on failure."""
 
@@ -66,6 +80,8 @@ def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
             on_progress(stage, frac)
         except Exception:
             pass
+
+    _prefetch_smart_turn(report)
 
     if settings.tts_provider == "Kokoro" and not _kokoro_present():
         from yumii.tts.kokoro_model import get_kokoro_model_paths

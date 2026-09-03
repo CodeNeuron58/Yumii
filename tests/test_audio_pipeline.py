@@ -118,6 +118,7 @@ def _make_pipeline(transcriber=None) -> AudioPipeline:
     p.transcriber = transcriber or FakeStreamingTranscriber()
     p.speech_trigger_frames = SPEECH_TRIGGER_FRAMES
     p.speech_threshold = SILERO_THRESHOLD
+    p._smart_turn = None  # legacy fixed-silence end-of-turn
     return p
 
 
