@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from contextlib import aclosing
 from typing import Any, Dict, List
 
 import aiosqlite
@@ -882,31 +883,34 @@ class YumiiEngine:
                     first = kind in ("stream_start", "utterance")
                     interrupted = False
                     try:
-                        async for chunk_data in self.speaker.stream_speak(
-                            response_text
-                        ):
-                            if self.interrupt_event.is_set():
-                                interrupted = True
-                                break
+                        # aclosing: on barge-in break, the generator's finally
+                        # runs and cancels the prefetch worker mid-synthesis.
+                        async with aclosing(
+                            self.speaker.stream_speak(response_text)
+                        ) as stream:
+                            async for chunk_data in stream:
+                                if self.interrupt_event.is_set():
+                                    interrupted = True
+                                    break
 
-                            if (
-                                isinstance(chunk_data, dict)
-                                and chunk_data.get("type") == "metadata"
-                            ):
-                                if first:
+                                if (
+                                    isinstance(chunk_data, dict)
+                                    and chunk_data.get("type") == "metadata"
+                                ):
+                                    if first:
+                                        await self.broadcast_payload(
+                                            {
+                                                "type": "audio_start",
+                                                "sampleRate": chunk_data["sampleRate"],
+                                                "text": response_text,
+                                                "expression": expression,
+                                                "motion": motion,
+                                            }
+                                        )
+                                else:
                                     await self.broadcast_payload(
-                                        {
-                                            "type": "audio_start",
-                                            "sampleRate": chunk_data["sampleRate"],
-                                            "text": response_text,
-                                            "expression": expression,
-                                            "motion": motion,
-                                        }
+                                        {"type": "audio_chunk", "data": chunk_data}
                                     )
-                            else:
-                                await self.broadcast_payload(
-                                    {"type": "audio_chunk", "data": chunk_data}
-                                )
                     except Exception as stream_err:
                         log.error("tts_stream_error", error=str(stream_err), exc_info=True)
                         if first:

@@ -1,13 +1,14 @@
-"""Regression tests for Kokoro's pacing-aware speech chunker.
+"""Regression tests for Kokoro's speech chunker.
 
-The chunker trades off two failure modes: a huge first chunk means
-seconds of silence before the voice starts; a tiny early chunk followed
-by a huge one means playback outruns synthesis and stalls mid-reply.
+Chunk budgets exist for latency and interrupt-responsiveness only — the
+prefetch worker (stream_speak) is what keeps synthesis ahead of playback.
+Small opener chunk = fast first word; steady chunks stay short so an
+in-flight synthesis never outlives a barge-in by long.
 """
 
 from yumii.tts.kokoro_speaker import (
-    _BUDGET_GROWTH,
     _FIRST_CHUNK_BUDGET,
+    _STEADY_BUDGET,
     _split_speech_chunks,
 )
 
@@ -25,11 +26,15 @@ def test_multi_sentence_reply_splits():
     assert " ".join(chunks) == text
 
 
-def test_run_on_sentence_splits_at_conjunction():
-    text = "Hello, it's so nice to meet you and I'm here to support you in any way I can."
+def test_long_run_on_sentence_splits_at_conjunction():
+    text = (
+        "Hello there, it's been such a long day and I have been waiting "
+        "for the chance to talk with you about everything that happened "
+        "since this morning."
+    )
     chunks = _split_speech_chunks(text)
-    assert len(chunks) == 2
-    assert chunks[1].startswith("and ")
+    assert len(chunks) >= 3
+    assert any(c.startswith("and ") for c in chunks)
     assert " ".join(chunks) == text
 
 
@@ -38,16 +43,13 @@ def test_no_punctuation_falls_back_to_single_chunk():
     assert _split_speech_chunks(text) == [text]
 
 
-def test_first_chunk_is_small_then_budget_grows():
-    # Many short sentences: chunk sizes must respect the growing budget
-    # so synthesis stays ahead of playback.
+def test_first_chunk_is_small_then_steady():
     text = "One two three. " * 20
     chunks = _split_speech_chunks(text.strip())
     assert len(chunks[0]) <= _FIRST_CHUNK_BUDGET
-    delivered = len(chunks[0])
     for chunk in chunks[1:]:
-        assert len(chunk) <= max(60, int(_BUDGET_GROWTH * delivered)) + 16  # +one atom slack
-        delivered += len(chunk)
+        # +slack for a single un-splittable atom packed alone
+        assert len(chunk) <= _STEADY_BUDGET + 80
 
 
 def test_empty_and_whitespace():
