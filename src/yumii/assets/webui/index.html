@@ -628,6 +628,7 @@
             let isStreaming = false;
             let scheduledSources = [];
             let currentSampleRate = 24000;
+            let replyCardActive = false; // a streaming reply already owns the card text
 
             // ── Status pill ────────────────────────────────────────────
             const statusBar = document.getElementById('status-bar');
@@ -709,6 +710,7 @@
                     stopAllAudio();
                     hideCard();
                     setStatus('');
+                    replyCardActive = false;
                     setOrbState('idle');
                     return;
                 }
@@ -719,17 +721,28 @@
                     stopAllAudio();
                     hideCard();
                     setStatus('');
+                    replyCardActive = false;
                     setOrbState('idle');
                     showErrorCard(data.kind, data.message);
                     return;
                 }
 
                 if (data.type === "thinking_start" || data.type === "thinking_delta") {
+                    if (data.type === "thinking_start") replyCardActive = false;
                     setStatus('Thinking…');
                     if (orbState !== 'speaking') setOrbState('thinking');
                     return;
                 }
                 if (data.type === "thinking_end") { return; }
+                // Streaming reply: the card grows sentence-by-sentence while
+                // she speaks, so it never jumps backwards to the first words.
+                if (data.type === "reply_text") {
+                    if ((orbState === 'speaking' || orbState === 'thinking') && data.text) {
+                        replyCardActive = true;
+                        showCard(data.text);
+                    }
+                    return;
+                }
                 if (data.type === "tool_status") {
                     if (data.status === "running") setStatus(`${_humanToolName(data.tool)}…`);
                     return;
@@ -770,7 +783,9 @@
                     nextPlayTime = audioContext.currentTime + 0.1;
                     setOrbColor(data.expression);
                     setOrbState('speaking');
-                    showCard(data.text);
+                    // A streamed reply already wrote the card via reply_text —
+                    // don't rewind it to the first sentence.
+                    if (!replyCardActive) showCard(data.text);
                     startOrbPulse();
                     return;
                 }
@@ -805,6 +820,7 @@
                     setTimeout(() => {
                         if (!isStreaming) return;
                         isStreaming = false;
+                        replyCardActive = false;
                         setOrbState('idle');
                         hideCard();
                         setStatus('');

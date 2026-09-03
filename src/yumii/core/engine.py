@@ -22,6 +22,7 @@ from yumii.core.memory_db import init_db
 from yumii.core.memory_manager import memory_manager
 from yumii.core.session_manager import session_manager
 from yumii.tts.factory import get_speaker
+from yumii.tts.sentence_stream import SentenceSegmenter
 
 from yumii.core.logging import get_logger
 
@@ -622,6 +623,33 @@ class YumiiEngine:
                 last_narration: str | None = None
                 turn_error: tuple[str, str] | None = None  # (kind, message)
 
+                # Token→sentence→TTS streaming: a sentence is queued for speech
+                # the moment its punctuation closes, while the model keeps
+                # generating. The full reply is never waited on.
+                segmenter = SentenceSegmenter()
+                spoken_sentences: list[str] = []
+                stream_open = False
+
+                async def _speak_streamed(sentence: str) -> None:
+                    """Queue one streamed sentence; the first opens the audio session."""
+                    nonlocal stream_open
+                    spoken = synthesize(sentence)
+                    if not spoken.response_text:
+                        return
+                    spoken_sentences.append(spoken.response_text)
+                    await self.tts_queue.put(
+                        {
+                            "kind": "stream_text" if stream_open else "stream_start",
+                            "response": spoken.response_text,
+                            "expression": spoken.expression,
+                            "motion": spoken.motion,
+                        }
+                    )
+                    stream_open = True
+                    await self.broadcast_payload(
+                        {"type": "reply_text", "text": " ".join(spoken_sentences)}
+                    )
+
                 try:
                     async for event in self.graph_app.astream_events(
                         initial_state, config=config, version="v2"
@@ -633,8 +661,13 @@ class YumiiEngine:
                         kind = event.get("event")
                         name = event.get("name", "")
 
-                        # Stream tokens as thinking_delta; the graph finalizes the AIMessage itself.
+                        # Stream tokens as thinking_delta, and split them into
+                        # speakable sentences; the graph finalizes the AIMessage itself.
                         if kind == "on_chat_model_stream":
+                            # Only the agent node speaks — any other in-graph
+                            # model (memory/extraction) must never reach TTS.
+                            if event.get("metadata", {}).get("langgraph_node") != "agent":
+                                continue
                             chunk = event.get("data", {}).get("chunk")
                             token = getattr(chunk, "content", None) if chunk else None
                             if token:
@@ -642,6 +675,9 @@ class YumiiEngine:
                                 await self.broadcast_payload(
                                     {"type": "thinking_delta", "text": token}
                                 )
+                                if isinstance(token, str):
+                                    for sentence in segmenter.feed(token):
+                                        await _speak_streamed(sentence)
 
                         elif kind == "on_tool_start":
                             await self.broadcast_payload(
@@ -677,6 +713,7 @@ class YumiiEngine:
                                     )
                                     await self.tts_queue.put(
                                         {
+                                            "kind": "utterance",
                                             "response": spoken.response_text,
                                             "expression": spoken.expression,
                                             "motion": spoken.motion,
@@ -696,6 +733,14 @@ class YumiiEngine:
                 if self.interrupt_event.is_set():
                     log.info("reasoning_interrupted")
                     continue
+
+                # Close the streamed session: flush any sentence still pending,
+                # then hand the speaker task the end-of-audio marker.
+                if stream_open:
+                    tail = segmenter.flush()
+                    if tail:
+                        await _speak_streamed(tail)
+                    await self.tts_queue.put({"kind": "stream_end"})
 
                 # Hard failure with nothing to say: show an actionable error card, not a frozen "Thinking".
                 if reasoning_result is None and turn_error is not None:
@@ -780,71 +825,119 @@ class YumiiEngine:
                 if len(self._memory_turn_buffer) >= _MEMORY_REVIEW_INTERVAL * 2:
                     self._flush_memory_review()
 
-                await self.tts_queue.put(reasoning_result)
+                if stream_open:
+                    # Already spoken sentence-by-sentence; reasoning_result only
+                    # feeds the transcript/memory bookkeeping below.
+                    pass
+                else:
+                    await self.tts_queue.put({"kind": "utterance", **reasoning_result})
             except Exception as e:
                 log.error("reasoning_engine_crash", error=str(e), exc_info=True)
                 await asyncio.sleep(1)
 
     async def tts_speaker_task(self) -> None:
-        """Voice loop: consume reasoning results and stream TTS audio to the orb."""
+        """Voice loop: speak queued payloads.
+
+        Payload kinds:
+        - ``utterance``: standalone one-shot speech (tool narrations, fallbacks) —
+          its own audio_start/audio_end pair.
+        - ``stream_start`` / ``stream_text`` / ``stream_end``: one streamed reply
+          — a single audio session; sentences flow as audio_chunk on the same
+          audio_start, so playback never restarts mid-reply.
+        """
         log.info("speaker_task_started")
         while True:
             try:
-                speech_payload = await self.tts_queue.get()
+                payload = await self.tts_queue.get()
                 if self.interrupt_event.is_set():
+                    # Interrupted turn: drop queued speech and go idle.
+                    self.is_speaking = False
                     continue
 
-                response_text = speech_payload["response"]
-                expression = speech_payload.get("expression", "normal")
-                motion = speech_payload.get("motion", "idle")
+                kind = payload.get("kind", "utterance")
+                response_text = payload.get("response", "")
+                expression = payload.get("expression", "normal")
+                motion = payload.get("motion", "idle")
 
-                log.info("yumii_response", text=response_text)
+                if kind == "stream_end":
+                    if self.is_speaking:
+                        await self.broadcast_payload({"type": "audio_end"})
+                    self.is_speaking = False
+                    continue
 
-                self.is_speaking = True
+                # A dropped stream_start (e.g. interrupt) leaves orphans — skip them.
+                if kind == "stream_text" and not self.is_speaking:
+                    continue
+
+                if kind in ("stream_start", "utterance"):
+                    self.is_speaking = True
+                    log.info("yumii_response", text=response_text)
+
+                if not response_text or not response_text.strip():
+                    continue
 
                 if hasattr(self.speaker, "stream_speak"):
+                    # Only a session opener (or standalone utterance) may send
+                    # audio_start/audio_end; streamed continuations are chunk-only.
+                    first = kind in ("stream_start", "utterance")
+                    interrupted = False
                     try:
                         async for chunk_data in self.speaker.stream_speak(
                             response_text
                         ):
                             if self.interrupt_event.is_set():
+                                interrupted = True
                                 break
 
                             if (
                                 isinstance(chunk_data, dict)
                                 and chunk_data.get("type") == "metadata"
                             ):
-                                await self.broadcast_payload(
-                                    {
-                                        "type": "audio_start",
-                                        "sampleRate": chunk_data["sampleRate"],
-                                        "text": response_text,
-                                        "expression": expression,
-                                        "motion": motion,
-                                    }
-                                )
+                                if first:
+                                    await self.broadcast_payload(
+                                        {
+                                            "type": "audio_start",
+                                            "sampleRate": chunk_data["sampleRate"],
+                                            "text": response_text,
+                                            "expression": expression,
+                                            "motion": motion,
+                                        }
+                                    )
                             else:
                                 await self.broadcast_payload(
                                     {"type": "audio_chunk", "data": chunk_data}
                                 )
-                        if not self.interrupt_event.is_set():
-                            await self.broadcast_payload({"type": "audio_end"})
                     except Exception as stream_err:
                         log.error("tts_stream_error", error=str(stream_err), exc_info=True)
-                        await self.broadcast_payload(
-                            {
-                                "text": response_text,
-                                "expression": expression,
-                                "motion": motion,
-                                "audio": None,
-                                "error": f"TTS failed: {stream_err}",
-                            }
-                        )
+                        if first:
+                            await self.broadcast_payload(
+                                {
+                                    "text": response_text,
+                                    "expression": expression,
+                                    "motion": motion,
+                                    "audio": None,
+                                    "error": f"TTS failed: {stream_err}",
+                                }
+                            )
+                            self.is_speaking = False
+                        continue
+
+                    if interrupted:
+                        self.is_speaking = False
+                        continue
+
+                    if kind == "utterance":
+                        await self.broadcast_payload({"type": "audio_end"})
+                        self.is_speaking = False
+                    # stream_start / stream_text: session stays open until stream_end.
                 else:
-                    # Fallback for non-streaming providers.
+                    # Non-streaming provider: every payload speaks standalone (legacy).
+                    if kind == "stream_end":
+                        continue
                     audio_b64, duration = await asyncio.to_thread(
                         self.speaker.speak, response_text
                     )
+                    self.is_speaking = False
                     if self.interrupt_event.is_set():
                         continue
                     await self.broadcast_payload(
@@ -862,8 +955,6 @@ class YumiiEngine:
                                 break
                             await asyncio.sleep(0.1)
                             slept += 0.1
-
-                self.is_speaking = False
 
             except Exception as e:
                 log.error("tts_speaker_crash", error=str(e), exc_info=True)
