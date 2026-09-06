@@ -45,6 +45,11 @@ class YumiiResponse(BaseModel):
 # Base LLM
 # ----------------------------------------------------------------------
 
+# Legacy fallbacks, used only when no catalog selection exists for a provider.
+_DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+_DEFAULT_ANTHROPIC_MODEL = "claude-3-5-haiku-latest"
+
+
 def build_ollama_llm(model: str, temperature: float = 0.7) -> ChatOllama:
     """Build a ChatOllama for Ollama Cloud (Bearer key via client_kwargs) or a local base_url."""
     client_kwargs: dict = {}
@@ -60,27 +65,90 @@ def build_ollama_llm(model: str, temperature: float = 0.7) -> ChatOllama:
     )
 
 
+def _resolve_model(provider: str) -> str:
+    """The model to speak with: catalog selection first, per-provider key, legacy default."""
+    if settings.llm_model:
+        return settings.llm_model
+    per_provider = {
+        "openai": settings.openai_model or _DEFAULT_OPENAI_MODEL,
+        "anthropic": settings.anthropic_model or _DEFAULT_ANTHROPIC_MODEL,
+        "groq": settings.groq_model,
+        "ollama": settings.ollama_model,
+    }.get(provider)
+    if per_provider:
+        return per_provider
+    raise ValueError(
+        f"No model selected for provider '{provider}'. "
+        "Pick one in Settings → Model picker."
+    )
+
+
+def _provider_api_key(provider: str) -> str | None:
+    """API key for a provider: settings fields where they exist, env (auth.json) otherwise."""
+    direct = {
+        "openai": settings.openai_api_key,
+        "anthropic": settings.anthropic_api_key,
+        "groq": settings.groq_api_key,
+        "ollama": settings.ollama_api_key,
+    }.get(provider)
+    if direct:
+        return direct
+    from yumii.core.model_catalog import key_for
+
+    return key_for(provider)
+
+
 def _build_base_llm() -> Any:
-    """Construct the configured provider's chat model, lazily (constructors validate keys)."""
+    """Construct the configured provider's chat model, lazily (constructors validate keys).
+
+    Provider wiring comes from the model catalog (provider id → LangChain
+    client + key name + base URL); the model id comes from the catalog
+    selection. Unknown provider strings keep the legacy Groq fallback.
+    """
+    from yumii.core.model_catalog import get_wiring
+
     provider = settings.llm_provider.lower()
-    if provider == "openai":
-        return ChatOpenAI(
-            model="gpt-4o",
+    wiring = get_wiring(provider)
+    if wiring is None:
+        # Unknown provider string — legacy behavior: Groq with its configured model.
+        return ChatGroq(
+            model=settings.groq_model,
             temperature=0.7,
-            api_key=settings.openai_api_key,
+            api_key=settings.groq_api_key,
         )
-    if provider == "anthropic":
-        return ChatAnthropic(
-            model="claude-3-5-sonnet-latest",
-            temperature=0.7,
-            api_key=settings.anthropic_api_key,
+
+    model = _resolve_model(wiring.id)
+    temperature = 0.7
+
+    if wiring.kind == "anthropic":
+        api_key = _provider_api_key(wiring.id)
+        if not api_key:
+            raise ValueError(
+                "Anthropic needs an API key — add it in Settings → Model picker."
+            )
+        return ChatAnthropic(model=model, temperature=temperature, api_key=api_key)
+
+    if wiring.kind == "groq":
+        api_key = _provider_api_key(wiring.id)
+        if not api_key:
+            raise ValueError("Groq needs an API key — add it in Settings → Model picker.")
+        return ChatGroq(model=model, temperature=temperature, api_key=api_key)
+
+    if wiring.kind == "ollama":
+        return build_ollama_llm(model, temperature=temperature)
+
+    # "openai" and every "openai-compatible" provider (Google, OpenRouter,
+    # DeepSeek, xAI, Together, Mistral) speak the OpenAI wire protocol.
+    api_key = _provider_api_key(wiring.id)
+    if not api_key and not wiring.key_optional:
+        raise ValueError(
+            f"{wiring.name} needs an API key — add it in Settings → Model picker."
         )
-    if provider == "ollama":
-        return build_ollama_llm(settings.ollama_model)
-    return ChatGroq(
-        model=settings.groq_model,
-        temperature=0.7,
-        api_key=settings.groq_api_key,
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        api_key=api_key or "unused",
+        base_url=wiring.base_url,
     )
 
 

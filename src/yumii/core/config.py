@@ -33,11 +33,15 @@ class Settings(BaseSettings):
     kokoro_voice: str = Field(default="af_heart", alias="KOKORO_VOICE")
     kokoro_model_size: str = Field(default="fp32", alias="KOKORO_MODEL_SIZE")
     llm_provider: str = Field(default="Ollama", alias="LLM_PROVIDER")
+    # Catalog-driven selection (Settings → Model picker) wins over per-provider keys.
+    llm_model: str | None = Field(default=None, alias="LLM_MODEL")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     groq_model: str = Field(default="qwen/qwen3.6-27b", alias="GROQ_MODEL")
     composio_api_key: str | None = Field(default=None, alias="COMPOSIO_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_model: str | None = Field(default=None, alias="OPENAI_MODEL")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    anthropic_model: str | None = Field(default=None, alias="ANTHROPIC_MODEL")
     # Ollama Cloud: key from ollama.com + a cloud model; base_url can point at a local Ollama.
     ollama_api_key: str | None = Field(default=None, alias="OLLAMA_API_KEY")
     ollama_model: str = Field(default="minimax-m3", alias="OLLAMA_MODEL")

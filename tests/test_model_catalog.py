@@ -1,0 +1,200 @@
+"""Tests for the models.dev catalog: snapshot, filtering, wiring, live selection."""
+
+import io
+import json
+
+import pytest
+
+from yumii.core import model_catalog as mc
+from yumii.core.model_catalog import (
+    PROVIDER_WIRING,
+    canonical_provider,
+    get_model,
+    get_wiring,
+    models,
+    providers,
+    reload_catalog,
+)
+
+
+# ---------------------------------------------------------------------------
+# Bundled snapshot
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_snapshot_loads_all_wired_providers():
+    reload_catalog()
+    ids = {p["id"] for p in providers()}
+    assert {"anthropic", "openai", "groq", "google", "openrouter", "deepseek",
+            "xai", "togetherai", "mistral", "ollama"} <= ids
+
+
+def test_bundled_models_are_chat_only():
+    # Whisper-class audio models must never appear as pickable minds.
+    groq_ids = {m["id"] for m in models("groq")}
+    assert groq_ids, "groq snapshot missing"
+    assert not any("whisper" in i for i in groq_ids)
+    assert "tts" not in " ".join(groq_ids)
+
+
+def test_get_model_known_and_unknown():
+    some = models("groq")[0]
+    assert get_model("groq", some["id"])["id"] == some["id"]
+    assert get_model("groq", "totally-not-real-9000") is None
+
+
+def test_openrouter_is_the_big_aggregator():
+    assert len(models("openrouter")) > 100
+
+
+# ---------------------------------------------------------------------------
+# Provider aliasing + wiring
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("Ollama", "ollama"),
+        ("GROQ", "groq"),
+        ("together", "togetherai"),
+        ("x.ai", "xai"),
+        ("nonsense-ai", None),
+    ],
+)
+def test_canonical_provider(raw: str, expected: str | None):
+    assert canonical_provider(raw) == expected
+
+
+def test_every_wired_provider_has_a_key_env():
+    for pid, wiring in PROVIDER_WIRING.items():
+        assert wiring.env_key.endswith("_API_KEY"), pid
+        if wiring.kind == "openai-compatible":
+            assert wiring.base_url, pid
+
+
+# ---------------------------------------------------------------------------
+# Refresh: models.dev fetch -> filtered user snapshot (fake network)
+# ---------------------------------------------------------------------------
+
+
+_FULL = {
+    "groq": {
+        "doc": "https://groq.example",
+        "models": {
+            "llama-chat": {"id": "llama-chat", "name": "Llama Chat", "tool_call": True,
+                           "modalities": {"input": ["text"], "output": ["text"]}},
+            "whisper-big": {"id": "whisper-big", "modalities": {"input": ["audio"], "output": ["text"]}},
+        },
+    },
+    "mystery-provider": {"models": {"m1": {}}},
+}
+
+
+class _FakeResp(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def test_refresh_writes_filtered_user_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        mc.urllib.request, "urlopen", lambda req, timeout: _FakeResp(json.dumps(_FULL).encode())
+    )
+    target = tmp_path / "model-catalog.json"
+    count = mc.refresh_catalog(target=target)
+
+    assert count == 1  # whisper filtered, mystery provider not wired
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert set(data["providers"]["groq"]["models"]) == {"llama-chat"}
+    assert "mystery-provider" not in data["providers"]
+
+
+def test_broken_user_file_falls_back_to_bundled(tmp_path, monkeypatch):
+    bad = tmp_path / "model-catalog.json"
+    bad.write_text("{not json", encoding="utf-8")
+    monkeypatch.setattr(mc, "_USER_FILE", bad)
+    reload_catalog()
+    try:
+        assert providers(), "bundled snapshot must still serve"
+    finally:
+        reload_catalog()
+
+
+# ---------------------------------------------------------------------------
+# Ollama live tags
+# ---------------------------------------------------------------------------
+
+
+def test_ollama_tag_parsing():
+    data = {"models": [{"name": "minimax-m3"}, {"model": "llama3:8b"}, {"name": ""}]}
+    out = mc._parse_ollama_tags(data)
+    assert [m["id"] for m in out] == ["minimax-m3", "llama3:8b"]
+
+
+# ---------------------------------------------------------------------------
+# LLM wiring (agent/llm.py) — no network, constructors only
+# ---------------------------------------------------------------------------
+
+
+from yumii.agent.llm import _build_base_llm, _resolve_model  # noqa: E402
+from yumii.core.config import settings  # noqa: E402
+
+
+def test_llm_model_setting_wins_over_everything(monkeypatch):
+    monkeypatch.setattr(settings, "llm_model", "the-picked-model")
+    monkeypatch.setattr(settings, "llm_provider", "groq")
+    assert _resolve_model("groq") == "the-picked-model"
+
+
+def test_unknown_provider_falls_back_to_groq(monkeypatch):
+    monkeypatch.setattr(settings, "llm_model", None)
+    monkeypatch.setattr(settings, "llm_provider", "nonsense-ai")
+    monkeypatch.setattr(settings, "groq_model", "legacy-behavior")
+    monkeypatch.setattr(settings, "groq_api_key", "test-key")
+    llm = _build_base_llm()
+    assert llm.model_name == "legacy-behavior"
+
+
+def test_openai_compatible_provider_builds_with_base_url(monkeypatch):
+    monkeypatch.setattr(settings, "llm_model", "deepseek-chat")
+    monkeypatch.setattr(settings, "llm_provider", "deepseek")
+    monkeypatch.setattr(mc, "key_for", lambda p: "test-key")
+    llm = _build_base_llm()
+    assert llm.model_name == "deepseek-chat"
+    assert "deepseek" in (llm.openai_api_base or "")
+
+
+def test_missing_key_raises_actionable_error(monkeypatch):
+    monkeypatch.setattr(settings, "llm_model", "some-model")
+    monkeypatch.setattr(settings, "llm_provider", "openrouter")
+    monkeypatch.setattr(mc, "key_for", lambda p: None)
+    with pytest.raises(ValueError, match="Model picker"):
+        _build_base_llm()
+
+
+def test_ollama_needs_no_key(monkeypatch):
+    monkeypatch.setattr(settings, "llm_model", None)
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+    monkeypatch.setattr(settings, "ollama_model", "minimax-m3")
+    monkeypatch.setattr(settings, "ollama_api_key", None)
+    llm = _build_base_llm()
+    assert llm.model == "minimax-m3"
+
+
+def test_hardcoded_models_are_gone():
+    import inspect
+
+    from yumii.agent import llm as llm_mod
+
+    src = inspect.getsource(llm_mod._build_base_llm)
+    assert "gpt-4o" not in src
+    assert "claude-3-5-sonnet" not in src
+
+
+def test_wiring_covers_every_catalog_provider():
+    wiring_ids = set(PROVIDER_WIRING)
+    assert get_wiring("ollama") is not None
+    assert wiring_ids == set(p["id"] for p in providers())

@@ -361,6 +361,142 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Model picker — catalog-driven LLM wiring (provider → key → model, no free text)
+# ---------------------------------------------------------------------------
+
+_LLM_SETTINGS_FIELDS = {
+    "GROQ_API_KEY": "groq_api_key",
+    "OPENAI_API_KEY": "openai_api_key",
+    "ANTHROPIC_API_KEY": "anthropic_api_key",
+    "OLLAMA_API_KEY": "ollama_api_key",
+}
+_LLM_MODEL_PREFS = {
+    "groq": "GROQ_MODEL",
+    "ollama": "OLLAMA_MODEL",
+    "openai": "OPENAI_MODEL",
+    "anthropic": "ANTHROPIC_MODEL",
+}
+
+
+def _llm_current() -> dict[str, Any]:
+    """The active selection, for the picker's prefill."""
+    from yumii.core.config import settings
+    from yumii.core.model_catalog import get_wiring
+
+    provider = settings.llm_provider.lower()
+    wiring = get_wiring(provider)
+    per_provider = {
+        "groq": settings.groq_model,
+        "ollama": settings.ollama_model,
+        "openai": settings.openai_model,
+        "anthropic": settings.anthropic_model,
+    }.get(provider)
+    return {
+        "provider": wiring.id if wiring else provider,
+        "model": settings.llm_model or per_provider or "",
+    }
+
+
+@app.get("/api/llm/catalog")
+async def llm_catalog() -> dict[str, Any]:
+    """Providers Yumii can wire, from the models.dev snapshot + wiring table."""
+    from yumii.core import model_catalog
+
+    return {"providers": model_catalog.providers(), "current": _llm_current()}
+
+
+@app.get("/api/llm/models/{provider_id}")
+async def llm_models(provider_id: str) -> dict[str, Any]:
+    """The provider's pickable models: catalog entries, or live Ollama tags."""
+    from yumii.core import model_catalog
+    from yumii.core.config import settings
+
+    wiring = model_catalog.get_wiring(provider_id)
+    if wiring is None:
+        raise HTTPException(status_code=404, detail=f"Unknown provider: {provider_id}")
+    if wiring.kind == "ollama":
+        models = await model_catalog.ollama_local_models(
+            settings.ollama_base_url, settings.ollama_api_key
+        )
+        return {"models": models, "source": "local"}
+    return {"models": model_catalog.models(wiring.id), "source": "catalog"}
+
+
+@app.post("/api/llm/refresh")
+async def llm_refresh() -> dict[str, Any]:
+    """Re-fetch the models.dev snapshot (non-fatal: bundled snapshot still works)."""
+    from yumii.core import model_catalog
+
+    try:
+        count = await asyncio.to_thread(model_catalog.refresh_catalog)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Catalog refresh failed: {e}")
+    return {"saved": True, "models": count}
+
+
+@app.post("/api/llm/select")
+async def llm_select(body: dict[str, Any]) -> dict[str, Any]:
+    """Wire a provider + model. Applies live (next reply) — no restart needed."""
+    from yumii.agent.llm import clear_llm_cache
+    from yumii.core import model_catalog
+    from yumii.core.config import settings
+    from yumii.core.credential_store import save_credential
+    from yumii.core.global_config import update_global_config
+
+    provider = str(body.get("provider", "")).strip()
+    model = str(body.get("model", "")).strip()
+    api_key = str(body.get("api_key") or "").strip()
+    if not provider or not model:
+        raise HTTPException(status_code=400, detail="provider and model are required")
+
+    wiring = model_catalog.get_wiring(provider)
+    if wiring is None:
+        raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
+
+    # Validate the model id against the catalog (or the live Ollama tag list) —
+    # a model that can't be instantiated never enters the config.
+    if wiring.kind == "ollama":
+        installed = await model_catalog.ollama_local_models(
+            settings.ollama_base_url, settings.ollama_api_key
+        )
+        if installed and model not in {m["id"] for m in installed}:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{model}' is not installed on your Ollama server.",
+            )
+    elif model_catalog.get_model(wiring.id, model) is None:
+        raise HTTPException(
+            status_code=400, detail=f"'{model}' is not a known {wiring.name} model."
+        )
+
+    key = api_key or model_catalog.key_for(wiring.id)
+    if not key and not wiring.key_optional:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{wiring.name} needs an API key — paste it in the picker first.",
+        )
+    if api_key:
+        save_credential(wiring.env_key, api_key)
+        os.environ[wiring.env_key] = api_key
+        field = _LLM_SETTINGS_FIELDS.get(wiring.env_key)
+        if field:
+            setattr(settings, field, api_key)
+
+    # Persist (config.json), then apply live: env + settings + tool-bound cache.
+    update_global_config("LLM_PROVIDER", wiring.id)
+    update_global_config("LLM_MODEL", model)
+    if wiring.id in _LLM_MODEL_PREFS:
+        update_global_config(_LLM_MODEL_PREFS[wiring.id], model)
+    os.environ["LLM_PROVIDER"] = wiring.id
+    os.environ["LLM_MODEL"] = model
+    settings.llm_provider = wiring.id
+    settings.llm_model = model
+
+    clear_llm_cache()
+    return {"saved": True, "provider": wiring.id, "model": model, "applies": "next reply"}
+
+
+# ---------------------------------------------------------------------------
 # REST API: Composio tool integrations (dashboard Tools panel)
 # ---------------------------------------------------------------------------
 

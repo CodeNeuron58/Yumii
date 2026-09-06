@@ -32,6 +32,13 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
         "ANTHROPIC_API_KEY",
         "OLLAMA_API_KEY",
         "COMPOSIO_API_KEY",
+        # Model-picker providers (models.dev catalog wiring).
+        "GEMINI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "XAI_API_KEY",
+        "TOGETHER_API_KEY",
+        "MISTRAL_API_KEY",
     }
 )
 
@@ -39,8 +46,11 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
 PREFERENCE_KEYS: frozenset[str] = frozenset(
     {
         "LLM_PROVIDER",
+        "LLM_MODEL",
         "GROQ_MODEL",
         "OLLAMA_MODEL",
+        "OPENAI_MODEL",
+        "ANTHROPIC_MODEL",
         "OLLAMA_BASE_URL",
         "PERSONALITY",
         "TTS_PROVIDER",
