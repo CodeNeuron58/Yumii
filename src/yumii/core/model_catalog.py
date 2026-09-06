@@ -45,6 +45,8 @@ PROVIDER_WIRING: dict[str, ProviderWiring] = {
     "anthropic": ProviderWiring("anthropic", "Anthropic", "anthropic", "ANTHROPIC_API_KEY"),
     "openai": ProviderWiring("openai", "OpenAI", "openai", "OPENAI_API_KEY"),
     "groq": ProviderWiring("groq", "Groq", "groq", "GROQ_API_KEY"),
+    "opencode": ProviderWiring("opencode", "OpenCode Zen", "openai-compatible", "OPENCODE_API_KEY",
+                               base_url="https://opencode.ai/zen/v1"),
     "ollama": ProviderWiring("ollama", "Ollama (local / cloud)", "ollama", "OLLAMA_API_KEY", key_optional=True),
     "google": ProviderWiring(
         "google", "Google Gemini", "openai-compatible", "GEMINI_API_KEY",

@@ -25,8 +25,15 @@ from yumii.core.model_catalog import (
 def test_bundled_snapshot_loads_all_wired_providers():
     reload_catalog()
     ids = {p["id"] for p in providers()}
-    assert {"anthropic", "openai", "groq", "google", "openrouter", "deepseek",
-            "xai", "togetherai", "mistral", "ollama"} <= ids
+    assert {"anthropic", "openai", "groq", "opencode", "google", "openrouter",
+            "deepseek", "xai", "togetherai", "mistral", "ollama"} <= ids
+
+
+def test_opencode_zen_free_models_are_pickable():
+    zen = models("opencode")
+    free = [m for m in zen if m["cost_in"] == 0 and m["cost_out"] == 0]
+    assert free, "Zen free models missing from the snapshot"
+    assert all(m["tool_call"] for m in zen), "Zen models must support tool calling"
 
 
 def test_bundled_models_are_chat_only():

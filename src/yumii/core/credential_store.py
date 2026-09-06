@@ -39,6 +39,7 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
         "XAI_API_KEY",
         "TOGETHER_API_KEY",
         "MISTRAL_API_KEY",
+        "OPENCODE_API_KEY",
     }
 )
 
