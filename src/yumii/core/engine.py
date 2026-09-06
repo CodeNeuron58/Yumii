@@ -75,6 +75,25 @@ def _classify_turn_error(exc: Exception) -> tuple[str, str]:
     if any(
         s in text
         for s in (
+            "not supported", "modelerror", "does not exist", "no such model",
+        )
+    ):
+        return (
+            "model",
+            "That model isn't available on the provider anymore. "
+            "Pick another one in the dashboard's Model panel — free ones come and go.",
+        )
+    if "internal server error" in text or (
+        "500" in text and "error" in text
+    ):
+        return (
+            "model",
+            "Her mind's server just failed mid-thought — the model itself errored. "
+            "Try again, or pick a different model in the dashboard (free ones can be flaky).",
+        )
+    if any(
+        s in text
+        for s in (
             "401", "403", "unauthorized", "invalid api key", "invalid_api_key",
             "authentication", "no api key", "requires a subscription",
         )

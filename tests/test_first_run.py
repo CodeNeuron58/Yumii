@@ -187,6 +187,9 @@ def test_ensure_is_noop_when_present(monkeypatch):
         ("model is overloaded, try again", "quota"),
         ("Connection refused: getaddrinfo failed", "network"),
         ("request timed out after 30s", "network"),
+        ("Internal server error", "model"),
+        ("Error code: 500 - {'type': 'error', 'error': {'type': 'error', 'message': 'Internal server error'}}", "model"),
+        ("Model muse-spark-free is not supported", "model"),
         ("some totally unexpected explosion", "generic"),
     ],
 )
@@ -194,6 +197,11 @@ def test_error_classification(message, expected):
     kind, text = _classify_turn_error(Exception(message))
     assert kind == expected
     assert text  # always a spoken/shown message
+
+
+def test_model_error_points_at_the_picker():
+    _, msg = _classify_turn_error(Exception("Internal server error"))
+    assert "model" in msg.lower() and ("pick" in msg.lower() or "try" in msg.lower())
 
 
 def test_error_message_is_user_facing():
