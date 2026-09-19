@@ -973,21 +973,24 @@ class YumiiEngine:
                                     interrupted = True
                                     break
 
-                            if (
-                                isinstance(chunk_data, dict)
-                                and chunk_data.get("type") == "metadata"
-                            ):
-                                if first:
-                                    await self.broadcast_payload(
-                                        {
-                                            "type": "audio_start",
-                                            "sampleRate": chunk_data["sampleRate"],
-                                            "text": response_text,
-                                            "expression": expression,
-                                            "motion": motion,
-                                            "seq": self._speak_seq,
-                                        }
-                                    )
+                                # Only a session opener announces audio_start;
+                                # continuations skip their metadata and reuse
+                                # the already-open session.
+                                if (
+                                    isinstance(chunk_data, dict)
+                                    and chunk_data.get("type") == "metadata"
+                                ):
+                                    if first:
+                                        await self.broadcast_payload(
+                                            {
+                                                "type": "audio_start",
+                                                "sampleRate": chunk_data["sampleRate"],
+                                                "text": response_text,
+                                                "expression": expression,
+                                                "motion": motion,
+                                                "seq": self._speak_seq,
+                                            }
+                                        )
                                 else:
                                     await self.broadcast_payload(
                                         {"type": "audio_chunk", "data": chunk_data}

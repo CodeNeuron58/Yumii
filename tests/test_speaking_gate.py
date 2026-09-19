@@ -90,3 +90,176 @@ async def test_arm_increments_session_seq():
     assert e._speak_seq == 2
     e._disarm_speaking_gate()
     assert not e.is_speaking
+
+
+# ---------------------------------------------------------------------------
+# tts_speaker_task streamed broadcasts. Regression for cf276e5, which
+# out-dented the broadcast block out of the stream loop: she never spoke,
+# and a yield-less stream misreported as "TTS failed: name 'chunk_data'".
+# ---------------------------------------------------------------------------
+
+
+class _StreamSpeaker:
+    """stream_speak protocol: metadata dict first, then base64 chunk strings."""
+
+    def __init__(self, chunks=("AAA", "BBB"), fail: bool = False) -> None:
+        self.chunks = list(chunks)
+        self.fail = fail
+
+    async def stream_speak(self, text: str):
+        yield {"type": "metadata", "sampleRate": 24000}
+        for chunk in self.chunks:
+            if self.fail:
+                raise RuntimeError("boom")
+            yield chunk
+
+
+class _GatedSpeaker:
+    """Same protocol with a pause between chunks — a window to trip barge-in."""
+
+    async def stream_speak(self, text: str):
+        yield {"type": "metadata", "sampleRate": 24000}
+        yield "AAA"
+        await asyncio.sleep(0.05)
+        yield "BBB"
+
+
+class _EmptySpeaker:
+    """Hypothetical provider whose stream yields nothing at all."""
+
+    async def stream_speak(self, text: str):
+        return
+        yield  # pragma: no cover — makes this an async generator
+
+
+def _speaker_engine() -> tuple[YumiiEngine, list, list]:
+    """Engine stub with a recording broadcast + gate hooks."""
+    e = _engine()
+    e.tts_queue = asyncio.Queue()
+    sent: list = []
+    disarm: list = []
+
+    async def fake_broadcast(payload):
+        sent.append(payload)
+
+    e.broadcast_payload = fake_broadcast
+    e._arm_speaking_gate = lambda: None
+    e._disarm_speaking_gate = lambda: disarm.append(1)
+    e._arm_playback_watchdog = lambda seq: None
+    return e, sent, disarm
+
+
+async def _run_speaker_until(e: YumiiEngine, done, timeout: float = 2.0, cancel: bool = True):
+    """Drive tts_speaker_task until ``done()`` is true; leave it running if cancel=False."""
+    task = asyncio.create_task(e.tts_speaker_task())
+    try:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not done():
+            if loop.time() > deadline:
+                raise TimeoutError("speaker task never reached the expected state")
+            await asyncio.sleep(0.01)
+    finally:
+        if cancel:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+    return task
+
+
+def _payload(kind: str) -> dict:
+    return {"kind": kind, "response": "hello", "expression": "smile", "motion": "nod"}
+
+
+@pytest.mark.asyncio
+async def test_streamed_tts_broadcasts_audio_start_then_chunks():
+    e, sent, _ = _speaker_engine()
+    e._speak_seq = 7
+    e.speaker = _StreamSpeaker()
+    e.tts_queue.put_nowait(_payload("stream_start"))
+
+    await _run_speaker_until(e, lambda: len(sent) >= 3)
+
+    assert sent[0]["type"] == "audio_start"
+    assert sent[0]["sampleRate"] == 24000
+    assert sent[0]["seq"] == 7
+    assert sent[0]["expression"] == "smile"
+    assert sent[1] == {"type": "audio_chunk", "data": "AAA"}
+    assert sent[2] == {"type": "audio_chunk", "data": "BBB"}
+
+
+@pytest.mark.asyncio
+async def test_stream_continuation_reuses_the_open_session():
+    e, sent, _ = _speaker_engine()
+    e.is_speaking = True  # stream_text is dropped when no session is open
+    e.speaker = _StreamSpeaker()
+    e.tts_queue.put_nowait(_payload("stream_start"))
+    e.tts_queue.put_nowait(_payload("stream_text"))
+    e.tts_queue.put_nowait({"kind": "stream_end"})  # sentinel — processed last
+
+    await _run_speaker_until(e, lambda: any(p["type"] == "audio_end" for p in sent))
+
+    # opener: audio_start + chunks; continuation: chunks only (metadata skipped)
+    assert [p["type"] for p in sent] == [
+        "audio_start", "audio_chunk", "audio_chunk",
+        "audio_chunk", "audio_chunk",
+        "audio_end",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_stream_yielding_nothing_stays_silent():
+    e, sent, _ = _speaker_engine()
+    e.speaker = _EmptySpeaker()
+    e.tts_queue.put_nowait(_payload("stream_start"))
+
+    task = asyncio.create_task(e.tts_speaker_task())
+    try:
+        await asyncio.sleep(0.15)
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    assert sent == []  # no audio, and no "TTS failed: name 'chunk_data'" card
+    assert task.cancelled()  # the task survived and is waiting for work
+
+
+@pytest.mark.asyncio
+async def test_stream_tts_error_sends_error_card_and_disarms():
+    e, sent, disarm = _speaker_engine()
+    e.speaker = _StreamSpeaker(fail=True)
+    e.tts_queue.put_nowait(_payload("stream_start"))
+
+    await _run_speaker_until(e, lambda: len(sent) >= 2)
+
+    assert sent[0]["type"] == "audio_start"  # metadata broadcast before the failure
+    card = sent[1]
+    assert card["error"] == "TTS failed: boom"
+    assert card["audio"] is None
+    assert disarm  # gate released — she can hear the next barge-in
+
+
+@pytest.mark.asyncio
+async def test_barge_in_mid_stream_stops_broadcasts_and_disarms():
+    e, sent, disarm = _speaker_engine()
+    e.speaker = _GatedSpeaker()
+    e.tts_queue.put_nowait(_payload("stream_start"))
+
+    task = await _run_speaker_until(e, lambda: len(sent) >= 2, cancel=False)
+    try:
+        e.interrupt_event.set()
+        await asyncio.sleep(0.12)  # _GatedSpeaker's pause — BBB would arrive here
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    assert [p["type"] for p in sent] == ["audio_start", "audio_chunk"]
+    assert disarm  # interrupted turn released the gate
