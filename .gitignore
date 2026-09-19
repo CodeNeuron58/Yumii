@@ -35,3 +35,6 @@ Thumbs.db
 
 # Staged model files for the installer (fetched at build time)
 packaging/build-models/
+
+# demo/export videos — 90MB+ binaries never belong in git
+*.mp4
