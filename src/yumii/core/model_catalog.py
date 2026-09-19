@@ -67,6 +67,19 @@ PROVIDER_WIRING: dict[str, ProviderWiring] = {
 # legacy aliases users may have typed in config.json
 _PROVIDER_ALIASES = {"together": "togetherai", "x.ai": "xai", "grok": "xai"}
 
+# Google serves many text-capable endpoints that are not chat "minds":
+# image generation, TTS, Live-API audio, transcription, computer use,
+# deep research, robotics, embeddings. None of those should be pickable.
+_MIND_EXCLUDE = (
+    "-image", "-tts", "live", "transcribe", "computer-use",
+    "deep-research", "robotics", "embedding", "-omni",
+)
+
+
+def _is_chat_mind(model_id: str) -> bool:
+    i = model_id.lower()
+    return i.startswith(("gemini", "gemma")) and not any(x in i for x in _MIND_EXCLUDE)
+
 
 def canonical_provider(provider: str) -> str | None:
     """Map a configured provider string to a wiring id (case-insensitive)."""
@@ -152,19 +165,26 @@ def _slim(mid: str, m: dict) -> dict:
 
 
 def models(provider: str) -> list[dict]:
-    """Chat models for a provider from the snapshot (Ollama is handled separately)."""
+    """Chat models for a provider from the snapshot (Ollama + live Google handled separately)."""
     pid = canonical_provider(provider)
     if not pid:
         return []
-    return [
+    slimmed = [
         _slim(mid, m)
         for mid, m in (_get().get(pid, {}).get("models", {})).items()
     ]
+    if pid == "google":
+        # models.dev carries image/TTS/Live models whose text modality flags
+        # slip past the snapshot filter — only true chat minds survive here.
+        slimmed = [m for m in slimmed if _is_chat_mind(m["id"])]
+    return slimmed
 
 
 def get_model(provider: str, model_id: str) -> dict | None:
     pid = canonical_provider(provider)
     if not pid:
+        return None
+    if pid == "google" and not _is_chat_mind(model_id):
         return None
     m = _get().get(pid, {}).get("models", {}).get(model_id)
     return _slim(model_id, m) if m else None
@@ -203,6 +223,78 @@ async def ollama_local_models(base_url: str, api_key: str | None) -> list[dict]:
         log.warning("ollama_tags_unreachable", extra={"error": str(e)})
         return []
     return _parse_ollama_tags(data)
+
+
+_GOOGLE_MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+
+
+def _parse_google_models(data: dict, meta_by_id: dict | None = None) -> list[dict]:
+    """Google ListModels payload -> Yumii's slim shape (chat minds only).
+
+    Anything that doesn't do ``generateContent`` is dropped, and the
+    non-chat text endpoints (image gen, TTS, Live audio, ...) are filtered
+    by :func:`_is_chat_mind`.
+    """
+    meta_by_id = meta_by_id or {}
+    out = []
+    for m in data.get("models", []):
+        methods = m.get("supportedGenerationMethods") or []
+        raw = (m.get("name") or "").removeprefix("models/")
+        if "generateContent" not in methods or not raw or not _is_chat_mind(raw):
+            continue
+        meta = meta_by_id.get(raw)
+        if meta is not None:
+            tool_call, reasoning = bool(meta.get("tool_call")), bool(meta.get("reasoning"))
+        else:
+            # Every Gemini text model takes function calls; gemma is unknown.
+            tool_call, reasoning = raw.startswith("gemini"), None
+        out.append({
+            "id": raw,
+            "name": m.get("displayName") or raw,
+            "tool_call": tool_call,
+            "reasoning": reasoning,
+            "context": m.get("inputTokenLimit"),
+            "max_output": m.get("outputTokenLimit"),
+            "cost_in": None,
+            "cost_out": None,
+        })
+    # gemini line first (newest version first), gemma after it
+    out.sort(key=lambda m: (not m["id"].startswith("gemma"), m["id"]), reverse=True)
+    return out
+
+
+async def google_live_models(api_key: str) -> list[dict]:
+    """Models this key can actually use, straight from Google — the live catalog.
+
+    Google's own listing beats any snapshot: it can't list shut-down models
+    or ones the key has no access to. All-or-nothing: [] on any failure so
+    the caller falls back to the snapshot.
+    """
+    import aiohttp
+
+    meta_by_id = _get().get("google", {}).get("models", {})
+    out: list[dict] = []
+    page_token: str | None = None
+    try:
+        async with aiohttp.ClientSession(
+            headers={"x-goog-api-key": api_key},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as s:
+            while True:
+                params: dict[str, str] = {"pageSize": "200"}
+                if page_token:
+                    params["pageToken"] = page_token
+                async with s.get(_GOOGLE_MODELS_URL, params=params) as resp:
+                    resp.raise_for_status()
+                    data = await resp.json()
+                out.extend(_parse_google_models(data, meta_by_id))
+                page_token = data.get("nextPageToken")
+                if not page_token:
+                    break
+    except Exception as e:
+        log.warning("google_models_unreachable", extra={"error": str(e)})
+        return []
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +357,7 @@ __all__ = [
     "get_model",
     "key_for",
     "ollama_local_models",
+    "google_live_models",
     "refresh_catalog",
     "reload_catalog",
 ]

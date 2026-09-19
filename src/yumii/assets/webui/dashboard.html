@@ -136,6 +136,9 @@
                 <div class="row"><label>Provider</label>
                     <select id="llm-provider"></select>
                     <button class="btn sm ghost" id="llm-refresh" title="Re-fetch the model catalog from models.dev">Refresh</button>
+                    <label class="hint" style="display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer">
+                        <input type="checkbox" id="llm-free-only"> Free only
+                    </label>
                 </div>
                 <div class="row" id="llm-key-row"><label>API key</label>
                     <input type="password" id="llm-key" placeholder="paste API key">
@@ -511,15 +514,23 @@
         const llmKeyRow = document.getElementById('llm-key-row');
         const llmHint = document.getElementById('llm-model-hint');
         const llmNote = document.getElementById('llm-note');
+        const llmFreeOnly = document.getElementById('llm-free-only');
         let llmProviders = [];
+
+        // OpenRouter marks free models with a ':free' id suffix and omits
+        // cost data entirely; other providers use real $0 pricing.
+        function _isFree(m) {
+            return String(m.id).includes(':free') || (m.cost_in === 0 && m.cost_out === 0);
+        }
 
         function _modelLabel(m) {
             const bits = [];
+            if (_isFree(m)) bits.push('FREE');
             if (m.tool_call) bits.push('tools');
             if (m.reasoning) bits.push('reasoning');
             if (m.context) bits.push(`${Math.round(m.context / 1000)}k ctx`);
             const price = m.cost_in != null ? `$${m.cost_in}/$${m.cost_out} per Mtok` : null;
-            if (price) bits.push(price);
+            if (price && !_isFree(m)) bits.push(price);
             return bits.length ? `${m.name} — ${bits.join(' · ')}` : m.name;
         }
 
@@ -537,11 +548,21 @@
                 const r = await fetch(`${API}/api/llm/models/${encodeURIComponent(providerId)}`, { cache: 'no-store' });
                 if (!r.ok) throw new Error(await r.text());
                 const data = await r.json();
-                const models = data.models || [];
+                let models = data.models || [];
+                const total = models.length;
+                // "live" = Google's ListModels — there are no separate free
+                // model IDs; every key gets a free rate-limited quota instead,
+                // so the Free-only filter doesn't apply there.
+                const live = data.source === 'live';
+                if (llmFreeOnly.checked && !live) {
+                    models = models.filter(_isFree);
+                }
                 if (!models.length) {
-                    llmHint.textContent = data.source === 'local'
-                        ? "Ollama server unreachable — start it (or `ollama serve`) and reopen Settings."
-                        : 'No models in the catalog — hit Refresh.';
+                    llmHint.textContent = total && llmFreeOnly.checked
+                        ? 'No free models for this provider — untick "Free only" to see all.'
+                        : (data.source === 'local'
+                            ? "Ollama server unreachable — start it (or `ollama serve`) and reopen Settings."
+                            : 'No models in the catalog — hit Refresh.');
                     return;
                 }
                 for (const m of models) {
@@ -551,9 +572,13 @@
                     if (m.id === preselect) opt.selected = true;
                     llmModelEl.appendChild(opt);
                 }
-                llmHint.textContent = data.source === 'local'
-                    ? `${models.length} models installed on your Ollama server.`
-                    : `${models.length} models from the models.dev catalog.`;
+                const freeCount = (data.models || []).filter(_isFree).length;
+                let hint;
+                if (live) hint = `${models.length} models, live from Google — every key also gets a free rate-limited quota.`;
+                else if (llmFreeOnly.checked) hint = `${models.length} free of ${total} models.`;
+                else if (data.source === 'local') hint = `${models.length} models installed on your Ollama server.`;
+                else hint = `${models.length} models (${freeCount} free) from the models.dev catalog.`;
+                llmHint.textContent = hint;
             } catch (e) {
                 llmHint.textContent = 'Could not load models: ' + e.message;
             }
@@ -589,6 +614,8 @@
             llmKeyEl.value = '';
             loadLlmModels(llmProviderEl.value, null);
         });
+
+        llmFreeOnly.addEventListener('change', () => loadLlmModels(llmProviderEl.value, null));
 
         document.getElementById('llm-refresh').addEventListener('click', async () => {
             llmNote.textContent = 'Refreshing catalog…';

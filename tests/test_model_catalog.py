@@ -142,6 +142,80 @@ def test_ollama_tag_parsing():
 
 
 # ---------------------------------------------------------------------------
+# Google: mind filter + live ListModels
+# ---------------------------------------------------------------------------
+
+
+def test_google_snapshot_shows_chat_minds_only():
+    ids = {m["id"] for m in models("google")}
+    assert ids, "google snapshot missing"
+    # real chat models survive…
+    assert "gemini-2.5-flash" in ids
+    # …image gen / TTS / Live audio / research / computer-use never appear
+    joined = " ".join(ids)
+    assert not any(x in joined for x in ("-image", "-tts", "live", "transcribe",
+                                         "computer-use", "deep-research"))
+
+
+def test_google_get_model_rejects_non_minds():
+    assert get_model("google", "gemini-2.5-flash") is not None
+    assert get_model("google", "gemini-3.1-flash-lite-image") is None
+
+
+@pytest.mark.parametrize(
+    "mid,expected",
+    [
+        ("gemini-3.8-flash", True),
+        ("gemma-3-27b-it", True),
+        ("gemini-3.1-flash-lite-image", False),   # Nano Banana image gen
+        ("gemini-2.5-flash-preview-tts", False),  # TTS
+        ("gemini-3.1-flash-live-preview", False),  # Live API audio
+        ("gemini-3.5-transcribe", False),
+        ("gemini-2.5-computer-use-preview-10-2025", False),
+        ("deep-research-max-preview-04-2026", False),
+        ("text-embedding-004", False),
+    ],
+)
+def test_is_chat_mind(mid: str, expected: bool):
+    assert mc._is_chat_mind(mid) is expected
+
+
+_GOOGLE_LIST = {
+    "models": [
+        {"name": "models/gemini-3.8-flash", "displayName": "Gemini 3.8 Flash",
+         "inputTokenLimit": 1048576, "outputTokenLimit": 65536,
+         "supportedGenerationMethods": ["generateContent", "countTokens"]},
+        {"name": "models/gemini-2.5-flash-preview-tts", "displayName": "TTS",
+         "supportedGenerationMethods": ["generateContent"]},
+        {"name": "models/gemini-embedding-001",
+         "supportedGenerationMethods": ["embedContent"]},
+        {"name": "models/imagen-4.0-generate-001",
+         "supportedGenerationMethods": ["predict"]},
+    ],
+}
+
+
+def test_google_listmodels_parsing():
+    out = mc._parse_google_models(
+        _GOOGLE_LIST, {"gemini-3.8-flash": {"tool_call": True, "reasoning": True}}
+    )
+    ids = [m["id"] for m in out]
+    assert ids == ["gemini-3.8-flash"]  # TTS + embeddings + imagen filtered
+    m = out[0]
+    assert m["name"] == "Gemini 3.8 Flash"
+    assert m["tool_call"] is True and m["reasoning"] is True
+    assert m["context"] == 1048576 and m["max_output"] == 65536
+
+
+def test_google_listmodels_unknown_model_defaults():
+    data = {"models": [{"name": "models/gemini-9.9-flash", "displayName": "Gemini 9.9 Flash",
+                        "supportedGenerationMethods": ["generateContent"]}]}
+    (m,) = mc._parse_google_models(data)
+    assert m["id"] == "gemini-9.9-flash"
+    assert m["tool_call"] is True and m["reasoning"] is None
+
+
+# ---------------------------------------------------------------------------
 # LLM wiring (agent/llm.py) — no network, constructors only
 # ---------------------------------------------------------------------------
 

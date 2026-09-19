@@ -419,6 +419,14 @@ async def llm_models(provider_id: str) -> dict[str, Any]:
             settings.ollama_base_url, settings.ollama_api_key
         )
         return {"models": models, "source": "local"}
+    if wiring.id == "google":
+        # Google publishes a live listing — show exactly what this key can use
+        # (never shut-down models, and tool/image/TTS noise is filtered out).
+        key = model_catalog.key_for("google")
+        if key:
+            live = await model_catalog.google_live_models(key)
+            if live:
+                return {"models": live, "source": "live"}
     return {"models": model_catalog.models(wiring.id), "source": "catalog"}
 
 
@@ -464,7 +472,13 @@ async def llm_select(body: dict[str, Any]) -> dict[str, Any]:
                 status_code=400,
                 detail=f"'{model}' is not installed on your Ollama server.",
             )
-    elif model_catalog.get_model(wiring.id, model) is None:
+    elif model_catalog.get_model(wiring.id, model) is not None:
+        pass  # in the (bundled or refreshed) catalog
+    elif wiring.id == "google" and (gkey := model_catalog.key_for(wiring.id)) and any(
+        m["id"] == model for m in await model_catalog.google_live_models(gkey)
+    ):
+        pass  # live-listed by Google — newer than the bundled snapshot
+    else:
         raise HTTPException(
             status_code=400, detail=f"'{model}' is not a known {wiring.name} model."
         )
