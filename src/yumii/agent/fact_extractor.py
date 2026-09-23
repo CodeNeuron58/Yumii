@@ -12,7 +12,6 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from yumii.core.config import settings
 from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -82,41 +81,17 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
 
 
 def _get_extractor_llm() -> Any:
-    """A cheap LLM for extraction — the configured provider's fast/cheap tier."""
-    provider = settings.llm_provider.lower()
+    """The LLM for extraction and summaries, via the catalog wiring.
 
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
+    The old hardcoded switch (openai/anthropic/ollama, Groq fallback) was
+    silent death for the seven picker-only providers — this goes through
+    the same path as the agent's mind, so every configured provider works.
+    Callers catch and warn, so a missing key degrades to "no memory
+    review this turn" with a log line instead of a crash.
+    """
+    from yumii.agent.llm import build_background_llm
 
-        return ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0.0,
-            api_key=settings.openai_api_key,
-        )
-
-    if provider == "anthropic":
-        from langchain_anthropic import ChatAnthropic
-
-        return ChatAnthropic(
-            model="claude-3-5-sonnet-latest",
-            temperature=0.0,
-            api_key=settings.anthropic_api_key,
-        )
-
-    if provider == "ollama":
-        # Ollama Cloud has no cheap tier — reuse the configured model at temp 0.
-        from yumii.agent.llm import build_ollama_llm
-
-        return build_ollama_llm(settings.ollama_model, temperature=0.0)
-
-    # Default — Groq (cheapest, fastest)
-    from langchain_groq import ChatGroq
-
-    return ChatGroq(
-        model="llama-3.1-8b-instant",
-        temperature=0.0,
-        api_key=settings.groq_api_key,
-    )
+    return build_background_llm(temperature=0.0)
 
 
 def _format_messages_for_prompt(messages: list[dict[str, str]]) -> str:

@@ -98,7 +98,7 @@ def _provider_api_key(provider: str) -> str | None:
     return key_for(provider)
 
 
-def _build_base_llm() -> Any:
+def _build_base_llm(temperature: float = 0.7) -> Any:
     """Construct the configured provider's chat model, lazily (constructors validate keys).
 
     Provider wiring comes from the model catalog (provider id → LangChain
@@ -113,12 +113,11 @@ def _build_base_llm() -> Any:
         # Unknown provider string — legacy behavior: Groq with its configured model.
         return ChatGroq(
             model=settings.groq_model,
-            temperature=0.7,
+            temperature=temperature,
             api_key=settings.groq_api_key,
         )
 
     model = _resolve_model(wiring.id)
-    temperature = 0.7
 
     if wiring.kind == "anthropic":
         api_key = _provider_api_key(wiring.id)
@@ -150,6 +149,17 @@ def _build_base_llm() -> Any:
         api_key=api_key or "unused",
         base_url=wiring.base_url,
     )
+
+
+def build_background_llm(temperature: float = 0.0) -> Any:
+    """The configured provider's chat model without tools bound — the shared
+    workhorse for background jobs (memory extraction, session summaries).
+
+    Goes through the same catalog wiring as the agent's mind, so every
+    provider the picker supports works here too; missing keys raise the
+    same actionable errors (callers catch and degrade with a warning).
+    """
+    return _build_base_llm(temperature=temperature)
 
 
 # ----------------------------------------------------------------------
@@ -244,6 +254,7 @@ __all__ = [
     "YumiiResponse",
     "BoundLLM",
     "get_agent_llm",
+    "build_background_llm",
     "clear_llm_cache",
     "clear_agent_cache",
 ]

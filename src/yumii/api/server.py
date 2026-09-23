@@ -118,10 +118,18 @@ async def status() -> dict[str, Any]:
     """First-run status for the orb: LLM key configured + local model state."""
     from yumii.core.config import settings
     from yumii.core.credential_store import get_credential
+    from yumii.core.model_catalog import get_wiring
 
     config = load_global_config()
     provider = config.get("LLM_PROVIDER", settings.llm_provider)
-    configured = bool(get_credential(f"{provider.upper()}_API_KEY"))
+    wiring = get_wiring(provider)
+    if wiring is None:
+        configured = False
+    else:
+        # Key name comes from the wiring (Google stores GEMINI_API_KEY, not
+        # GOOGLE_API_KEY); key-optional providers (local Ollama) are
+        # configured without one.
+        configured = wiring.key_optional or bool(get_credential(wiring.env_key))
     return {
         "configured": configured,
         "provider": provider,
@@ -260,9 +268,40 @@ async def delete_fact_endpoint(fact_id: str) -> dict[str, Any]:
 # REST API: Settings (dashboard)
 # ---------------------------------------------------------------------------
 
+# Credential keys that also live on the Settings object. Saving one goes to
+# auth.json AND env AND the settings field, so the picker (`key_for`),
+# `connected` badges, and the factories all see it without a restart.
+_CREDENTIAL_SETTINGS_FIELDS: dict[str, str] = {
+    "GROQ_API_KEY": "groq_api_key",
+    "OPENAI_API_KEY": "openai_api_key",
+    "ANTHROPIC_API_KEY": "anthropic_api_key",
+    "OLLAMA_API_KEY": "ollama_api_key",
+    "COMPOSIO_API_KEY": "composio_api_key",
+    "ELEVENLABS_API_KEY": "elevenlabs_api_key",
+    "CAMB_API_KEY": "camb_api_key",
+}
+
+
+def _mirror_credential(key: str, value: str) -> None:
+    """Make a freshly saved credential visible immediately (env + settings)."""
+    from yumii.core.config import settings
+
+    os.environ[key] = value
+    field = _CREDENTIAL_SETTINGS_FIELDS.get(key)
+    if field:
+        setattr(settings, field, value)
+
+
+def _llm_provider_choices() -> list[str]:
+    """Every catalog provider id — the picker stores lowercase wiring ids."""
+    from yumii.core.model_catalog import PROVIDER_WIRING
+
+    return list(PROVIDER_WIRING.keys())
+
+
 # Whitelist of writable preference keys — anything else is rejected.
 _SETTING_CHOICES: dict[str, list[str]] = {
-    "LLM_PROVIDER": ["Groq", "OpenAI", "Anthropic", "Ollama"],
+    "LLM_PROVIDER": _llm_provider_choices(),
     "TTS_PROVIDER": ["Kokoro", "ElevenLabs", "CAMB.ai"],
     "STT_PROVIDER": ["local", "groq", "vosk"],
     "PERSONALITY": ["caring", "tsundere", "genki", "kuudere", "yandere", "dandere"],
@@ -294,6 +333,7 @@ def _mask(value: str) -> str:
 @app.get("/api/settings")
 async def get_settings() -> dict[str, Any]:
     """Current preferences + masked credentials for the dashboard."""
+    from yumii.core.config import settings
     from yumii.core.credential_store import CREDENTIAL_KEYS, get_credential
 
     config = load_global_config()
@@ -301,6 +341,10 @@ async def get_settings() -> dict[str, Any]:
         key: config.get(key, choices[0])
         for key, choices in _SETTING_CHOICES.items()
     }
+    # The engine's actual default (config.py) — not the first choice in the
+    # list, which used to report "Groq" on a fresh Ollama install.
+    if "LLM_PROVIDER" not in config:
+        preferences["LLM_PROVIDER"] = settings.llm_provider
     text_settings = {
         key: config.get(key, default) for key, default in _TEXT_SETTINGS.items()
     }
@@ -316,6 +360,25 @@ async def get_settings() -> dict[str, Any]:
     }
 
 
+def _apply_provider_change(provider: str) -> None:
+    """Apply a provider switch live (the picker's semantics) and drop a now-
+    foreign global model — a model id from the old provider would otherwise
+    guarantee provider-side model-not-found on every turn. The factory's
+    actionable "pick one in Settings → Model picker" error surfaces instead.
+    """
+    from yumii.agent.llm import clear_llm_cache
+    from yumii.core.config import settings
+    from yumii.core.global_config import update_global_config
+
+    if load_global_config().get("LLM_MODEL"):
+        update_global_config("LLM_MODEL", "")
+        settings.llm_model = None
+        os.environ.pop("LLM_MODEL", None)
+    os.environ["LLM_PROVIDER"] = provider
+    settings.llm_provider = provider
+    clear_llm_cache()
+
+
 @app.put("/api/settings")
 async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
     """Save preferences and/or credentials from the dashboard."""
@@ -328,11 +391,24 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
     for key, value in prefs.items():
         if key not in _SETTING_CHOICES:
             raise HTTPException(status_code=400, detail=f"Unknown preference: {key}")
-        if value not in _SETTING_CHOICES[key]:
+        if key == "LLM_PROVIDER":
+            # The picker stores lowercase catalog ids; the orb's onboarding
+            # sends the legacy 'Ollama'. Canonicalize instead of rejecting.
+            from yumii.core.model_catalog import canonical_provider
+
+            canonical = canonical_provider(str(value))
+            if canonical is None:
+                raise HTTPException(
+                    status_code=400, detail=f"Unknown provider: {value}"
+                )
+            value = canonical
+        elif value not in _SETTING_CHOICES[key]:
             raise HTTPException(status_code=400, detail=f"Invalid value for {key}: {value}")
         current = load_global_config().get(key)
         if current != value:
             update_global_config(key, value)
+            if key == "LLM_PROVIDER":
+                _apply_provider_change(value)
             if key in _RESTART_KEYS:
                 restart_required = True
 
@@ -355,6 +431,7 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
         value = str(value).strip()
         if value:
             save_credential(key, value)
+            _mirror_credential(key, value)
             restart_required = True
 
     return {"saved": True, "restart_required": restart_required}
@@ -364,12 +441,6 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
 # Model picker — catalog-driven LLM wiring (provider → key → model, no free text)
 # ---------------------------------------------------------------------------
 
-_LLM_SETTINGS_FIELDS = {
-    "GROQ_API_KEY": "groq_api_key",
-    "OPENAI_API_KEY": "openai_api_key",
-    "ANTHROPIC_API_KEY": "anthropic_api_key",
-    "OLLAMA_API_KEY": "ollama_api_key",
-}
 _LLM_MODEL_PREFS = {
     "groq": "GROQ_MODEL",
     "ollama": "OLLAMA_MODEL",
@@ -491,10 +562,7 @@ async def llm_select(body: dict[str, Any]) -> dict[str, Any]:
         )
     if api_key:
         save_credential(wiring.env_key, api_key)
-        os.environ[wiring.env_key] = api_key
-        field = _LLM_SETTINGS_FIELDS.get(wiring.env_key)
-        if field:
-            setattr(settings, field, api_key)
+        _mirror_credential(wiring.env_key, api_key)
 
     # Persist (config.json), then apply live: env + settings + tool-bound cache.
     update_global_config("LLM_PROVIDER", wiring.id)
