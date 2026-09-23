@@ -83,6 +83,38 @@ def test_tool_message_after_ai_does_not_confuse_detection():
     assert _derive_tool_narration(out) == "Checking now."
 
 
+def test_block_list_content_is_not_repr_spoken():
+    """Anthropic-style providers return block-list content — str() of it used
+    to reach TTS as literal ``[{'type': 'text', ...}]`` gibberish."""
+    out = {
+        "messages": [
+            AIMessage(
+                content=[
+                    {"type": "text", "text": "Checking "},
+                    {"type": "text", "text": "now."},
+                ],
+                tool_calls=[{"name": "GMAIL_FETCH_EMAILS", "args": {}, "id": "c1"}],
+            )
+        ]
+    }
+    assert _derive_tool_narration(out) == "Checking now."
+
+
+def test_mixed_block_list_drops_non_text_blocks():
+    out = {
+        "messages": [
+            AIMessage(
+                content=[
+                    {"type": "tool_use", "id": "c1", "name": "x", "input": {}},
+                    {"type": "text", "text": "One moment."},
+                ],
+                tool_calls=[{"name": "GMAIL_FETCH_EMAILS", "args": {}, "id": "c1"}],
+            )
+        ]
+    }
+    assert _derive_tool_narration(out) == "One moment."
+
+
 def test_garbage_inputs_return_none():
     assert _derive_tool_narration(None) is None
     assert _derive_tool_narration("not-a-dict") is None

@@ -39,6 +39,7 @@ def test_barge_in_gate_is_stricter_than_normal():
 def _engine() -> YumiiEngine:
     e = object.__new__(YumiiEngine)  # skip __init__ wiring
     e.interrupt_event = asyncio.Event()
+    e._speech_generation = 0
     e.audio_input_queue = asyncio.Queue()
     e.is_speaking = False
     e._speak_seq = 0
@@ -245,14 +246,15 @@ async def test_stream_tts_error_sends_error_card_and_disarms():
 
 
 @pytest.mark.asyncio
-async def test_barge_in_mid_stream_stops_broadcasts_and_disarms():
+async def test_generation_bump_mid_stream_stops_broadcasts_and_disarms():
+    """Cancellation is a generation bump — the only thing that stops speech."""
     e, sent, disarm = _speaker_engine()
     e.speaker = _GatedSpeaker()
     e.tts_queue.put_nowait(_payload("stream_start"))
 
     task = await _run_speaker_until(e, lambda: len(sent) >= 2, cancel=False)
     try:
-        e.interrupt_event.set()
+        e._speech_generation += 1  # barge-in / session switch / new turn
         await asyncio.sleep(0.12)  # _GatedSpeaker's pause — BBB would arrive here
     finally:
         task.cancel()
@@ -263,3 +265,51 @@ async def test_barge_in_mid_stream_stops_broadcasts_and_disarms():
 
     assert [p["type"] for p in sent] == ["audio_start", "audio_chunk"]
     assert disarm  # interrupted turn released the gate
+
+
+@pytest.mark.asyncio
+async def test_interrupt_event_alone_does_not_stop_speech():
+    """Regression for the old race: the reasoning loop cleared the shared
+    interrupt_event before the speaker task observed it, so barge-in was
+    silently missed. Speech is cancelled by generation bumps only — the
+    event now exists solely for HITL veto state."""
+    e, sent, disarm = _speaker_engine()
+    e.speaker = _GatedSpeaker()
+    e.tts_queue.put_nowait(_payload("stream_start"))
+
+    task = await _run_speaker_until(e, lambda: len(sent) >= 3, cancel=False)
+    try:
+        e.interrupt_event.set()
+        await asyncio.sleep(0.12)  # _GatedSpeaker's pause — BBB arrives here
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    assert [p["type"] for p in sent] == ["audio_start", "audio_chunk", "audio_chunk"]
+    assert not disarm
+
+
+@pytest.mark.asyncio
+async def test_stale_generation_payload_is_dropped():
+    """Speech queued under an older generation never plays — this is what
+    drops the previous turn's still-queued sentences when a new turn starts."""
+    e, sent, _ = _speaker_engine()
+    e.speaker = _StreamSpeaker()
+    e.tts_queue.put_nowait({**_payload("stream_start"), "gen": 0})
+    e._speech_generation = 1  # a cancellation happened after it was queued
+
+    task = asyncio.create_task(e.tts_speaker_task())
+    try:
+        await asyncio.sleep(0.1)
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    assert sent == []  # stale audio dropped, no broadcasts, no crash
+    assert e.tts_queue.empty()

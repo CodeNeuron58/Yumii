@@ -630,6 +630,7 @@
             let currentSampleRate = 24000;
             let replyCardActive = false; // a streaming reply already owns the card text
             let currentSeq = 0;          // speech session id echoed back on playback_finished
+            let audioEndTimer = null;    // pending audio_end completion timer (seq-guarded)
 
             // ── Status pill ────────────────────────────────────────────
             const statusBar = document.getElementById('status-bar');
@@ -677,6 +678,7 @@
             }
 
             function stopAllAudio() {
+                if (audioEndTimer) { clearTimeout(audioEndTimer); audioEndTimer = null; }
                 if (currentAudioSource) {
                     try { currentAudioSource.stop(); } catch (e) {}
                     currentAudioSource = null;
@@ -820,8 +822,14 @@
                 if (data.type === "audio_end") {
                     const remaining = Math.max(0, nextPlayTime - audioContext.currentTime);
                     const seq = currentSeq;
-                    setTimeout(() => {
-                        if (!isStreaming) return; // an interrupt already handled state
+                    if (audioEndTimer) clearTimeout(audioEndTimer);
+                    audioEndTimer = setTimeout(() => {
+                        audioEndTimer = null;
+                        // A stale timer (from an interleaved narration audio_end
+                        // or a superseded session) must NOT tear down the live
+                        // session — that killed every remaining audio_chunk of
+                        // the real reply.
+                        if (!isStreaming || currentSeq !== seq) return;
                         // Tell the backend playback ACTUALLY finished — it keeps
                         // the barge-in gate armed until now (mic hears the tail).
                         socket.send(JSON.stringify({ type: "playback_finished", seq }));

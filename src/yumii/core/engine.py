@@ -15,7 +15,7 @@ from langchain_core.messages import AIMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from yumii.agent.graph import _CHECKPOINT_DB, build_graph, set_confirmation_hook
-from yumii.agent.synthesizer import _THINK_BLOCK, synthesize
+from yumii.agent.synthesizer import _THINK_BLOCK, content_to_text, synthesize
 from yumii.audio.stt import AudioPipeline
 from yumii.core.config import settings
 from yumii.core.interfaces import BaseSpeaker
@@ -58,7 +58,7 @@ def _derive_tool_narration(output: Any, *, allow_filler: bool = True) -> str | N
     )
     if last_ai is None or not getattr(last_ai, "tool_calls", None):
         return None
-    raw = last_ai.content if isinstance(last_ai.content, str) else str(last_ai.content or "")
+    raw = content_to_text(last_ai.content)
     narration = _THINK_BLOCK.sub("", raw).strip()
     if not narration:
         if not allow_filler:
@@ -140,6 +140,12 @@ class YumiiEngine:
         # Monotonic id of the current speech session; the webui echoes it back
         # on playback_finished so a late report can't disarm a newer session.
         self._speak_seq: int = 0
+        # Monotonic speech generation: every cancellation (barge-in, session
+        # switch, new turn) bumps it; speech queued under an older generation
+        # is abandoned wherever it is — queued, mid-synthesis, or mid-broadcast.
+        # Unlike a clearable Event, nothing can "un-cancel" a bump, which is
+        # what let old speech keep playing after barge-in / session switches.
+        self._speech_generation: int = 0
         self.mic_muted: bool = False
         self.active_session_id: str | None = None
         self.active_session_name: str = "New Chat"
@@ -272,7 +278,7 @@ class YumiiEngine:
                 messages = (state.values or {}).get("messages", []) if state else []
                 turns: list[tuple[str, str]] = []
                 for m in messages:
-                    content = m.content if isinstance(m.content, str) else str(m.content)
+                    content = content_to_text(m.content)
                     if not content.strip():
                         continue
                     if isinstance(m, HumanMessage):
@@ -404,6 +410,10 @@ class YumiiEngine:
         self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
+        # A switch must STOP in-flight speech from the old session — the old
+        # clear() here un-cancelled it instead, letting her finish the
+        # previous session's reply audibly before speaking in the new one.
+        self._cancel_speech()
         self._disarm_speaking_gate()
 
         session_id = await session_manager.create_session(name)
@@ -434,6 +444,7 @@ class YumiiEngine:
         self._flush_memory_review()
         await self._clear_all_queues()
         self.interrupt_event.clear()
+        self._cancel_speech()  # stop the old session's in-flight speech (see create_new_session)
         self._disarm_speaking_gate()
 
         self.active_session_id = session.id
@@ -466,6 +477,16 @@ class YumiiEngine:
     # ------------------------------------------------------------------
     # Speaking gate: barge-in arming + playback-finished handshake
     # ------------------------------------------------------------------
+
+    def _cancel_speech(self) -> int:
+        """Invalidate all speech from earlier generations and return the new one.
+
+        Bumped by every cancel-speech event: barge-in, session switch, and
+        the start of a new reasoning turn (a fresh turn takes over the
+        airwaves — the queued-speech drain only covered not-yet-played text).
+        """
+        self._speech_generation += 1
+        return self._speech_generation
 
     def _arm_speaking_gate(self) -> None:
         """While she speaks, interrupting her needs sustained high-confidence speech."""
@@ -618,6 +639,7 @@ class YumiiEngine:
             else:
                 log.debug("speech_started_interrupt")
             self._disarm_speaking_gate()
+            self._cancel_speech()
             self.interrupt_event.set()
             asyncio.create_task(self.broadcast_payload({"type": "interrupt"}))
 
@@ -669,6 +691,12 @@ class YumiiEngine:
                     except asyncio.QueueEmpty:
                         break
 
+                # A new turn takes over the airwaves: bump the generation so
+                # any speech still playing from an earlier turn stops at its
+                # next chunk check (the drain above only covers not-yet-played
+                # text — this is what closes the old interrupt_event race).
+                turn_generation = self._cancel_speech()
+
                 if not self.active_session_id or not self.graph_app:
                     log.warning("reasoning_skipped_no_session")
                     continue
@@ -706,6 +734,10 @@ class YumiiEngine:
                 segmenter = SentenceSegmenter()
                 spoken_sentences: list[str] = []
                 stream_open = False
+                # Raw tokens streamed during the CURRENT agent pass (reset at
+                # each on_chain_end) — a tool pass whose text was already
+                # streamed must not be narrated again (the double-speak bug).
+                pass_streamed: list[str] = []
 
                 async def _speak_streamed(sentence: str) -> None:
                     """Queue one streamed sentence; the first opens the audio session."""
@@ -720,6 +752,7 @@ class YumiiEngine:
                             "response": spoken.response_text,
                             "expression": spoken.expression,
                             "motion": spoken.motion,
+                            "gen": self._speech_generation,
                         }
                     )
                     stream_open = True
@@ -731,7 +764,7 @@ class YumiiEngine:
                     async for event in self.graph_app.astream_events(
                         initial_state, config=config, version="v2"
                     ):
-                        if self.interrupt_event.is_set():
+                        if self._speech_generation != turn_generation:
                             log.info("reasoning_interrupted_mid_stream")
                             break
 
@@ -753,6 +786,7 @@ class YumiiEngine:
                                     {"type": "thinking_delta", "text": token}
                                 )
                                 if isinstance(token, str):
+                                    pass_streamed.append(token)
                                     for sentence in segmenter.feed(token):
                                         await _speak_streamed(sentence)
 
@@ -772,15 +806,22 @@ class YumiiEngine:
                             if isinstance(output, dict) and output.get("response"):
                                 reasoning_result = output
                             else:
-                                # Tool pass: speak narration/filler now (FIFO queue) so a slow tool isn't dead air.
-                                narration = _derive_tool_narration(
-                                    output,
-                                    allow_filler=tool_passes_narrated == 0,
-                                )
+                                # Tool pass. If this pass streamed text, the
+                                # streamer already spoke it sentence-by-sentence
+                                # — re-deriving the same pre-tool line here was
+                                # the double-speak bug. Only a pass that said
+                                # nothing gets a narration line.
+                                narration = None
+                                if not any(s.strip() for s in pass_streamed):
+                                    narration = _derive_tool_narration(
+                                        output,
+                                        allow_filler=tool_passes_narrated == 0,
+                                    )
+                                pass_streamed = []
                                 if (
                                     narration
                                     and narration != last_narration
-                                    and not self.interrupt_event.is_set()
+                                    and self._speech_generation == turn_generation
                                 ):
                                     tool_passes_narrated += 1
                                     last_narration = narration
@@ -790,10 +831,19 @@ class YumiiEngine:
                                     )
                                     await self.tts_queue.put(
                                         {
-                                            "kind": "utterance",
+                                            # While a streamed session is open the
+                                            # narration must CONTINUE it (chunk-only):
+                                            # a second "utterance" would open a new
+                                            # audio session mid-reply, and the webui
+                                            # drops the buffered reply tail from then
+                                            # on.
+                                            "kind": (
+                                                "stream_text" if stream_open else "utterance"
+                                            ),
                                             "response": spoken.response_text,
                                             "expression": spoken.expression,
                                             "motion": spoken.motion,
+                                            "gen": self._speech_generation,
                                         }
                                     )
                 except Exception as stream_exc:
@@ -807,7 +857,7 @@ class YumiiEngine:
                 # Always close the thinking indicator, even on error.
                 await self.broadcast_payload({"type": "thinking_end"})
 
-                if self.interrupt_event.is_set():
+                if self._speech_generation != turn_generation:
                     log.info("reasoning_interrupted")
                     continue
 
@@ -817,7 +867,9 @@ class YumiiEngine:
                     tail = segmenter.flush()
                     if tail:
                         await _speak_streamed(tail)
-                    await self.tts_queue.put({"kind": "stream_end"})
+                    await self.tts_queue.put(
+                        {"kind": "stream_end", "gen": self._speech_generation}
+                    )
 
                 # Hard failure with nothing to say: show an actionable error card, not a frozen "Thinking".
                 if reasoning_result is None and turn_error is not None:
@@ -907,7 +959,13 @@ class YumiiEngine:
                     # feeds the transcript/memory bookkeeping below.
                     pass
                 else:
-                    await self.tts_queue.put({"kind": "utterance", **reasoning_result})
+                    await self.tts_queue.put(
+                        {
+                            "kind": "utterance",
+                            "gen": self._speech_generation,
+                            **reasoning_result,
+                        }
+                    )
             except Exception as e:
                 log.error("reasoning_engine_crash", error=str(e), exc_info=True)
                 await asyncio.sleep(1)
@@ -926,9 +984,11 @@ class YumiiEngine:
         while True:
             try:
                 payload = await self.tts_queue.get()
-                if self.interrupt_event.is_set():
-                    # Interrupted turn: drop queued speech and go idle.
-                    self._disarm_speaking_gate()
+                payload_gen = payload.get("gen", self._speech_generation)
+                if payload_gen != self._speech_generation:
+                    # Speech from a cancelled generation (barge-in, session
+                    # switch, newer turn): drop it. The canceller already
+                    # disarmed the gate — nothing to do but move on.
                     continue
 
                 kind = payload.get("kind", "utterance")
@@ -969,7 +1029,7 @@ class YumiiEngine:
                             self.speaker.stream_speak(response_text)
                         ) as stream:
                             async for chunk_data in stream:
-                                if self.interrupt_event.is_set():
+                                if payload_gen != self._speech_generation:
                                     interrupted = True
                                     break
 
@@ -1027,7 +1087,7 @@ class YumiiEngine:
                         self.speaker.speak, response_text
                     )
                     self._disarm_speaking_gate()
-                    if self.interrupt_event.is_set():
+                    if payload_gen != self._speech_generation:
                         continue
                     await self.broadcast_payload(
                         {
@@ -1040,7 +1100,7 @@ class YumiiEngine:
                     if duration > 0:
                         slept = 0.0
                         while slept < (duration + 0.5):
-                            if self.interrupt_event.is_set():
+                            if payload_gen != self._speech_generation:
                                 break
                             await asyncio.sleep(0.1)
                             slept += 0.1
