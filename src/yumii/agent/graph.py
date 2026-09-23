@@ -19,7 +19,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from yumii.agent.llm import get_agent_llm
 from yumii.agent.nodes import check_personality_switch
-from yumii.agent.synthesizer import synthesize
+from yumii.agent.synthesizer import content_to_text, synthesize
 from yumii.core.config import settings
 from yumii.core.logging import get_logger
 from yumii.tools.registry import list_policies, list_tools, tools_requiring_confirmation
@@ -187,7 +187,8 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
             )
 
     if not getattr(response, "tool_calls", None):
-        yumii_resp = synthesize(response.content or "")
+        # content may be a block list (Anthropic-style) — synthesize() would crash on it.
+        yumii_resp = synthesize(content_to_text(response.content))
         if not response.id:
             response = AIMessage(
                 content=response.content,

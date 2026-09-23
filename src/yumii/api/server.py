@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.websockets import WebSocketState
 
+from yumii.agent.synthesizer import content_to_text
 from yumii.core.engine import YumiiEngine
 from yumii.core.global_config import load_global_config
 from yumii.core.logging import get_logger
@@ -214,7 +215,7 @@ async def session_messages_endpoint(session_id: str) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for m in messages:
         kind = type(m).__name__
-        content = m.content if isinstance(m.content, str) else str(m.content)
+        content = content_to_text(m.content)
         if kind == "HumanMessage":
             out.append({"role": "user", "text": content})
         elif kind == "AIMessage":

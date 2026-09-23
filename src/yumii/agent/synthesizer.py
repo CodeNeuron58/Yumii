@@ -8,7 +8,7 @@ matching pattern wins (most specific first). Labels are pinned by
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import Any, Literal
 
 from yumii.agent.llm import YumiiResponse
 
@@ -165,6 +165,32 @@ _MOTION_PATTERNS: list[tuple[MotionLabel, re.Pattern[str]]] = [
 
 
 # ----------------------------------------------------------------------
+# Content flattening
+# ----------------------------------------------------------------------
+
+
+def content_to_text(content: Any) -> str:
+    """Flatten a LangChain message's content to plain speakable text.
+
+    Anthropic-style providers return block lists like
+    ``[{'type': 'text', 'text': '...'}, ...]`` — ``str()`` would turn that
+    into repr gibberish that reaches TTS. Plain strings pass through;
+    non-text blocks (tool_use, images) are dropped.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and isinstance(block.get("text"), str):
+                parts.append(block["text"])
+        return "".join(parts)
+    return str(content or "")
+
+
+# ----------------------------------------------------------------------
 # Classifier
 # ----------------------------------------------------------------------
 
@@ -227,6 +253,7 @@ __all__ = [
     "MotionLabel",
     "VALID_EXPRESSIONS",
     "VALID_MOTIONS",
+    "content_to_text",
     "synthesize",
     "_expression_for",
     "_motion_for",
