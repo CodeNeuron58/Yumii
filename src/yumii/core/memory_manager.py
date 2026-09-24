@@ -65,6 +65,12 @@ class MemoryManager:
         )
         self._store: AsyncSqliteStore | None = None
         self._conn: aiosqlite.Connection | None = None
+        # Reviews fire from several places (threshold, session switch,
+        # shutdown) — serialized, or two overlapping reviews dedupe against
+        # stale snapshots and store the same fact twice.
+        import asyncio
+
+        self._review_lock = asyncio.Lock()
 
     async def _ensure_store(self) -> AsyncSqliteStore:
         """Lazy-connect to the SQLite store and run migrations."""
@@ -293,9 +299,10 @@ class MemoryManager:
         try:
             from yumii.agent.fact_extractor import review_facts
 
-            existing = await self.get_facts_raw(limit=500)
-            ops = await review_facts(turns, existing)
-            counts = await self.apply_review_ops(ops, session_id=session_id)
+            async with self._review_lock:
+                existing = await self.get_facts_raw(limit=500)
+                ops = await review_facts(turns, existing)
+                counts = await self.apply_review_ops(ops, session_id=session_id)
             log.info("memory_review_applied", session_id=session_id, **counts)
             return counts
         except Exception as exc:

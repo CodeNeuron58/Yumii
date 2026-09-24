@@ -69,6 +69,11 @@ async def _get_connection() -> aiosqlite.Connection:
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
     await db.execute("PRAGMA foreign_keys = ON")
+    # Concurrent writers are routine (turn bookkeeping + memory reviews +
+    # summaries): WAL stops transient locks from killing a turn's
+    # bookkeeping, and a busy timeout rides out brief contention.
+    await db.execute("PRAGMA journal_mode=WAL")
+    await db.execute("PRAGMA busy_timeout=5000")
     return db
 
 

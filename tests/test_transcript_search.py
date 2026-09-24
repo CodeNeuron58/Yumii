@@ -246,3 +246,25 @@ async def test_recall_tool_passes_the_time_box_through(isolated_db):
     assert "Found" not in recent  # the old hit is out of the window
     everything = await search_past_conversations.ainvoke({"query": "python asyncio"})
     assert "Found" in everything
+
+
+async def test_chatty_session_cannot_starve_other_sessions(isolated_db):
+    """Regression: the old LIMIT-then-dedupe order let one session with 60+
+    matches return as the ONLY result for a query that matched dozens of
+    conversations. Dedupe now happens before limiting."""
+    await memory_db.execute(
+        "INSERT INTO sessions (id, name) VALUES (?, ?)", ("s-chatty", "Chatty")
+    )
+    for i in range(65):
+        sid = "s-chatty"
+        await memory_db.execute(
+            "INSERT INTO messages (session_id, role, content, created_at)"
+            " VALUES (?, 'user', ?, '2026-01-01')",
+            (sid, f"alpha note number {i}"),
+        )
+    await _seed("s-other", "Other chat", [("alpha exists here too", "Yep")])
+
+    hits = await transcript.search("alpha")
+    session_ids = {h.session_id for h in hits}
+    assert {"s-chatty", "s-other"} <= session_ids
+    assert hits[0].session_id == "s-chatty"  # best-ranked session first

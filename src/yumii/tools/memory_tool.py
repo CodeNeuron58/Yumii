@@ -77,9 +77,11 @@ async def manage_memory(
     if action == "add":
         if not fact:
             return "Nothing to save — 'fact' is required for add."
-        # Near-duplicate guard: point the model at replace instead.
-        existing = await memory_manager.find_facts_matching(fact[:40])
-        if any(fact.lower() in f.fact.lower() or f.fact.lower() in fact.lower() for f in existing):
+        # Near-duplicate guard: bidirectional containment over ALL stored
+        # facts — the old 40-char probe missed any stored fact shorter than
+        # the probe, so duplicates piled up in every system prompt.
+        existing = await memory_manager.get_facts_raw(limit=500)
+        if any(fact.lower() in f.lower() or f.lower() in fact.lower() for f in existing):
             return (
                 "A very similar fact is already stored. Use action='replace' "
                 "with old_text if it needs updating."

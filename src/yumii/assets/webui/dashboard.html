@@ -227,7 +227,7 @@
             });
         });
 
-        const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+        const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
 
         // ── Settings ───────────────────────────────────────────────────
         const PREF_LABELS = {

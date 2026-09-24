@@ -12,9 +12,7 @@ from yumii.core.memory_db import execute, fetchall, fetchone, transaction
 
 log = get_logger(__name__)
 
-# FTS rows to scan before deduping by session, distinct sessions to return,
-# and messages shown around a hit (each side).
-_SCAN_LIMIT = 60
+# Distinct sessions to return, and messages shown around a hit (each side).
 _MAX_SESSIONS = 3
 _WINDOW = 3
 
@@ -100,6 +98,24 @@ def _fts_query(raw: str) -> str:
     return " ".join(f'"{t}"' for t in tokens)
 
 
+def _build_snippet(content: str, query: str, width: int = 140) -> str:
+    """A Python-side snippet around the first matching term (SQLite's snippet()
+    is unavailable once the query leaves the plain MATCH context)."""
+    lowered = (content or "").lower()
+    pos = -1
+    for token in re.findall(r"\w+", query, re.UNICODE):
+        pos = lowered.find(token.lower())
+        if pos != -1:
+            break
+    if pos == -1:
+        return (content or "")[:width]
+    start = max(0, pos - 40)
+    end = min(len(content), start + width)
+    prefix = "…" if start else ""
+    suffix = "…" if end < len(content) else ""
+    return f"{prefix}{content[start:end]}{suffix}"
+
+
 async def _window(session_id: str, anchor_id: int, span: int = _WINDOW) -> list[dict[str, Any]]:
     """Messages around ``anchor_id`` within one session, oldest first."""
     before = await fetchall(
@@ -138,43 +154,69 @@ async def search(
         where += " AND m.created_at >= ?"
         params.append(cutoff)
 
-    sql = (
-        "SELECT m.id, m.session_id, m.role, m.created_at,"
-        "       COALESCE(s.name, '(deleted session)') AS session_name,"
-        "       snippet(messages_fts, 0, '»', '«', ' … ', 16) AS snip,"
-        "       bm25(messages_fts) AS rank"
+    # Three steps, because SQLite forbids FTS auxiliary functions (bm25,
+    # snippet) inside GROUP BY queries: (1) rank ALL matches in a plain MATCH
+    # query, (2) dedupe by session in Python — per-session best BEFORE any
+    # limiting, so one chatty session can't starve the others — (3) fetch the
+    # chosen rows' details and build snippets from content.
+    rank_sql = (
+        "SELECT messages_fts.rowid AS mid, bm25(messages_fts) AS rank"
         " FROM messages_fts"
         " JOIN messages m ON m.id = messages_fts.rowid"
-        " LEFT JOIN sessions s ON s.id = m.session_id"
-        f" {where}"
-        " ORDER BY rank LIMIT ?"
+        f" {where} ORDER BY rank LIMIT 500"
     )
-    rows = await fetchall(sql, (*params, _SCAN_LIMIT))
-    if not rows and " " in match:
+    ranked = await fetchall(rank_sql, tuple(params))
+    if not ranked and " " in match:
+        # AND semantics found nothing — fall back to OR before giving up.
         or_match = match.replace(" ", " OR ")
-        rows = await fetchall(sql, (or_match, *params[1:], _SCAN_LIMIT))
+        ranked = await fetchall(rank_sql, (or_match, *params[1:]))
 
-    # Keep the best-ranked hit per session (rows arrive ranked).
+    best: dict[str, int] = {}
+    # Session ids come with a second fetch — dedupe needs them here, so
+    # fetch them for the ranked rows in one go.
+    ids = [r["mid"] for r in ranked]
+    if ids:
+        id_rows = await fetchall(
+            "SELECT id, session_id FROM messages WHERE id IN"
+            f" ({','.join('?' * len(ids))})",
+            ids,
+        )
+        session_of = {r["id"]: r["session_id"] for r in id_rows}
+        for r in ranked:
+            sid = session_of.get(r["mid"])
+            if sid and sid not in best:
+                best[sid] = r["mid"]
+            if len(best) >= max_sessions:
+                break
+    if not best:
+        return []
+
+    chosen_ids = list(best.values())
+    detail_sql = (
+        "SELECT m.id, m.session_id, m.role, m.created_at, m.content,"
+        "       COALESCE(s.name, '(deleted session)') AS session_name"
+        " FROM messages m"
+        " LEFT JOIN sessions s ON s.id = m.session_id"
+        f" WHERE m.id IN ({','.join('?' * len(chosen_ids))})"
+    )
+    details = {r["id"]: r for r in await fetchall(detail_sql, chosen_ids)}
+
     hits: list[TranscriptHit] = []
-    seen_sessions: set[str] = set()
-    for r in rows:
-        sid = r["session_id"]
-        if sid in seen_sessions:
+    for sid, mid in best.items():
+        r = details.get(mid)
+        if r is None:
             continue
-        seen_sessions.add(sid)
         hits.append(
             TranscriptHit(
-                message_id=r["id"],
+                message_id=mid,
                 session_id=sid,
                 session_name=r["session_name"],
                 role=r["role"],
-                snippet=r["snip"],
+                snippet=_build_snippet(r["content"], query),
                 created_at=r["created_at"] or "",
-                window=await _window(sid, r["id"]),
+                window=await _window(sid, mid),
             )
         )
-        if len(hits) >= max_sessions:
-            break
     return hits
 
 
