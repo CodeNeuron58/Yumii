@@ -29,7 +29,10 @@ companion, so Yumii can remember it later. Write 2-4 plain sentences, \
 past tense, third person ("the user...", "Yumii..."). Capture: what \
 the user shared or asked about, decisions made, the emotional tone if \
 notable, and any open threads or promises (things to follow up on). \
-Skip pleasantries and filler. Output ONLY the summary text — no \
+Skip pleasantries and filler. If the input includes a PREVIOUS SUMMARY \
+of the earlier part of the same conversation, merge it with the newer \
+turns into ONE updated summary — keep what is still true, add what is \
+new, drop what has been resolved. Output ONLY the summary text — no \
 headings, no quotes, no preamble."""
 
 
@@ -92,7 +95,7 @@ async def summarize_session(session_id: str) -> str | None:
         return None
 
     existing = await fetchone(
-        "SELECT message_count FROM session_summaries WHERE session_id = ?",
+        "SELECT summary, message_count FROM session_summaries WHERE session_id = ?",
         (session_id,),
     )
     if existing and existing["message_count"] >= len(rows):
@@ -103,6 +106,19 @@ async def summarize_session(session_id: str) -> str | None:
         for r in rows[-_MAX_ROWS:]
     ]
 
+    # Hierarchical fold: an existing summary covering the earlier part of
+    # the conversation is merged in — summarizing only the tail would erase
+    # the session's beginning on every periodic refresh.
+    prompt_lines = lines
+    if existing and (existing["summary"] or "").strip():
+        prompt_lines = [
+            "[Previous summary of the earlier part of this conversation]",
+            existing["summary"].strip(),
+            "",
+            "[Newer turns — merge these with the previous summary]",
+            *lines,
+        ]
+
     from yumii.agent.fact_extractor import _get_extractor_llm
 
     try:
@@ -110,7 +126,7 @@ async def summarize_session(session_id: str) -> str | None:
         response = await llm.ainvoke(
             [
                 SystemMessage(content=_SUMMARY_SYSTEM_PROMPT),
-                HumanMessage(content="\n".join(lines)),
+                HumanMessage(content="\n".join(prompt_lines)),
             ]
         )
     except Exception as exc:

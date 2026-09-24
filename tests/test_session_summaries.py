@@ -217,3 +217,55 @@ def test_prompt_without_context_is_unchanged_prefix():
 
 def test_refresh_interval_is_sane():
     assert summarizer.SUMMARY_REFRESH_MESSAGES >= 10  # not every turn
+
+
+# ── Hierarchical fold ──────────────────────────────────────────────────
+
+
+async def test_summary_refresh_folds_the_previous_summary(isolated_db, monkeypatch):
+    """A periodic refresh must MERGE the previous summary — summarizing only
+    the tail erased the session's beginning every 10 turns."""
+    from langchain_core.messages import HumanMessage
+
+    import yumii.agent.fact_extractor as fx
+
+    await _seed_session("s-fold", "Long chat", _ago(hours=1), turns=2)
+
+    class CapturingLLM:
+        def __init__(self, replies):
+            self.replies = list(replies)
+            self.user_prompts = []
+            self.system_prompts = []
+
+        async def ainvoke(self, messages):
+            self.system_prompts.append(messages[0].content)
+            self.user_prompts.append(
+                next(m.content for m in messages if isinstance(m, HumanMessage))
+            )
+
+            class R:
+                content = self.replies.pop(0)
+
+            return R()
+
+    llm = CapturingLLM([
+        "early summary: the user planned a trip to Kyoto",
+        "merged summary: Kyoto trip, plus a new ramen plan",
+    ])
+    monkeypatch.setattr(fx, "_get_extractor_llm", lambda: llm)
+
+    first = await summarize_session("s-fold")
+    assert first == "early summary: the user planned a trip to Kyoto"
+
+    # more conversation happens; the refresh now sees prior summary + new rows
+    await transcript.record_turn("s-fold", "any ramen places?", "Yes - Ichiran!")
+    second = await summarize_session("s-fold")
+
+    assert second == "merged summary: Kyoto trip, plus a new ramen plan"
+    prompt = llm.user_prompts[1]
+    assert "[Previous summary of the earlier part of this conversation]" in prompt
+    assert "early summary: the user planned a trip to Kyoto" in prompt
+    assert "[Newer turns" in prompt
+    assert "merge these with the previous summary" in prompt
+    assert prompt.index("trip to Kyoto") < prompt.index("ramen")
+    assert "merge it with the newer turns" in llm.system_prompts[1]
