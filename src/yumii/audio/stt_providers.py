@@ -1,6 +1,8 @@
 """STT providers: local faster-whisper (CPU) and cloud Groq Whisper."""
 
 
+import time
+
 import numpy as np
 
 from yumii.core.interfaces import BaseSTTProvider
@@ -78,16 +80,37 @@ class GroqSTT(BaseSTTProvider):
             wf.setframerate(16000)  # RATE
             wf.writeframes(audio_data.tobytes())
 
-        try:
-            result = self._groq_client.audio.transcriptions.create(
-                file=("audio.wav", buf.getvalue()),
-                model="whisper-large-v3-turbo",
-                # verbose_json gives per-segment confidence for the gates below.
-                response_format="verbose_json",
-                language="en",
-            )
-        except Exception as e:
-            log.error("groq_stt_error", error=str(e), exc_info=True)
+        result = None
+        last_error: Exception | None = None
+        for attempt in (1, 2):
+            try:
+                result = self._groq_client.audio.transcriptions.create(
+                    file=("audio.wav", buf.getvalue()),
+                    model="whisper-large-v3-turbo",
+                    # verbose_json gives per-segment confidence for the gates below.
+                    response_format="verbose_json",
+                    language="en",
+                    # SDK default is minutes — a stalled call must not wedge
+                    # the single listener task while mic audio buffers.
+                    timeout=15.0,
+                )
+                break
+            except Exception as exc:
+                last_error = exc
+                lowered = str(exc).lower()
+                transient = any(
+                    s in lowered
+                    for s in ("429", "rate limit", "overloaded", "timed out",
+                              "timeout", "503", "502", "connection")
+                )
+                if attempt == 1 and transient:
+                    log.warning("groq_stt_retrying", attempt=attempt, error=str(exc)[:200])
+                    time.sleep(1.5)  # runs off-loop via asyncio.to_thread
+                    continue
+                log.error("groq_stt_error", error=str(exc), exc_info=True)
+                return None
+        if result is None:
+            log.error("groq_stt_error", error=str(last_error))
             return None
 
         segments = getattr(result, "segments", None) or []

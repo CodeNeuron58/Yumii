@@ -551,13 +551,19 @@ class YumiiEngine:
         return session.id
 
     async def _clear_all_queues(self) -> None:
-        """Drain all internal queues so no stale audio / text bleeds across sessions."""
+        """Drain all internal queues so no stale audio / text bleeds across sessions.
+
+        The None sentinel afterwards resets any in-flight capture — without
+        it, the previous session's half-utterance kept recording and landed
+        in the fresh session as its first turn.
+        """
         for q in (self.tts_queue, self.transcription_queue, self.audio_input_queue):
             while not q.empty():
                 try:
                     q.get_nowait()
                 except asyncio.QueueEmpty:
                     break
+        await self.audio_input_queue.put(None)
         log.debug("queues_cleared")
 
     # ------------------------------------------------------------------
@@ -654,6 +660,13 @@ class YumiiEngine:
         if timeout is None:
             timeout = settings.hitl_timeout_seconds
 
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[bool] = loop.create_future()
+        # Register the future BEFORE broadcasting: a fast client replying to
+        # the request in the broadcast window must find it, or the approval
+        # resolves nothing and hangs until the 30s timeout denies.
+        self.pending_confirmations[request_id] = future
+
         await self.broadcast_payload(
             {
                 "type": "confirmation_request",
@@ -663,10 +676,6 @@ class YumiiEngine:
                 "timeout_seconds": timeout,
             }
         )
-
-        loop = asyncio.get_running_loop()
-        future: asyncio.Future[bool] = loop.create_future()
-        self.pending_confirmations[request_id] = future
 
         try:
             approved = await asyncio.wait_for(future, timeout=timeout)

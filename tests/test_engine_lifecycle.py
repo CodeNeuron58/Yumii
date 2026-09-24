@@ -197,3 +197,21 @@ async def test_create_new_session_persists_last_session(isolated_config, monkeyp
 
     assert e.active_session_id == "s-new-1"
     assert isolated_config.load_global_config()["LAST_SESSION_ID"] == "s-new-1"
+
+
+@pytest.mark.asyncio
+async def test_clear_all_queues_leaves_a_capture_reset_sentinel():
+    """The drained audio queue must end with a None sentinel so an in-flight
+    capture resets instead of bleeding the old session's half-utterance into
+    the new one."""
+    e = YumiiEngine()
+    e.tts_queue.put_nowait({"kind": "utterance"})
+    e.transcription_queue.put_nowait("stale text")
+    e.audio_input_queue.put_nowait(b"\x00" * 1024)
+
+    await e._clear_all_queues()
+
+    assert e.tts_queue.empty()
+    assert e.transcription_queue.empty()
+    assert e.audio_input_queue.qsize() == 1
+    assert e.audio_input_queue.get_nowait() is None

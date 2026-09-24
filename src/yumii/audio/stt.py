@@ -26,6 +26,10 @@ SILENCE_END_FRAMES_QUICK = 6
 SMART_TURN_RECHECK_STRIDE = 6
 _SMART_TURN_MAX_RECHECKS = 5
 MIN_SPEECH_DURATION_SEC = 0.7
+# Hard bound on one utterance: audio that never dips below the VAD threshold
+# (music/TV near the mic) must eventually finalize instead of growing forever.
+_MAX_UTTERANCE_SEC = 60
+_MAX_UTTERANCE_FRAMES = int(_MAX_UTTERANCE_SEC * RATE / FRAME_SIZE)
 SILERO_THRESHOLD = 0.5
 # Energy floor before running the VAD — skips faint noise; humming is handled by the Groq confidence gate.
 RMS_ENERGY_GATE = 0.012
@@ -147,6 +151,7 @@ class AudioPipeline:
         pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
         rechecks = 0
+        utterance_frames = 0
         consecutive_silence = 0
         accumulation_buffer = np.array([], dtype=np.float32)
 
@@ -155,12 +160,23 @@ class AudioPipeline:
             if chunk_bytes is None:  # mute sentinel
                 self._reset_vad()
                 recording = []
-                pre_buffer.clear()
+                # Keep pre-buffered speech onset: the playback-end sentinel
+                # arrives ~400ms after her audio stops, and a user replying
+                # inside that window must not lose their first phonemes.
+                if not any(s for _, s in list(pre_buffer)[-6:]):
+                    pre_buffer.clear()
                 triggered = False
                 rechecks = 0
+                utterance_frames = 0
                 consecutive_silence = 0
                 accumulation_buffer = np.array([], dtype=np.float32)
                 log.debug("capture_reset_by_mute")
+                continue
+            if len(chunk_bytes) % 2 != 0:
+                # np.frombuffer would raise on odd byte counts — and a dead
+                # capture used to lose its recording AND prime stale Vosk
+                # state for the next utterance.
+                log.warning("odd_frame_dropped", bytes=len(chunk_bytes))
                 continue
             audio_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
             audio_f32 = audio_int16.astype(np.float32) / 32768.0
@@ -189,13 +205,23 @@ class AudioPipeline:
                         pre_buffer.clear()
                 else:
                     recording.append(pcm16)
+                    utterance_frames += 1
                     if is_speech:
                         consecutive_silence = 0
+                        # The climbing recheck stride only survives within one
+                        # continuous pause — speech must reset it, or pauses
+                        # from earlier in the turn force-cut later ones.
+                        rechecks = 0
                     else:
                         consecutive_silence += 1
-                    should_end, rechecks = await self._check_turn_end(
-                        recording, consecutive_silence, rechecks
-                    )
+
+                    if utterance_frames >= _MAX_UTTERANCE_FRAMES:
+                        log.info("utterance_force_capped", seconds=_MAX_UTTERANCE_SEC)
+                        should_end = True
+                    else:
+                        should_end, rechecks = await self._check_turn_end(
+                            recording, consecutive_silence, rechecks
+                        )
                     if should_end:
                         log.debug("speech_ended")
                         return (
@@ -214,10 +240,15 @@ class AudioPipeline:
     ) -> str | None:
         """Like stream_capture but streams chunks to a partial-capable transcriber (None = mute sentinel)."""
         self._reset_vad()
+        # Discard residue from an aborted capture: without this, a dead
+        # capture's half-utterance is prepended to the next transcript.
+        if hasattr(self.transcriber, "get_final"):
+            self.transcriber.get_final()
         pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
         rechecks = 0
         recording: list[np.ndarray] = []
+        utterance_frames = 0
         consecutive_silence = 0
         accumulation_buffer = np.array([], dtype=np.float32)
 
@@ -225,15 +256,21 @@ class AudioPipeline:
             chunk_bytes = await queue.get()
             if chunk_bytes is None:  # mute sentinel
                 self._reset_vad()
-                pre_buffer.clear()
+                # Keep pre-buffered speech onset (see stream_capture).
+                if not any(s for _, s in list(pre_buffer)[-6:]):
+                    pre_buffer.clear()
                 triggered = False
                 rechecks = 0
                 recording = []
+                utterance_frames = 0
                 consecutive_silence = 0
                 accumulation_buffer = np.array([], dtype=np.float32)
                 if hasattr(self.transcriber, "get_final"):
                     self.transcriber.get_final()  # discard the half-utterance
                 log.debug("capture_reset_by_mute")
+                continue
+            if len(chunk_bytes) % 2 != 0:
+                log.warning("odd_frame_dropped", bytes=len(chunk_bytes))
                 continue
             audio_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
             audio_f32 = audio_int16.astype(np.float32) / 32768.0
@@ -272,8 +309,10 @@ class AudioPipeline:
                         pre_buffer.clear()
                 else:
                     recording.append(pcm16)
+                    utterance_frames += 1
                     if is_speech:
                         consecutive_silence = 0
+                        rechecks = 0  # speech resets the climbing recheck stride
                     else:
                         consecutive_silence += 1
                     if hasattr(self.transcriber, "process_chunk"):
@@ -286,9 +325,13 @@ class AudioPipeline:
                             else:
                                 on_partial(event["text"])
 
-                    should_end, rechecks = await self._check_turn_end(
-                        recording, consecutive_silence, rechecks
-                    )
+                    if utterance_frames >= _MAX_UTTERANCE_FRAMES:
+                        log.info("utterance_force_capped", seconds=_MAX_UTTERANCE_SEC)
+                        should_end = True
+                    else:
+                        should_end, rechecks = await self._check_turn_end(
+                            recording, consecutive_silence, rechecks
+                        )
                     if should_end:
                         log.debug("speech_ended")
                         if hasattr(self.transcriber, "get_final"):

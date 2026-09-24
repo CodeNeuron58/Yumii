@@ -184,8 +184,9 @@ async def test_mute_sentinel_discards_streaming_partial_state() -> None:
     )
 
     assert text == "post-mute words"
-    # One discard on the sentinel + one real final at utterance end.
-    assert transcriber.final_calls == 2
+    # Discards: capture start (aborted-capture residue) + the sentinel, plus
+    # one real final at utterance end.
+    assert transcriber.final_calls == 3
 
 
 # ---------------------------------------------------------------------------
@@ -193,3 +194,127 @@ async def test_mute_sentinel_discards_streaming_partial_state() -> None:
 # under tests/integration/ which require a working network connection
 # for the first-run model download. v0.1.0 ships without those.
 # ---------------------------------------------------------------------------
+
+
+# ── Turn-taking reliability: cap, recheck reset, odd frames, onset ─────
+
+
+def _speech_frames(n: int) -> list[bytes]:
+    return [_SPEECH] * n
+
+
+@pytest.mark.asyncio
+async def test_utterance_is_force_capped_at_the_hard_limit(monkeypatch):
+    """Audio that never dips below the VAD threshold (music near the mic)
+    must finalize instead of growing forever."""
+    from yumii.audio import stt as stt_module
+
+    monkeypatch.setattr(stt_module, "_MAX_UTTERANCE_FRAMES", 30)
+    pipeline = _make_pipeline()
+    queue: asyncio.Queue = asyncio.Queue()
+    for chunk in _speech_frames(200):
+        await queue.put(chunk)
+
+    audio = await asyncio.wait_for(pipeline.stream_capture(queue), timeout=5)
+    assert len(audio) > 0  # finalized by the cap, not silence
+
+
+@pytest.mark.asyncio
+async def test_speech_resets_the_smart_turn_recheck_stride(monkeypatch):
+    """A pause earlier in the turn must not raise the end-check latency for
+    later pauses — speech resets the climbing recheck counter."""
+    from yumii.audio import stt as stt_module
+
+    class FakeSmartTurn:
+        def __init__(self):
+            self.calls = 0
+
+        def is_complete(self, audio):
+            self.calls += 1
+            return (False, 0.4)
+
+    fake = FakeSmartTurn()
+    monkeypatch.setattr(stt_module, "_SMART_TURN_MAX_RECHECKS", 99)
+    pipeline = _make_pipeline()
+    pipeline._smart_turn = fake
+    queue: asyncio.Queue = asyncio.Queue()
+
+    for chunk in _speech_frames(12):   # trigger + a little speech
+        await queue.put(chunk)
+    for _ in range(6):                 # pause 1: probe fires at the quick threshold
+        await queue.put(_silence_frame())
+    for chunk in _speech_frames(3):    # speech resumes → rechecks reset
+        await queue.put(chunk)
+    for _ in range(6):                 # pause 2: probe must fire at 6 again
+        await queue.put(_silence_frame())
+
+    # Drain one more chunk so the probe from pause 2 completes.
+    await queue.put(_silence_frame())
+    task = asyncio.create_task(pipeline.stream_capture(queue))
+    try:
+        await asyncio.sleep(0.2)
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    # Without the reset, pause 2's probe would need 12 silence frames → 1 call.
+    assert fake.calls >= 2
+
+
+def _silence_frame() -> bytes:
+    return (np.zeros(FRAME_SIZE, dtype=np.float32)).astype(np.int16).tobytes()
+
+
+@pytest.mark.asyncio
+async def test_odd_length_frames_are_dropped_not_fatal():
+    """An odd-byte frame must not kill the capture (and stale Vosk residue
+    must not prepend the lost utterance to the next one)."""
+    transcriber = FakeStreamingTranscriber()
+    pipeline = _make_pipeline(transcriber)
+    queue: asyncio.Queue = asyncio.Queue()
+
+    await queue.put(b"")  # odd byte count — used to crash the capture
+    for chunk in _utterance():
+        await queue.put(chunk)
+
+    text = await asyncio.wait_for(
+        pipeline.stream_capture_and_transcribe(queue), timeout=5
+    )
+    assert text == "post-mute words"  # the turn survived
+
+
+@pytest.mark.asyncio
+async def test_playback_end_sentinel_preserves_speech_onset():
+    """A user replying inside the 400ms playback tail keeps their first
+    phonemes — the sentinel only discards echo, not real onset."""
+    pipeline = _make_pipeline(FakeStreamingTranscriber())
+    queue: asyncio.Queue = asyncio.Queue()
+    triggered = []
+
+    # 4 onset frames sit in the pre-buffer (below the 8-frame trigger) when
+    # the playback-end sentinel arrives mid-onset.
+    for chunk in _speech_frames(4):
+        await queue.put(chunk)
+    await queue.put(None)
+    for chunk in _speech_frames(5):    # preserved onset + 5 → trigger fires
+        await queue.put(chunk)
+
+    def on_speech_start():
+        triggered.append(True)
+
+    task = asyncio.create_task(
+        pipeline.stream_capture(queue, on_speech_start=on_speech_start)
+    )
+    try:
+        await asyncio.sleep(0.15)
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    assert triggered  # onset preserved → the preserved frames counted toward the trigger
