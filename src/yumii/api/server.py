@@ -803,8 +803,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     msg_type = payload.get("type", "")
 
                     if msg_type == "command":
-                        cmd = payload.get("command", "")
-                        await engine.transcription_queue.put(cmd)
+                        # Typed input flows into the same pipeline as speech —
+                        # coerce and cap it (WS frames are otherwise unbounded).
+                        cmd = str(payload.get("command", "")).strip()[:4000]
+                        if cmd:
+                            await engine.transcription_queue.put(cmd)
 
                     elif msg_type == "mic_mute":
                         await engine.set_mic_muted(

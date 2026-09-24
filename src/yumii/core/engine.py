@@ -43,6 +43,15 @@ _TOOL_NARRATION_FILLERS = (
     "On it, give me a second.",
 )
 
+# Short utterances that are direct commands, not chat — matched exactly
+# (after normalization) so ordinary sentences never trip them. Works for
+# typed input AND transcribed speech alike.
+_STOP_PHRASES = {"stop", "stop it", "stop stop", "quiet", "be quiet"}
+_MUTE_PHRASES = {"mute", "mute yourself"}
+_UNMUTE_PHRASES = {"unmute", "unmute yourself", "you can listen"}
+_NEW_CHAT_PHRASES = {"new chat", "new session", "new conversation"}
+_REPEAT_PHRASES = {"repeat", "repeat that", "say that again", "come again"}
+
 
 def _derive_tool_narration(output: Any, *, allow_filler: bool = True) -> str | None:
     """Spoken line for a tool-calling pass: the model's narration, a filler, or None.
@@ -149,6 +158,8 @@ class YumiiEngine:
         self.mic_muted: bool = False
         self.active_session_id: str | None = None
         self.active_session_name: str = "New Chat"
+        # Last completed reply, for the "repeat" command.
+        self._last_reply_text: str | None = None
 
         # Pending HITL confirmations, keyed by request_id; resolved by the WS server.
         self.pending_confirmations: dict[str, "asyncio.Future[bool]"] = {}
@@ -699,6 +710,64 @@ class YumiiEngine:
     # Background tasks
     # ------------------------------------------------------------------
 
+    async def _handle_text_command(self, text: str) -> bool:
+        """Interpret short utterances as direct commands instead of chat.
+
+        Runs for typed input and transcribed speech alike — a spoken "stop"
+        or "new chat" works exactly like the typed one. Matching is exact
+        after normalization, so ordinary sentences never trip it. Returns
+        True when the text was a command and no LLM turn should run.
+        """
+        normalized = " ".join(text.strip().lower().rstrip(".!?,").split())
+        if not normalized:
+            return True  # nothing to say — skip the turn
+
+        if normalized in _STOP_PHRASES:
+            self._cancel_speech()
+            while not self.tts_queue.empty():
+                try:
+                    self.tts_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+            self._disarm_speaking_gate()
+            self._spawn(self.broadcast_payload({"type": "interrupt"}))
+            log.info("text_command", command="stop")
+            return True
+
+        if normalized in _MUTE_PHRASES:
+            await self.set_mic_muted(True)
+            await self.broadcast_payload({"type": "reply_text", "text": "Mic muted."})
+            log.info("text_command", command="mute")
+            return True
+
+        if normalized in _UNMUTE_PHRASES:
+            await self.set_mic_muted(False)
+            await self.broadcast_payload({"type": "reply_text", "text": "Mic unmuted."})
+            log.info("text_command", command="unmute")
+            return True
+
+        if normalized in _NEW_CHAT_PHRASES:
+            await self.create_new_session()
+            await self.broadcast_payload(
+                {"type": "reply_text", "text": "New chat — I'm all ears."}
+            )
+            log.info("text_command", command="new chat")
+            return True
+
+        if normalized in _REPEAT_PHRASES:
+            if self._last_reply_text:
+                await self.tts_queue.put(
+                    {
+                        "kind": "utterance",
+                        "gen": self._speech_generation,
+                        "response": self._last_reply_text,
+                    }
+                )
+            log.info("text_command", command="repeat")
+            return True
+
+        return False
+
     async def audio_listener_task(self) -> None:
         """Consume audio, trigger interrupts on speech, push transcriptions to the reasoning queue."""
 
@@ -758,6 +827,11 @@ class YumiiEngine:
         while True:
             try:
                 user_text = await self.transcription_queue.get()
+
+                # Commands (typed or spoken) never become LLM turns.
+                if await self._handle_text_command(user_text):
+                    continue
+
                 self.interrupt_event.clear()
 
                 while not self.tts_queue.empty():
@@ -775,6 +849,11 @@ class YumiiEngine:
                 # session switch landing mid-turn (or mid-bookkeeping) must
                 # not redirect its transcript/summary/memory writes.
                 turn_session_id = self.active_session_id
+                # One personality read per turn: the synthesizer's per-persona
+                # expression calibration needs it for every streamed sentence.
+                from yumii.agent.personality_manager import personality_manager
+
+                turn_personality = personality_manager.get_current_personality()
 
                 if not self.active_session_id or not self.graph_app:
                     log.warning("reasoning_skipped_no_session")
@@ -821,7 +900,7 @@ class YumiiEngine:
                 async def _speak_streamed(sentence: str) -> None:
                     """Queue one streamed sentence; the first opens the audio session."""
                     nonlocal stream_open
-                    spoken = synthesize(sentence)
+                    spoken = synthesize(sentence, personality=turn_personality)
                     if not spoken.response_text:
                         return
                     spoken_sentences.append(spoken.response_text)
@@ -904,7 +983,9 @@ class YumiiEngine:
                                 ):
                                     tool_passes_narrated += 1
                                     last_narration = narration
-                                    spoken = synthesize(narration)
+                                    spoken = synthesize(
+                                        narration, personality=turn_personality
+                                    )
                                     log.info(
                                         "tool_narration", text=spoken.response_text[:80]
                                     )
@@ -985,6 +1066,9 @@ class YumiiEngine:
                         "expression": "sad",
                         "motion": "shakehead",
                     }
+
+                if reasoning_result.get("response"):
+                    self._last_reply_text = reasoning_result["response"]
 
                 log.debug(
                     "reasoning_done",

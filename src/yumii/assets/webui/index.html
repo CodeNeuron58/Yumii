@@ -338,6 +338,30 @@
         #error-modal h3 { color: #ffcf6b; }
         #error-modal .err-buttons { display: flex; gap: 10px; justify-content: center; }
         #error-modal #err-fix { background: rgba(0, 212, 170, 0.22); border-color: rgba(0, 212, 170, 0.5); }
+
+        /* ── Typed input — same command channel voice uses ────────────── */
+        #text-row {
+            position: absolute;
+            bottom: 26px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(440px, 84vw);
+            z-index: 5;
+        }
+        #text-input {
+            width: 100%;
+            box-sizing: border-box;
+            background: rgba(10, 14, 20, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 999px;
+            padding: 10px 18px;
+            color: #eef2f6;
+            font-size: 14px;
+            outline: none;
+            backdrop-filter: blur(6px);
+        }
+        #text-input:focus { border-color: rgba(255, 255, 255, 0.32); }
+        #text-input::placeholder { color: rgba(238, 242, 246, 0.4); }
     </style>
 </head>
 
@@ -380,6 +404,10 @@
         <div id="hint">Waking Yumii up…</div>
         <div id="progress"><div id="progress-fill"></div></div>
         <div id="card"></div>
+        <div id="text-row">
+            <input id="text-input" type="text" autocomplete="off"
+                   placeholder="Type to Yumii… (or say stop / mute / new chat)" />
+        </div>
     </div>
 
     <!-- Companion "coming soon" -->
@@ -477,6 +505,21 @@
             cardEl.classList.add('visible');
         }
         function hideCard() { cardEl.classList.remove('visible'); }
+
+        // ── Typed input — the WS command channel doubles as text chat ──
+        const textInput = document.getElementById('text-input');
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const text = textInput.value.trim();
+            if (!text) return;
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                showCard('⚠️ Not connected yet.');
+                return;
+            }
+            socket.send(JSON.stringify({ type: 'command', command: text }));
+            textInput.value = '';
+            if (orbState === 'idle' || orbState === 'listening') showCard(text);
+        });
 
         // ── Mode menu + coming-soon ────────────────────────────────────
         const modeMenu = document.getElementById('mode-menu');

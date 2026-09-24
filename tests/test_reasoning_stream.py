@@ -97,6 +97,10 @@ def _reasoning_engine(events, mid_stream_hook=None) -> tuple[YumiiEngine, list, 
     e.is_speaking = False
     e._speak_seq = 0
     e.pipeline = None
+    e.audio_input_queue = asyncio.Queue()
+    e.mic_muted = False
+    e._background_tasks = set()
+    e._last_reply_text = None
     e.active_session_id = "sess-1"
     e.active_session_name = "Test"  # not "New Chat" — skips the name refresh
     e.session_context = ""
@@ -360,3 +364,130 @@ async def test_turn_bookkeeping_uses_the_session_captured_at_turn_start(
     assert stubbed_singletons["bump"][0][0] == "sess-1"
     assert stubbed_singletons["record"][0][0] == "sess-1"
     assert all(sid == "sess-1" for sid, _ in e._memory_turn_buffer)
+
+
+# ── Text command channel (typed or spoken) ─────────────────────────────
+
+
+def _command_engine():
+    """Engine stub for _handle_text_command; returns (engine, sent, muted, created)."""
+    e = object.__new__(YumiiEngine)
+    e.transcription_queue = asyncio.Queue()
+    e.tts_queue = asyncio.Queue()
+    e.audio_input_queue = asyncio.Queue()
+    e.interrupt_event = asyncio.Event()
+    e._speech_generation = 0
+    e._speak_seq = 0
+    e.is_speaking = False
+    e.pipeline = None
+    e.mic_muted = False
+    e._background_tasks = set()
+    e._memory_turn_buffer = []
+    e._last_reply_text = "the previous reply"
+    e.active_session_id = "sess-1"
+    e.active_session_name = "Test"
+    e._session_msg_count = 0
+
+    sent: list = []
+
+    async def fake_broadcast(payload):
+        sent.append(payload)
+
+    e.broadcast_payload = fake_broadcast
+    muted: list = []
+
+    async def fake_mute(value):
+        muted.append(value)
+
+    e.set_mic_muted = fake_mute
+    created: list = []
+
+    async def fake_new_session(name=None):
+        created.append(name)
+        return "s-new"
+
+    e.create_new_session = fake_new_session
+    return e, sent, muted, created
+
+
+@pytest.mark.asyncio
+async def test_typed_stop_cancels_speech_and_skips_the_turn():
+    e, sent, _, _ = _command_engine()
+    e.tts_queue.put_nowait(
+        {"kind": "utterance", "gen": e._speech_generation, "response": "old"}
+    )
+
+    handled = await e._handle_text_command("Stop!")
+
+    assert handled
+    assert e.tts_queue.empty()        # queued speech dropped
+    assert e._speech_generation == 1  # generation bumped → in-flight speech stops
+    await asyncio.sleep(0)            # let the spawned broadcast task run
+    assert any(p["type"] == "interrupt" for p in sent)
+
+
+@pytest.mark.asyncio
+async def test_typed_mute_unmute_and_new_chat():
+    e, sent, muted, created = _command_engine()
+
+    assert await e._handle_text_command("mute yourself.")
+    assert muted == [True]
+    assert any(p["type"] == "reply_text" and p["text"] == "Mic muted." for p in sent)
+
+    assert await e._handle_text_command("unmute")
+    assert muted == [True, False]
+
+    assert await e._handle_text_command("new chat")
+    assert created == [None]
+    assert any("New chat" in p["text"] for p in sent if p["type"] == "reply_text")
+
+
+@pytest.mark.asyncio
+async def test_typed_repeat_requeues_the_last_reply():
+    e, sent, _, _ = _command_engine()
+
+    handled = await e._handle_text_command("say that again")
+
+    assert handled
+    assert [p["response"] for p in e.tts_queue._queue if isinstance(p, dict)] == [
+        "the previous reply"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_empty_text_is_swallowed():
+    e, _, _, _ = _command_engine()
+    assert await e._handle_text_command("   ")
+
+
+@pytest.mark.asyncio
+async def test_normal_sentences_are_not_commands():
+    e, _, _, _ = _command_engine()
+    for text in (
+        "stop making that joke",
+        "can you mute the tv",
+        "what's a new chat?",
+        "please repeat the chorus",
+    ):
+        assert not await e._handle_text_command(text)
+
+
+@pytest.mark.asyncio
+async def test_stop_command_never_reaches_the_graph(stubbed_singletons):
+    """A typed/spoken 'stop' must not produce an LLM turn."""
+    e, tts, sent = _reasoning_engine([_token("should never run")])
+    e._sent_broadcasts = sent
+    await e.transcription_queue.put("stop")
+
+    task = asyncio.create_task(e.reasoning_engine_task())
+    try:
+        await asyncio.sleep(0.15)
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    assert not any(p["type"] == "thinking_start" for p in sent)
+    assert tts == []
