@@ -99,3 +99,101 @@ async def test_shutdown_is_idle_safe(quiet_memory):
     """Shutting down with nothing running and no connection must not raise."""
     e = YumiiEngine()
     await asyncio.wait_for(e.shutdown(), timeout=15.0)
+
+
+# ── Session continuity across restarts ─────────────────────────────────
+
+
+@pytest.fixture
+def isolated_config(tmp_path, monkeypatch):
+    from yumii.core import global_config as gc
+
+    monkeypatch.setattr(gc, "CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(gc, "CONFIG_FILE", tmp_path / "config.json")
+    return gc
+
+
+@pytest.mark.asyncio
+async def test_restore_last_session_resumes_it(isolated_config, monkeypatch):
+    from yumii.core import engine as engine_module
+
+    isolated_config.update_global_config("LAST_SESSION_ID", "s-9")
+
+    e = YumiiEngine()
+    assert e.active_session_id is None
+
+    class _Session:
+        id = "s-9"
+        name = "Robotics chat"
+
+    async def fake_get(session_id):
+        return _Session() if session_id == "s-9" else None
+
+    monkeypatch.setattr(engine_module.session_manager, "get_session", fake_get)
+    rebuilt: list[bool] = []
+
+    async def fake_ctx(include_current):
+        rebuilt.append(include_current)
+
+    e._rebuild_session_context = fake_ctx
+
+    await e._restore_last_session()
+
+    assert e.active_session_id == "s-9"
+    assert e.active_session_name == "Robotics chat"
+    assert rebuilt == [True]
+
+
+@pytest.mark.asyncio
+async def test_restore_skips_when_session_is_gone(isolated_config, monkeypatch):
+    from yumii.core import engine as engine_module
+
+    isolated_config.update_global_config("LAST_SESSION_ID", "deleted-id")
+    e = YumiiEngine()
+
+    async def fake_get(session_id):
+        return None
+
+    monkeypatch.setattr(engine_module.session_manager, "get_session", fake_get)
+
+    await e._restore_last_session()
+    assert e.active_session_id is None  # fresh start, no stale reference
+
+
+@pytest.mark.asyncio
+async def test_restore_never_overrides_a_live_session(isolated_config, monkeypatch):
+    e = YumiiEngine()
+    e.active_session_id = "already-active"
+
+    async def fail(*args, **kwargs):
+        raise AssertionError("get_session must not be called")
+
+    monkeypatch.setattr(engine_module.session_manager, "get_session", fail)
+
+    await e._restore_last_session()
+    assert e.active_session_id == "already-active"
+
+
+@pytest.mark.asyncio
+async def test_create_new_session_persists_last_session(isolated_config, monkeypatch):
+    from yumii.core import engine as engine_module
+
+    e = YumiiEngine()
+
+    async def fake_create(name):
+        return "s-new-1"
+
+    async def fake_facts():
+        return []
+
+    async def fake_ctx(include_current):
+        return None
+
+    monkeypatch.setattr(engine_module.session_manager, "create_session", fake_create)
+    monkeypatch.setattr(engine_module.memory_manager, "get_facts_raw", fake_facts)
+    e._rebuild_session_context = fake_ctx
+
+    await e.create_new_session(name="Fresh")
+
+    assert e.active_session_id == "s-new-1"
+    assert isolated_config.load_global_config()["LAST_SESSION_ID"] == "s-new-1"

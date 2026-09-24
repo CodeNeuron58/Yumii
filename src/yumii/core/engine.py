@@ -218,6 +218,14 @@ class YumiiEngine:
         except Exception:
             log.warning("transcript_backfill_failed", exc_info=True)
 
+        # Continue the last conversation across restarts — the orb's 'auto'
+        # reconnect keeps whatever session is active here, so without this a
+        # restart silently strands the user in a context-free new chat.
+        try:
+            await self._restore_last_session()
+        except Exception:
+            log.warning("session_restore_failed", exc_info=True)
+
         # Prepare audio in the background so /health and /api/status respond immediately.
         self._spawn(self._prepare_audio())
 
@@ -268,6 +276,33 @@ class YumiiEngine:
             model_size=self.model_size,
             groq_api_key=self.groq_api_key,
         )
+
+    def _remember_active_session(self, session_id: str) -> None:
+        """Persist the active session so a restart continues this conversation."""
+        from yumii.core.global_config import update_global_config
+
+        try:
+            update_global_config("LAST_SESSION_ID", session_id)
+        except Exception:
+            log.warning("last_session_persist_failed", exc_info=True)
+
+    async def _restore_last_session(self) -> None:
+        """Make the last active session active again after a restart."""
+        from yumii.core.global_config import load_global_config
+
+        if self.active_session_id:
+            return
+        last_id = load_global_config().get("LAST_SESSION_ID")
+        if not last_id:
+            return
+        session = await session_manager.get_session(last_id)
+        if session is None:
+            log.info("last_session_missing_starting_fresh", session_id=last_id)
+            return
+        self.active_session_id = session.id
+        self.active_session_name = session.name
+        await self._rebuild_session_context(include_current=True)
+        log.info("last_session_restored", session_id=session.id, name=session.name)
 
     async def _backfill_transcript_once(self) -> None:
         """Populate the transcript from checkpoints, first boot only (fresh-upgrade gate)."""
@@ -463,6 +498,7 @@ class YumiiEngine:
             self._spawn(self._finalize_session(previous_session))
 
         facts = await memory_manager.get_facts_raw()
+        self._remember_active_session(session_id)
         log.info(
             "session_created_and_active",
             session_id=session_id,
@@ -494,6 +530,7 @@ class YumiiEngine:
             self._spawn(self._finalize_session(previous_session))
 
         facts = await memory_manager.get_facts_raw()
+        self._remember_active_session(session.id)
         log.info(
             "session_resumed",
             session_id=session.id,
