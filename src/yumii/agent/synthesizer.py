@@ -98,9 +98,11 @@ _EXPRESSION_PATTERNS: list[tuple[ExpressionLabel, re.Pattern[str]]] = [
 
 
 _MOTION_PATTERNS: list[tuple[MotionLabel, re.Pattern[str]]] = [
-    # Greeting opener — always a wave/tilt on first contact
+    # Greeting opener — always a wave/tilt on first contact (word-bounded:
+    # "You're" used to match via the "yo" prefix).
     ("greeting", re.compile(
-        r"^\s*(?:hi|hello|hey|yo|welcome|greetings|good (?:morning|afternoon|evening))",
+        r"^\s*(?:hi\b|hello\b|hey\b|yo\b|welcome\b|greetings\b"
+        r"|good\s+(?:morning|afternoon|evening)\b)",
         re.IGNORECASE,
     )),
     # Agreement / affirmation
@@ -150,13 +152,13 @@ _MOTION_PATTERNS: list[tuple[MotionLabel, re.Pattern[str]]] = [
         r")\b",
         re.IGNORECASE,
     )),
-    # Fidget / energy (genki-style)
+    # Fidget / energy (genki-style). Note: `!{2,}` must NOT sit inside a
+    # \b wrapper — bangs are non-word chars, so a trailing \b almost never
+    # matches before whitespace (the rule was effectively dead for years).
     ("fidget", re.compile(
-        r"\b("
-        r"yay|wheee|let'?s go|come on|"
-        r"yatta|banzai|woohoo|"
-        r"!{2,}|w+!+"
-        r")\b",
+        r"\b(?:yay|wheee|let'?s go|come on|yatta|banzai|woohoo)\b"
+        r"|!{2,}"
+        r"|\bw+!+",
         re.IGNORECASE,
     )),
     # Default fallback — pattern that can never match
@@ -188,6 +190,24 @@ def content_to_text(content: Any) -> str:
                 parts.append(block["text"])
         return "".join(parts)
     return str(content or "")
+
+
+# Per-personality expression calibration. Personas speak with different
+# energies: "!!" reads as fury in the generic table, but for genki it's
+# scripted joy. Override patterns are guarded so explicit emotion words in
+# the text still win (genki's lookahead refuses anger vocabulary).
+_PERSONA_EXPRESSION_OVERRIDES: dict[str, list[tuple[ExpressionLabel, re.Pattern[str]]]] = {
+    "genki": [
+        (
+            "smile",
+            re.compile(
+                r"^(?!.*\b(?:angry|mad|furious|annoyed|frustrated|hate|terrible|awful|horrible|damn|ugh|grr)\b)"
+                r".*!{2,}",
+                re.IGNORECASE | re.DOTALL,
+            ),
+        ),
+    ],
+}
 
 
 # ----------------------------------------------------------------------
@@ -231,8 +251,13 @@ _THINK_BLOCK = re.compile(
 )
 
 
-def synthesize(agent_text: str) -> YumiiResponse:
-    """Convert agent text into a YumiiResponse (deterministic; empty text → safe default)."""
+def synthesize(agent_text: str, personality: str | None = None) -> YumiiResponse:
+    """Convert agent text into a YumiiResponse (deterministic; empty text → safe default).
+
+    ``personality`` applies that persona's expression calibration after the
+    generic tables — an override only fires when its (guarded) pattern
+    matches, so anger words beat genki's joy-reading of "!!".
+    """
     text = _THINK_BLOCK.sub("", agent_text or "").strip()
     if not text:
         return YumiiResponse(
@@ -240,9 +265,17 @@ def synthesize(agent_text: str) -> YumiiResponse:
             expression="normal",
             motion="idle",
         )
+    expression = _expression_for(text)
+    if personality:
+        for label, pattern in _PERSONA_EXPRESSION_OVERRIDES.get(
+            personality.lower(), []
+        ):
+            if pattern.search(text):
+                expression = label
+                break
     return YumiiResponse(
         response_text=text,
-        expression=_expression_for(text),
+        expression=expression,
         motion=_motion_for(text),
     )
 

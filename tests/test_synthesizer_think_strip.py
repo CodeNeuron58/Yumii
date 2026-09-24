@@ -34,3 +34,30 @@ def test_think_only_content_degrades_to_placeholder():
 
 def test_normal_text_untouched():
     assert synthesize("Hi there!").response_text == "Hi there!"
+
+
+# ── Per-personality expression calibration ─────────────────────────────
+
+
+def test_genki_double_bang_is_joy_not_anger():
+    """genki's scripted enthusiasm is full of '!!' — the generic table read
+    that as fury. Her signature line must light up a smile."""
+    from yumii.agent.synthesizer import synthesize
+
+    r = synthesize("You're back!! Okay tell me everything.", personality="genki")
+    assert r.expression == "smile"
+    assert r.motion == "fidget"  # the motion table already read it right
+
+
+def test_genki_explicit_anger_words_still_win():
+    from yumii.agent.synthesizer import synthesize
+
+    r = synthesize("I'm so mad!!", personality="genki")
+    assert r.expression == "angry"
+
+
+def test_other_personalities_keep_the_generic_table():
+    from yumii.agent.synthesizer import synthesize
+
+    assert synthesize("You're back!!", personality="tsundere").expression == "angry"
+    assert synthesize("You're back!!").expression == "angry"  # no persona → unchanged
