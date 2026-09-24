@@ -88,15 +88,14 @@ async def load_and_register_composio_tools(
     client_factory: Callable[[], Any] | None = None,
 ) -> list[str]:
     """Fetch tools for every enabled toolkit and register them; returns the registered names."""
-    # Reload-safe: drop what we registered last time before re-registering.
-    for name in _registered_composio_tools:
-        registry.unregister(name)
-    _registered_composio_tools.clear()
-
     if not composio_api_key():
         return []
     toolkits = enabled_toolkits()
     if not toolkits:
+        # A successful reload to "nothing enabled" — the old set must go.
+        for name in _registered_composio_tools:
+            registry.unregister(name)
+        _registered_composio_tools.clear()
         return []
 
     factory = client_factory or get_composio_client
@@ -118,16 +117,35 @@ async def load_and_register_composio_tools(
             )
         return loaded
 
+    # Fetch FIRST, then swap: unregistering before the fetch meant one
+    # Composio hiccup (timeout, or one bad slug — the explicit-slug fetch is
+    # all-or-nothing) silently stripped every Composio tool and rebuilt the
+    # graph with built-ins only. On failure the previous set stays live.
     try:
         tools = await asyncio.wait_for(
             asyncio.to_thread(_load), timeout=_LOAD_TIMEOUT_SEC
         )
     except asyncio.TimeoutError:
-        log.warning("composio_load_timeout", toolkits=toolkits, timeout=_LOAD_TIMEOUT_SEC)
-        return []
+        log.warning(
+            "composio_load_timeout_keep_old",
+            toolkits=toolkits,
+            timeout=_LOAD_TIMEOUT_SEC,
+            kept=len(_registered_composio_tools),
+        )
+        return list(_registered_composio_tools)
     except Exception as e:
-        log.warning("composio_load_failed", toolkits=toolkits, error=str(e))
-        return []
+        log.warning(
+            "composio_load_failed_keep_old",
+            toolkits=toolkits,
+            error=str(e),
+            kept=len(_registered_composio_tools),
+        )
+        return list(_registered_composio_tools)
+
+    # Swap point — the fetch succeeded; the old set may go now.
+    for name in _registered_composio_tools:
+        registry.unregister(name)
+    _registered_composio_tools.clear()
 
     registered: list[str] = []
     for tool in tools:

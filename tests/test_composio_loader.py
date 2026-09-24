@@ -95,11 +95,29 @@ async def test_collision_is_skipped(monkeypatch):
 
 
 async def test_sdk_failure_never_raises(monkeypatch):
+    monkeypatch.setattr(composio_loader, "_registered_composio_tools", set())
     monkeypatch.setattr(composio_loader, "composio_api_key", lambda: "ak_test")
     monkeypatch.setattr(composio_loader, "enabled_toolkits", lambda: ["GMAIL"])
     factory = lambda: FakeClient(exc=RuntimeError("401 Invalid API key"))  # noqa: E731
 
     assert await composio_loader.load_and_register_composio_tools(client_factory=factory) == []
+
+
+async def test_failed_fetch_keeps_the_previously_registered_tools(monkeypatch):
+    """A Composio hiccup must not strip every tool: fetch first, swap only on
+    success — the old set stays live until a good fetch replaces it."""
+    monkeypatch.setattr(composio_loader, "composio_api_key", lambda: "ak_test")
+    monkeypatch.setattr(composio_loader, "enabled_toolkits", lambda: ["GMAIL"])
+
+    good = lambda: FakeClient(tools=[gmail_fetch_emails, gmail_send_email])  # noqa: E731
+    await composio_loader.load_and_register_composio_tools(client_factory=good)
+
+    bad = lambda: FakeClient(exc=RuntimeError("one bad slug kills the batch"))  # noqa: E731
+    names = await composio_loader.load_and_register_composio_tools(client_factory=bad)
+
+    assert set(names) == {"gmail_fetch_emails", "gmail_send_email"}
+    assert "gmail_fetch_emails" in registry
+    assert "gmail_send_email" in registry
 
 
 async def test_reload_replaces_previous_composio_tools(monkeypatch):

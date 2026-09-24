@@ -97,7 +97,12 @@ def web_search(query: str) -> str:
             )
         except Exception as exc:
             log.warning("web_search_failed", query=query[:80], error=str(exc))
-            return f"The web search failed: {exc}"
+            # A canned phrase — the tool result is spoken aloud, and raw
+            # exception text would leak internals into her voice.
+            return (
+                "The web search failed on my end — the engine may be "
+                "rate-limiting or down right now. Try again in a bit."
+            )
     finally:
         # Abandon a hung worker instead of joining it; it shares no state.
         pool.shutdown(wait=False, cancel_futures=True)
