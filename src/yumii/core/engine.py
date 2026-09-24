@@ -153,7 +153,14 @@ class YumiiEngine:
         # Pending HITL confirmations, keyed by request_id; resolved by the WS server.
         self.pending_confirmations: dict[str, "asyncio.Future[bool]"] = {}
 
-        self._memory_turn_buffer: list[dict[str, str]] = []
+        # Turns pending background memory review, tagged with the session they
+        # belong to — an in-flight turn may complete after a session switch.
+        self._memory_turn_buffer: list[tuple[str | None, dict[str, str]]] = []
+
+        # Every fire-and-forget task lives here: bare create_task results are
+        # GC-vulnerable (the loop holds only weak refs), and shutdown() must
+        # be able to stop them before closing the stores they write to.
+        self._background_tasks: set[asyncio.Task] = set()
 
         # Episodic block for the system prompt (time since last talk + recent summaries).
         self.session_context: str = ""
@@ -178,6 +185,13 @@ class YumiiEngine:
         self.graph_app: Any | None = None
         self._conn: aiosqlite.Connection | None = None
         self._saver: AsyncSqliteSaver | None = None
+
+    def _spawn(self, coro: Any) -> asyncio.Task:
+        """create_task that keeps a reference and is cancellable by shutdown()."""
+        task = asyncio.get_running_loop().create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     async def initialize(self) -> None:
         """Async one-time initialization: database tables + compiled graph."""
@@ -205,7 +219,7 @@ class YumiiEngine:
             log.warning("transcript_backfill_failed", exc_info=True)
 
         # Prepare audio in the background so /health and /api/status respond immediately.
-        asyncio.create_task(self._prepare_audio())
+        self._spawn(self._prepare_audio())
 
         log.info("engine_ready")
 
@@ -233,9 +247,9 @@ class YumiiEngine:
                     "progress": 1.0,
                     "indeterminate": False,
                 }
-                asyncio.create_task(self.audio_listener_task())
-                asyncio.create_task(self.reasoning_engine_task())
-                asyncio.create_task(self.tts_speaker_task())
+                self._spawn(self.audio_listener_task())
+                self._spawn(self.reasoning_engine_task())
+                self._spawn(self.tts_speaker_task())
                 log.info("audio_ready")
             except Exception:
                 log.error("audio_prepare_failed_retrying", exc_info=True)
@@ -312,17 +326,22 @@ class YumiiEngine:
         log.info("tools_reloaded", composio_count=len(registered))
         return registered
 
+    def _drain_memory_turns(self) -> dict[str, list[dict[str, str]]]:
+        """Take the buffered turns, grouped by the session they belong to.
+
+        Turns are tagged at capture time: a turn that finishes after a
+        session switch must be reviewed under the session it was spoken in.
+        """
+        buffered, self._memory_turn_buffer = self._memory_turn_buffer, []
+        groups: dict[str, list[dict[str, str]]] = {}
+        for sid, entry in buffered:
+            groups.setdefault(sid or self.active_session_id or "", []).append(entry)
+        return groups
+
     def _flush_memory_review(self, session_id: str | None = None) -> None:
         """Fire the background memory review over the buffered turns."""
-        if not self._memory_turn_buffer:
-            return
-        turns = self._memory_turn_buffer
-        self._memory_turn_buffer = []
-        asyncio.create_task(
-            memory_manager.review_recent_turns(
-                turns, session_id or self.active_session_id
-            )
-        )
+        for sid, turns in self._drain_memory_turns().items():
+            self._spawn(memory_manager.review_recent_turns(turns, session_id or sid))
 
     async def _rebuild_session_context(self, *, include_current: bool) -> None:
         """Recompute the episodic prompt block (never lets a failure block)."""
@@ -350,13 +369,19 @@ class YumiiEngine:
         """Clean shutdown: close SQLite connections and memory store."""
         log.info("engine_shutting_down")
 
-        # Review buffered turns before exit (bounded so a slow provider can't hang quit).
-        if self._memory_turn_buffer:
-            turns, self._memory_turn_buffer = self._memory_turn_buffer, []
+        # Review buffered turns before exit (bounded so a slow provider can't
+        # hang quit); grouped per session — a stale active id must not
+        # capture another session's turns.
+        groups = self._drain_memory_turns()
+        if groups:
             try:
                 await asyncio.wait_for(
-                    memory_manager.review_recent_turns(
-                        turns, self.active_session_id
+                    asyncio.gather(
+                        *(
+                            memory_manager.review_recent_turns(turns, sid)
+                            for sid, turns in groups.items()
+                        ),
+                        return_exceptions=True,
                     ),
                     timeout=20.0,
                 )
@@ -373,6 +398,19 @@ class YumiiEngine:
                 )
             except Exception:
                 log.warning("shutdown_session_summary_failed", exc_info=True)
+
+        # Stop the loops and background work BEFORE closing anything they
+        # touch — a turn still in flight would otherwise write checkpoints
+        # into a closed connection, and pending reviews die with their turns
+        # already drained.
+        pending = [t for t in self._background_tasks if not t.done()]
+        for task in pending:
+            task.cancel()
+        if pending:
+            done, stubborn = await asyncio.wait(pending, timeout=5.0)
+            log.info(
+                "background_tasks_stopped", stopped=len(done), stubborn=len(stubborn)
+            )
 
         if self._conn is not None:
             try:
@@ -422,7 +460,7 @@ class YumiiEngine:
         self._session_msg_count = 0
         await self._rebuild_session_context(include_current=False)
         if previous_session:
-            asyncio.create_task(self._finalize_session(previous_session))
+            self._spawn(self._finalize_session(previous_session))
 
         facts = await memory_manager.get_facts_raw()
         log.info(
@@ -453,7 +491,7 @@ class YumiiEngine:
         await session_manager.update_session_activity(session.id)
         await self._rebuild_session_context(include_current=True)
         if previous_session and previous_session != session.id:
-            asyncio.create_task(self._finalize_session(previous_session))
+            self._spawn(self._finalize_session(previous_session))
 
         facts = await memory_manager.get_facts_raw()
         log.info(
@@ -510,7 +548,7 @@ class YumiiEngine:
                 log.warning("playback_finished_timeout", seq=seq)
                 await self.on_playback_finished(seq)
 
-        asyncio.create_task(_guard())
+        self._spawn(_guard())
 
     async def on_playback_finished(self, seq: int | None = None) -> None:
         """Webui reports real playback end — disarm the gate, reset capture.
@@ -641,7 +679,7 @@ class YumiiEngine:
             self._disarm_speaking_gate()
             self._cancel_speech()
             self.interrupt_event.set()
-            asyncio.create_task(self.broadcast_payload({"type": "interrupt"}))
+            self._spawn(self.broadcast_payload({"type": "interrupt"}))
 
         log.info("listener_task_started")
         while True:
@@ -696,6 +734,10 @@ class YumiiEngine:
                 # next chunk check (the drain above only covers not-yet-played
                 # text — this is what closes the old interrupt_event race).
                 turn_generation = self._cancel_speech()
+                # The session this turn belongs to — captured NOW, because a
+                # session switch landing mid-turn (or mid-bookkeeping) must
+                # not redirect its transcript/summary/memory writes.
+                turn_session_id = self.active_session_id
 
                 if not self.active_session_id or not self.graph_app:
                     log.warning("reasoning_skipped_no_session")
@@ -914,7 +956,7 @@ class YumiiEngine:
                 )
 
                 await session_manager.bump_after_turn(
-                    self.active_session_id, user_text
+                    turn_session_id, user_text
                 )
 
                 # Append to the searchable transcript for future recall.
@@ -922,7 +964,7 @@ class YumiiEngine:
                     from yumii.core import transcript
 
                     await transcript.record_turn(
-                        self.active_session_id,
+                        turn_session_id,
                         user_text,
                         reasoning_result["response"],
                     )
@@ -934,9 +976,7 @@ class YumiiEngine:
                 from yumii.core.summarizer import SUMMARY_REFRESH_MESSAGES
 
                 if self._session_msg_count % SUMMARY_REFRESH_MESSAGES == 0:
-                    asyncio.create_task(
-                        self._finalize_session(self.active_session_id)
-                    )
+                    self._spawn(self._finalize_session(turn_session_id))
                 if self.active_session_name == "New Chat":
                     refreshed = await session_manager.get_session(
                         self.active_session_id
@@ -944,12 +984,14 @@ class YumiiEngine:
                     if refreshed:
                         self.active_session_name = refreshed.name
 
-                # Buffer the turn for the periodic memory review.
+                # Buffer the turn for the periodic memory review — tagged with
+                # the session it was spoken in (see _drain_memory_turns).
                 self._memory_turn_buffer.extend(
-                    [
+                    (turn_session_id, entry)
+                    for entry in (
                         {"role": "user", "content": user_text},
                         {"role": "assistant", "content": reasoning_result["response"]},
-                    ]
+                    )
                 )
                 if len(self._memory_turn_buffer) >= _MEMORY_REVIEW_INTERVAL * 2:
                     self._flush_memory_review()

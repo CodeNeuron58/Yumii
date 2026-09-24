@@ -158,20 +158,26 @@ async def _run_turn(e: YumiiEngine) -> None:
 
 @pytest.fixture
 def stubbed_singletons(monkeypatch):
-    """Silence the engine's collaborators (facts, transcript, summaries)."""
+    """Silence the engine's collaborators and record their session-id calls."""
     from yumii.core.summarizer import SUMMARY_REFRESH_MESSAGES
 
-    async def nothing(*args, **kwargs):
-        return None
+    calls: dict[str, list] = {"bump": [], "record": []}
 
     async def no_facts():
         return []
 
+    async def fake_bump(session_id, user_text):
+        calls["bump"].append((session_id, user_text))
+
+    async def fake_record_turn(session_id, user_text, reply):
+        calls["record"].append((session_id, user_text, reply))
+
     monkeypatch.setattr(memory_manager, "get_facts_raw", no_facts)
-    monkeypatch.setattr(session_manager, "bump_after_turn", nothing)
-    monkeypatch.setattr(transcript, "record_turn", nothing)
+    monkeypatch.setattr(session_manager, "bump_after_turn", fake_bump)
+    monkeypatch.setattr(transcript, "record_turn", fake_record_turn)
     # Keep the periodic-summary trigger from firing _finalize_session for real.
     assert SUMMARY_REFRESH_MESSAGES > 2  # one turn must never hit the refresh
+    return calls
 
 
 # ---------------------------------------------------------------------------
@@ -330,3 +336,27 @@ async def test_generation_bump_mid_stream_aborts_the_turn(stubbed_singletons):
     # the pre-bump sentence is queued but tagged with the now-stale generation
     assert len(tts) == 1
     assert tts[0]["gen"] != e._speech_generation
+
+
+@pytest.mark.asyncio
+async def test_turn_bookkeeping_uses_the_session_captured_at_turn_start(
+    stubbed_singletons,
+):
+    """A session switch landing mid-turn must not redirect the turn's
+    transcript/memory writes into the new session. (A real switch also bumps
+    the speech generation and aborts the turn; this pins the bookkeeping
+    capture for the interleaving windows where it doesn't.)"""
+
+    def switch_session():
+        e.active_session_id = "sess-2"  # resume_session lands here
+
+    e, tts, sent = _reasoning_engine(
+        [_token("First. "), _final_pass("First. reply")],
+        mid_stream_hook=switch_session,
+    )
+    e._sent_broadcasts = sent
+    await _run_turn(e)
+
+    assert stubbed_singletons["bump"][0][0] == "sess-1"
+    assert stubbed_singletons["record"][0][0] == "sess-1"
+    assert all(sid == "sess-1" for sid, _ in e._memory_turn_buffer)

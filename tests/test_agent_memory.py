@@ -243,9 +243,11 @@ async def test_engine_flush_fires_review_and_clears_buffer(monkeypatch):
 
     e = YumiiEngine.__new__(YumiiEngine)
     e.active_session_id = "s1"
+    e._background_tasks = set()
+    # turns are tagged with the session they belong to
     e._memory_turn_buffer = [
-        {"role": "user", "content": "hi"},
-        {"role": "assistant", "content": "hello"},
+        ("s1", {"role": "user", "content": "hi"}),
+        ("s1", {"role": "assistant", "content": "hello"}),
     ]
     e._flush_memory_review()
     assert e._memory_turn_buffer == []
@@ -256,3 +258,34 @@ async def test_engine_flush_fires_review_and_clears_buffer(monkeypatch):
     e._flush_memory_review()  # empty buffer → no second call
     await asyncio.sleep(0)
     assert len(calls) == 1
+
+
+async def test_engine_flush_groups_buffered_turns_by_session(monkeypatch):
+    """Turns finished after a session switch must be reviewed under the
+    session they were spoken in, not wherever the engine happens to point."""
+    from yumii.core.engine import YumiiEngine
+    from yumii.core import engine as engine_module
+
+    calls = []
+
+    async def fake_review(turns, session_id):
+        calls.append((session_id, list(turns)))
+
+    monkeypatch.setattr(
+        engine_module.memory_manager, "review_recent_turns", fake_review
+    )
+
+    e = YumiiEngine.__new__(YumiiEngine)
+    e.active_session_id = "s2"  # stale — must NOT capture s1's turns
+    e._background_tasks = set()
+    e._memory_turn_buffer = [
+        ("s1", {"role": "user", "content": "a"}),
+        ("s2", {"role": "user", "content": "b"}),
+        ("s1", {"role": "assistant", "content": "c"}),
+    ]
+    e._flush_memory_review()
+    await asyncio.sleep(0)
+
+    by_session = {sid: turns for sid, turns in calls}
+    assert [t["content"] for t in by_session["s1"]] == ["a", "c"]
+    assert [t["content"] for t in by_session["s2"]] == ["b"]
