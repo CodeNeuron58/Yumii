@@ -126,10 +126,16 @@ async def status() -> dict[str, Any]:
     wiring = get_wiring(provider)
     if wiring is None:
         configured = False
+    elif wiring.kind == "ollama":
+        # Ollama is key-optional only when actually LOCAL — the default
+        # base_url is the cloud endpoint, which needs a key (else first-run
+        # onboarding is skipped and turn one dies on a 401).
+        base = (settings.ollama_base_url or "").lower()
+        is_local = "localhost" in base or "127.0.0.1" in base
+        configured = is_local or bool(get_credential(wiring.env_key))
     else:
         # Key name comes from the wiring (Google stores GEMINI_API_KEY, not
-        # GOOGLE_API_KEY); key-optional providers (local Ollama) are
-        # configured without one.
+        # GOOGLE_API_KEY); other key-optional providers pass without one.
         configured = wiring.key_optional or bool(get_credential(wiring.env_key))
     return {
         "configured": configured,

@@ -85,16 +85,32 @@ def test_status_togetherai_maps_to_together_key(client: TestClient) -> None:
     assert client.get("/api/status").json()["configured"] is True
 
 
-def test_status_key_optional_provider_needs_no_key(client: TestClient) -> None:
-    """A local Ollama user has no key — they must still pass first-run."""
+def test_status_local_ollama_needs_no_key(client: TestClient, monkeypatch) -> None:
+    """A LOCAL Ollama user has no key — they must still pass first-run."""
+    from yumii.core.config import settings
+
+    monkeypatch.setattr(settings, "ollama_base_url", "http://localhost:11434")
     gc.update_global_config("LLM_PROVIDER", "ollama")
     assert client.get("/api/status").json()["configured"] is True
 
 
-def test_status_legacy_capitalized_provider_canonicalizes(client: TestClient) -> None:
+def test_status_cloud_ollama_without_key_still_shows_onboarding(client: TestClient) -> None:
+    """The default base_url is ollama.com (cloud) — without a key the user
+    must get onboarding, not a 401 error card on turn one."""
+    gc.update_global_config("LLM_PROVIDER", "ollama")
+    assert client.get("/api/status").json()["configured"] is False
+
+    cs.save_credential("OLLAMA_API_KEY", "gsk_test")
+    assert client.get("/api/status").json()["configured"] is True
+
+
+def test_status_legacy_capitalized_provider_canonicalizes(client: TestClient, monkeypatch) -> None:
+    from yumii.core.config import settings
+
+    monkeypatch.setattr(settings, "ollama_base_url", "http://localhost:11434")
     gc.update_global_config("LLM_PROVIDER", "Ollama")
     body = client.get("/api/status").json()
-    assert body["configured"] is True  # key_optional via canonical 'ollama'
+    assert body["configured"] is True  # local + key_optional via canonical 'ollama'
 
 
 def test_status_unknown_provider_reports_unconfigured(client: TestClient) -> None:
