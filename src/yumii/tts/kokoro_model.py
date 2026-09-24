@@ -4,10 +4,10 @@ fp32 (~325 MB) is the default: int8 measured ~3.7x slower on x86 CPUs (fallback 
 """
 
 import os
-import urllib.request
 from pathlib import Path
 from typing import Callable
 
+from yumii.core.downloads import download_file
 from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -26,26 +26,17 @@ _VOICES_FILE = "voices-v1.0.bin"
 ProgressFn = Callable[[float], None]
 
 
-def _hook_into(on_progress: ProgressFn | None, lo: float, hi: float):
-    """Map ``urlretrieve``'s (block, size, total) into a [lo, hi] fraction."""
+def _band_progress(on_progress: ProgressFn | None, lo: float, hi: float):
+    """Map a 0..1 download fraction into the [lo, hi] slice of the first-run bar."""
     if on_progress is None:
         return None
-
-    def hook(block_num: int, block_size: int, total_size: int) -> None:
-        if total_size <= 0:
-            return
-        frac = min(1.0, (block_num * block_size) / total_size)
-        on_progress(lo + frac * (hi - lo))
-
-    return hook
+    return lambda frac: on_progress(lo + frac * (hi - lo))
 
 
-def _download(url: str, target: Path, reporthook=None) -> None:
-    """Download *url* to *target* atomically (.part rename) so an interrupt can't leave a truncated file."""
-    part = target.with_suffix(target.suffix + ".part")
+def _download(url: str, target: Path, progress=None) -> None:
+    """Atomic, timeout-bounded download (see yumii.core.downloads)."""
     log.info("downloading_kokoro_file", url=url, target=str(target))
-    urllib.request.urlretrieve(url, str(part), reporthook=reporthook)
-    os.replace(str(part), str(target))
+    download_file(url, target, progress=progress)
 
 
 def _bundled_paths(model_size: str) -> tuple[str, str] | None:
@@ -84,13 +75,13 @@ def get_kokoro_model_paths(
         _download(
             f"{_RELEASE_BASE}/{KOKORO_MODELS[model_size]}",
             model_path,
-            _hook_into(on_progress, 0.0, 0.92),
+            _band_progress(on_progress, 0.0, 0.92),
         )
     if not voices_path.exists():
         _download(
             f"{_RELEASE_BASE}/{_VOICES_FILE}",
             voices_path,
-            _hook_into(on_progress, 0.92, 1.0),
+            _band_progress(on_progress, 0.92, 1.0),
         )
 
     log.info("kokoro_model_ready", model=str(model_path), voices=str(voices_path))

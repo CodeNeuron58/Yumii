@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import os
 import shutil
-import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Callable
 
+from yumii.core.downloads import download_file
 from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -50,17 +50,6 @@ def purge(size: str) -> None:
         shutil.rmtree(d, ignore_errors=True)
 
 
-def _hook(on_progress: ProgressFn | None):
-    if on_progress is None:
-        return None
-
-    def hook(block_num: int, block_size: int, total_size: int) -> None:
-        if total_size > 0:
-            on_progress(min(1.0, (block_num * block_size) / total_size))
-
-    return hook
-
-
 def get_whisper_model_dir(
     size: str = "base", on_progress: ProgressFn | None = None
 ) -> str:
@@ -75,15 +64,15 @@ def get_whisper_model_dir(
     target.mkdir(parents=True, exist_ok=True)
 
     url = f"{_RELEASE_BASE}/whisper-{size}.zip"
-    part = target.parent / f"whisper-{size}.zip.part"
+    zip_path = target.parent / f"whisper-{size}.zip"
     log.info("downloading_whisper_model", size=size, url=url)
     try:
-        urllib.request.urlretrieve(url, str(part), reporthook=_hook(on_progress))
-        with zipfile.ZipFile(str(part)) as z:
+        download_file(url, zip_path, progress=on_progress)
+        with zipfile.ZipFile(str(zip_path)) as z:
             z.extractall(str(target))
     finally:
-        if part.exists():
-            os.remove(str(part))
+        if zip_path.exists():
+            os.remove(str(zip_path))
 
     if not is_present(size):
         purge(size)

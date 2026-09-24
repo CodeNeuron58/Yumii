@@ -74,13 +74,14 @@ def test_download_extracts_complete_model(isolated_models, monkeypatch, tmp_path
         "tokenizer.json": "{}", "vocabulary.txt": "words",
     })
 
-    def fake_urlretrieve(url, out, reporthook=None):
-        if reporthook:
-            reporthook(1, 100, 100)  # 100%
+    def fake_download(url, out, progress=None):
         import shutil
-        shutil.copy(src_zip, out)
 
-    monkeypatch.setattr(wm.urllib.request, "urlretrieve", fake_urlretrieve)
+        shutil.copy(src_zip, out)
+        if progress:
+            progress(1.0)  # 100%
+
+    monkeypatch.setattr(wm, "download_file", fake_download)
 
     fracs: list[float] = []
     path = wm.get_whisper_model_dir("base", on_progress=fracs.append)
@@ -96,11 +97,12 @@ def test_incomplete_archive_raises_and_cleans(isolated_models, monkeypatch, tmp_
     src_zip = tmp_path / "bad.zip"
     _fake_zip(src_zip, {"model.bin": "weights", "tokenizer.json": "{}"})
 
-    def fake_urlretrieve(url, out, reporthook=None):
+    def fake_download(url, out, progress=None):
         import shutil
+
         shutil.copy(src_zip, out)
 
-    monkeypatch.setattr(wm.urllib.request, "urlretrieve", fake_urlretrieve)
+    monkeypatch.setattr(wm, "download_file", fake_download)
 
     with pytest.raises(RuntimeError, match="incomplete"):
         wm.get_whisper_model_dir("base")
@@ -115,5 +117,5 @@ def test_present_model_skips_download(isolated_models, monkeypatch):
     def boom(*a, **k):
         raise AssertionError("should not download when already present")
 
-    monkeypatch.setattr(wm.urllib.request, "urlretrieve", boom)
+    monkeypatch.setattr(wm, "download_file", boom)
     assert wm.get_whisper_model_dir("base") == str(wm.model_dir_for("base"))
