@@ -98,12 +98,13 @@ def _provider_api_key(provider: str) -> str | None:
     return key_for(provider)
 
 
-def _build_base_llm(temperature: float = 0.7) -> Any:
+def _build_base_llm(temperature: float = 0.7, model: str | None = None) -> Any:
     """Construct the configured provider's chat model, lazily (constructors validate keys).
 
     Provider wiring comes from the model catalog (provider id → LangChain
     client + key name + base URL); the model id comes from the catalog
-    selection. Unknown provider strings keep the legacy Groq fallback.
+    selection unless an explicit ``model`` is passed. Unknown provider
+    strings keep the legacy Groq fallback.
     """
     from yumii.core.model_catalog import get_wiring
 
@@ -112,12 +113,12 @@ def _build_base_llm(temperature: float = 0.7) -> Any:
     if wiring is None:
         # Unknown provider string — legacy behavior: Groq with its configured model.
         return ChatGroq(
-            model=settings.groq_model,
+            model=model or settings.groq_model,
             temperature=temperature,
             api_key=settings.groq_api_key,
         )
 
-    model = _resolve_model(wiring.id)
+    chosen = model or _resolve_model(wiring.id)
 
     if wiring.kind == "anthropic":
         api_key = _provider_api_key(wiring.id)
@@ -125,16 +126,16 @@ def _build_base_llm(temperature: float = 0.7) -> Any:
             raise ValueError(
                 "Anthropic needs an API key — add it in Settings → Model picker."
             )
-        return ChatAnthropic(model=model, temperature=temperature, api_key=api_key)
+        return ChatAnthropic(model=chosen, temperature=temperature, api_key=api_key)
 
     if wiring.kind == "groq":
         api_key = _provider_api_key(wiring.id)
         if not api_key:
             raise ValueError("Groq needs an API key — add it in Settings → Model picker.")
-        return ChatGroq(model=model, temperature=temperature, api_key=api_key)
+        return ChatGroq(model=chosen, temperature=temperature, api_key=api_key)
 
     if wiring.kind == "ollama":
-        return build_ollama_llm(model, temperature=temperature)
+        return build_ollama_llm(chosen, temperature=temperature)
 
     # "openai" and every "openai-compatible" provider (Google, OpenRouter,
     # DeepSeek, xAI, Together, Mistral) speak the OpenAI wire protocol.
@@ -144,7 +145,7 @@ def _build_base_llm(temperature: float = 0.7) -> Any:
             f"{wiring.name} needs an API key — add it in Settings → Model picker."
         )
     return ChatOpenAI(
-        model=model,
+        model=chosen,
         temperature=temperature,
         api_key=api_key or "unused",
         base_url=wiring.base_url,
@@ -152,13 +153,19 @@ def _build_base_llm(temperature: float = 0.7) -> Any:
 
 
 def build_background_llm(temperature: float = 0.0) -> Any:
-    """The configured provider's chat model without tools bound — the shared
-    workhorse for background jobs (memory extraction, session summaries).
+    """The provider's cheap tier for background jobs (memory review, summaries).
 
-    Goes through the same catalog wiring as the agent's mind, so every
-    provider the picker supports works here too; missing keys raise the
-    same actionable errors (callers catch and degrade with a warning).
+    Prefers the catalog's small/fast model so background work never runs —
+    or pays for — the user's flagship chat model; falls back to the selected
+    chat model when the catalog knows no cheap tier for the provider.
+    Missing keys raise the same actionable errors as the agent's mind
+    (callers catch and degrade with a warning).
     """
+    from yumii.core.model_catalog import cheap_model_for
+
+    cheap = cheap_model_for(settings.llm_provider)
+    if cheap:
+        return _build_base_llm(temperature=temperature, model=cheap)
     return _build_base_llm(temperature=temperature)
 
 

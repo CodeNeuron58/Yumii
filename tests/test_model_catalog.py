@@ -279,3 +279,43 @@ def test_wiring_covers_every_catalog_provider():
     wiring_ids = set(PROVIDER_WIRING)
     assert get_wiring("ollama") is not None
     assert wiring_ids == set(p["id"] for p in providers())
+
+
+def test_cheap_model_is_always_a_real_catalog_id():
+    """The cheap pick must be derived from the snapshot — never a hardcoded
+    id that can silently retire (the old Groq fallback died exactly that way)."""
+    for provider in ("openai", "anthropic", "google", "groq"):
+        pick = mc.cheap_model_for(provider)
+        if pick is not None:
+            assert pick in {m["id"] for m in mc.models(provider)}
+
+
+def test_cheap_model_prefers_marked_small_tiers():
+    pick = mc.cheap_model_for("google")
+    assert pick is not None
+    assert any(p in pick.lower() for p in ("flash", "mini", "nano", "lite"))
+
+
+def test_cheap_model_none_without_snapshot_knowledge():
+    # Ollama's live tag list has no snapshot slice; nonsense isn't a provider.
+    assert mc.cheap_model_for("ollama") is None
+    assert mc.cheap_model_for("nonsense-ai") is None
+
+
+def test_background_llm_prefers_the_cheap_tier(monkeypatch):
+    from yumii.agent.llm import build_background_llm
+
+    monkeypatch.setattr(settings, "llm_provider", "openai")
+    monkeypatch.setattr(mc, "cheap_model_for", lambda p: "test-mini" if p == "openai" else None)
+    monkeypatch.setattr(mc, "key_for", lambda p: "test-key")
+    assert build_background_llm().model_name == "test-mini"
+
+
+def test_background_llm_falls_back_to_the_selected_model(monkeypatch):
+    from yumii.agent.llm import build_background_llm
+
+    monkeypatch.setattr(settings, "llm_provider", "openai")
+    monkeypatch.setattr(settings, "llm_model", "the-selected-model")
+    monkeypatch.setattr(mc, "cheap_model_for", lambda p: None)
+    monkeypatch.setattr(mc, "key_for", lambda p: "test-key")
+    assert build_background_llm().model_name == "the-selected-model"

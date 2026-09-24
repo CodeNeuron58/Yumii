@@ -198,6 +198,31 @@ def key_for(provider: str) -> str | None:
     return os.environ.get(wiring.env_key)
 
 
+# Substrings that mark a provider's small/fast tier in catalog model ids.
+_CHEAP_TIERS = ("flash", "mini", "haiku", "nano", "lite", "small")
+
+
+def cheap_model_for(provider: str) -> str | None:
+    """The provider's small/fast catalog model, for background LLM work.
+
+    Memory review and summaries don't need the user's flagship chat model —
+    but background jobs also can't hardcode model ids (they retire). The
+    pick is therefore derived from the snapshot: within a cheap-tier name
+    pattern, the cheapest model wins. Returns None when the catalog has no
+    cheap tier for the provider — the caller should use the selected chat
+    model instead.
+    """
+    pid = canonical_provider(provider)
+    if not pid:
+        return None
+    catalog = models(pid)
+    for pattern in _CHEAP_TIERS:
+        matches = [m for m in catalog if pattern in m["id"].lower()]
+        if matches:
+            return min(matches, key=lambda m: m.get("cost_in") or 0)["id"]
+    return None
+
+
 def _parse_ollama_tags(data: dict) -> list[dict]:
     out = []
     for m in data.get("models", []):
