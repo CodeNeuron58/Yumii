@@ -60,6 +60,7 @@ dev = [
     "jupyter>=1.1.1",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-timeout>=2.3.0",
     "ruff>=0.3.0",
     "mypy>=1.8.0"
 ]
@@ -84,5 +85,7 @@ exclude = ["Experiments", "Trash", ".git", ".venv", "__pycache__"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# A hung async deadlock must fail the run, not spin until the CI job cap.
+timeout = 120
 
 
