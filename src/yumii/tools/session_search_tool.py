@@ -41,6 +41,14 @@ class RecallInput(BaseModel):
             "surrounding conversation of. Use together with session_id."
         ),
     )
+    since_days: int | None = Field(
+        default=None,
+        description=(
+            "Only search conversations from the last N days — 1 for today, "
+            "7 for 'this week', 30 for 'this month'. Omit to search all of "
+            "history. Works with query."
+        ),
+    )
 
 
 def _fmt_ts(ts: str) -> str:
@@ -64,13 +72,15 @@ async def search_past_conversations(
     query: str | None = None,
     session_id: str | None = None,
     message_id: int | None = None,
+    since_days: int | None = None,
 ) -> str:
     """Recall past conversations with the user — your long-term episodic memory.
 
     Use when the user refers to something discussed before ("that thing we
     talked about", "what did I say about X", "last week you told me…") or
     when older context would clearly help. Three ways to call it:
-    query="words" searches everything you've ever discussed; session_id +
+    query="words" searches everything you've ever discussed (add
+    since_days to bound it to recent conversations); session_id +
     message_id (from a previous result) reads the surrounding conversation;
     no arguments lists recent conversations. Results are the real stored
     messages with timestamps.
@@ -89,13 +99,15 @@ async def search_past_conversations(
 
     # Discover: full-text search.
     if query and query.strip():
-        hits = await transcript.search(query.strip())
+        hits = await transcript.search(query.strip(), since_days=since_days)
+        scope = f" from the last {since_days} day(s)" if since_days else ""
         if not hits:
             return (
-                f"No past conversation mentions '{query.strip()}'. "
-                "It may have been phrased differently — try other words."
+                f"No past conversation mentions '{query.strip()}'{scope}. "
+                "It may have been phrased differently — try other words, or "
+                "search without the day limit."
             )
-        parts = [f"Found {len(hits)} past conversation(s) mentioning it:"]
+        parts = [f"Found {len(hits)} past conversation(s) mentioning it{scope}:"]
         for h in hits:
             parts.append(
                 f"\n— Conversation '{h.session_name}' (session_id={h.session_id}), "

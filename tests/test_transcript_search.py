@@ -196,3 +196,53 @@ async def test_tool_registered_as_ungated_read():
     policy = registry.get_policy("search_past_conversations")
     assert policy.category is ToolCategory.READ
     assert policy.requires_confirmation is False
+
+
+# ── Unicode queries + time-boxed search ────────────────────────────────
+
+
+async def test_unicode_query_finds_accented_text(isolated_db):
+    """Regression: the tokenizer was ASCII-only, so accented queries silently
+    returned nothing even though the FTS index (unicode61) had them."""
+    await _seed("s-café", "Café planning", [
+        ("on s'est retrouvés au café pour parler du projet", "Génial !"),
+    ])
+    hits = await transcript.search("café projet")
+    assert len(hits) == 1
+    assert hits[0].session_id == "s-café"
+
+
+async def test_search_respects_since_days(isolated_db):
+    """The recall tool's time box: old conversations are excluded, recent kept."""
+    from datetime import datetime, timedelta, timezone
+
+    def _ts(**kw):
+        return (datetime.now(timezone.utc) - timedelta(**kw)).strftime(
+            "%Y-%m-%d %H:%M:%S.%f"
+        )
+
+    await memory_db.execute(
+        "INSERT INTO sessions (id, name) VALUES (?, ?)", ("s-old", "Old plan")
+    )
+    await transcript.record_many("s-old", [("user", "marathon training plan")], created_at=_ts(days=30))
+    await _seed("s-new", "This week", [("marathon shoes arrived", "Nice!")])
+
+    all_hits = await transcript.search("marathon")
+    assert {h.session_id for h in all_hits} == {"s-old", "s-new"}
+
+    recent = await transcript.search("marathon", since_days=7)
+    assert {h.session_id for h in recent} == {"s-new"}
+
+
+async def test_recall_tool_passes_the_time_box_through(isolated_db):
+    await memory_db.execute(
+        "INSERT INTO sessions (id, name) VALUES (?, ?)", ("s-old", "Old")
+    )
+    await transcript.record_many(
+        "s-old", [("user", "python asyncio bug")], created_at="2020-01-01 00:00:00.000000"
+    )
+
+    recent = await search_past_conversations.ainvoke({"query": "python asyncio", "since_days": 7})
+    assert "Found" not in recent  # the old hit is out of the window
+    everything = await search_past_conversations.ainvoke({"query": "python asyncio"})
+    assert "Found" in everything

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from yumii.core.logging import get_logger
@@ -94,7 +94,9 @@ async def is_empty() -> bool:
 
 def _fts_query(raw: str) -> str:
     """Turn free text into a safe FTS5 MATCH expression (each token quoted; AND semantics)."""
-    tokens = re.findall(r"[A-Za-z0-9_]+", raw)
+    # \w with UNICODE: the index uses the unicode61 tokenizer, so accented
+    # and non-Latin queries must not be filtered to ASCII.
+    tokens = re.findall(r"\w+", raw, re.UNICODE)
     return " ".join(f'"{t}"' for t in tokens)
 
 
@@ -114,11 +116,27 @@ async def _window(session_id: str, anchor_id: int, span: int = _WINDOW) -> list[
     return [dict(r) for r in rows]
 
 
-async def search(query: str, max_sessions: int = _MAX_SESSIONS) -> list[TranscriptHit]:
-    """Full-text search across all conversations, best hit per session (BM25; AND then OR)."""
+async def search(
+    query: str,
+    max_sessions: int = _MAX_SESSIONS,
+    since_days: int | None = None,
+) -> list[TranscriptHit]:
+    """Full-text search across all conversations, best hit per session (BM25; AND then OR).
+
+    ``since_days`` bounds the search to recent conversations (1 = today).
+    """
     match = _fts_query(query)
     if not match:
         return []
+
+    where = "WHERE messages_fts MATCH ?"
+    params: list[Any] = [match]
+    if since_days is not None and since_days > 0:
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=int(since_days))
+        ).strftime("%Y-%m-%d %H:%M:%S.%f")
+        where += " AND m.created_at >= ?"
+        params.append(cutoff)
 
     sql = (
         "SELECT m.id, m.session_id, m.role, m.created_at,"
@@ -128,12 +146,13 @@ async def search(query: str, max_sessions: int = _MAX_SESSIONS) -> list[Transcri
         " FROM messages_fts"
         " JOIN messages m ON m.id = messages_fts.rowid"
         " LEFT JOIN sessions s ON s.id = m.session_id"
-        " WHERE messages_fts MATCH ?"
+        f" {where}"
         " ORDER BY rank LIMIT ?"
     )
-    rows = await fetchall(sql, (match, _SCAN_LIMIT))
+    rows = await fetchall(sql, (*params, _SCAN_LIMIT))
     if not rows and " " in match:
-        rows = await fetchall(sql, (match.replace(" ", " OR "), _SCAN_LIMIT))
+        or_match = match.replace(" ", " OR ")
+        rows = await fetchall(sql, (or_match, *params[1:], _SCAN_LIMIT))
 
     # Keep the best-ranked hit per session (rows arrive ranked).
     hits: list[TranscriptHit] = []
