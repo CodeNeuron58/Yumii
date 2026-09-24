@@ -93,6 +93,10 @@ class CambSpeaker(BaseSpeaker):
 
         except Exception as e:
             log.error("camb_tts_error", error=str(e), exc_info=True)
+            # Re-raise (like the ElevenLabs speaker) so the engine's error
+            # path fires — swallowing left the user in dead silence with no
+            # error card, or a silently truncated sentence.
+            raise
 
     def speak(self, text: str, streaming: bool = False) -> tuple[str | None, float]:
         """Perform blocking synthesis using the streaming generator."""

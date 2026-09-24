@@ -21,8 +21,31 @@ _SHAPES_CLOSE = ("</think>", "</thinking>")
 # token, so that tail must be held back instead of spoken.
 _MAX_PARTIAL = len("</thinking>") - 1
 
-_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?…])\s+")
+# Sentence boundaries: ASCII terminators need trailing whitespace; CJK
+# terminators (。！？) split immediately (no spaces in CJK text).
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?…])\s+|(?<=[。！？])")
 _CLAUSE_BOUNDARY = re.compile(r"(?<=[,;:])\s+")
+
+# "Mr." / "e.g." — a boundary after these is not a sentence end. The splitter
+# skips it and looks for the next one.
+_ABBREV_TAIL = re.compile(
+    r"\b(?:Mr|Mrs|Ms|Dr|St|Sr|Jr|Prof|vs|etc|Inc|Ltd|No|approx|e\.g|i\.e)\.$",
+    re.IGNORECASE,
+)
+
+
+def merge_abbreviation_fragments(parts: list[str]) -> list[str]:
+    """Join split fragments whose predecessor ended in an abbreviation.
+
+    Shared with the TTS chunker, which splits with the same regex.
+    """
+    merged: list[str] = []
+    for part in parts:
+        if merged and _ABBREV_TAIL.search(merged[-1].rstrip()):
+            merged[-1] = f"{merged[-1].rstrip()} {part.strip()}"
+        else:
+            merged.append(part)
+    return merged
 
 # A punctuation-free ramble longer than this flushes at the last clause
 # boundary so speech starts before the model stops for breath.
@@ -45,16 +68,21 @@ def _split_sentences(text: str, final: bool) -> tuple[list[str], str]:
 
     emitted: list[str] = []
     rest = text
+    start = 0
     while True:
-        # Emit at the FIRST closed boundary — each completed sentence goes out
-        # immediately rather than batching with later ones.
-        m = _SENTENCE_BOUNDARY.search(rest)
+        # Emit at the FIRST closed boundary that isn't an abbreviation
+        # ("Mr." / "e.g." — the following boundary is the real one).
+        m = _SENTENCE_BOUNDARY.search(rest, start)
         if m is None:
             break
-        sentence = rest[: m.end()].strip()
+        candidate = rest[: m.end()].strip()
+        if _ABBREV_TAIL.search(candidate):
+            start = m.end()
+            continue
+        if candidate:
+            emitted.append(candidate)
         rest = rest[m.end():]
-        if sentence:
-            emitted.append(sentence)
+        start = 0
 
     if final:
         if rest.strip():
@@ -139,4 +167,4 @@ class SentenceSegmenter:
                 return out
 
 
-__all__ = ["SentenceSegmenter"]
+__all__ = ["SentenceSegmenter", "merge_abbreviation_fragments"]

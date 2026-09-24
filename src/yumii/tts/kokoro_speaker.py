@@ -18,6 +18,7 @@ from yumii.core.config import settings
 from yumii.core.interfaces import BaseSpeaker
 from yumii.core.logging import get_logger
 from yumii.tts.kokoro_model import get_kokoro_model_paths
+from yumii.tts.sentence_stream import merge_abbreviation_fragments
 
 log = get_logger(__name__)
 
@@ -28,7 +29,7 @@ DEFAULT_VOICE = "af_heart"
 # prefetch worker (see stream_speak) makes long gaps unnecessary.
 _CHUNK_GAP_SEC = 0.04
 
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?…])\s+")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?…])\s+|(?<=[。！？])")
 _CLAUSE_SPLIT = re.compile(r"(?<=[,;:])\s+")
 _CONJ_SPLIT = re.compile(r"\s+(?=(?:and|but|so|because|while|or|then)\b)", re.IGNORECASE)
 
@@ -50,7 +51,7 @@ _SYNTHESIS_CACHE_MAX = 48
 def _atoms(text: str) -> list[str]:
     """Break text into sentences, then clauses, then run-on clauses at conjunctions."""
     out: list[str] = []
-    for s in _SENTENCE_SPLIT.split(text.strip()):
+    for s in merge_abbreviation_fragments(_SENTENCE_SPLIT.split(text.strip())):
         for c in _CLAUSE_SPLIT.split(s.strip()):
             c = c.strip()
             if not c:

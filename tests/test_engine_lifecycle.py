@@ -215,3 +215,29 @@ async def test_clear_all_queues_leaves_a_capture_reset_sentinel():
     assert e.transcription_queue.empty()
     assert e.audio_input_queue.qsize() == 1
     assert e.audio_input_queue.get_nowait() is None
+
+
+@pytest.mark.asyncio
+async def test_purge_session_checkpoints_removes_the_thread():
+    """A 'hard-deleted' session must not survive forever in checkpoints.db —
+    that's what the messages endpoint renders from."""
+    e = YumiiEngine()
+
+    class _Conn:
+        def __init__(self):
+            self.deleted = []
+
+        async def execute(self, sql, params=None):
+            self.deleted.append((sql.split()[2], params[0]))
+
+        async def commit(self):
+            pass
+
+    conn = _Conn()
+    e._conn = conn
+
+    await e.purge_session_checkpoints("s-gone")
+
+    tables = {t for t, _ in conn.deleted}
+    assert tables == {"checkpoints", "checkpoint_blobs", "checkpoint_writes"}
+    assert all(sid == "s-gone" for _, sid in conn.deleted)

@@ -108,3 +108,25 @@ def test_empty_stream_flushes_none():
 )
 def test_shapes(text: str, expected: list[str]):
     assert feed_all(SentenceSegmenter(), text, chunk=2) == expected
+
+
+# ── Abbreviations + CJK ────────────────────────────────────────────────
+
+
+def test_abbreviation_is_not_a_sentence_boundary():
+    seg = SentenceSegmenter()
+    out = seg.feed("Mr. Smith came. ")
+    assert out == ["Mr. Smith came."]  # "Mr." never split the sentence
+
+
+def test_abbreviation_before_real_boundary():
+    seg = SentenceSegmenter()
+    out = seg.feed("Meet Dr. Who at 5. I'll be there.")
+    assert out == ["Meet Dr. Who at 5."]
+    assert seg.flush() == "I'll be there."  # held until the stream ends
+
+
+def test_cjk_terminators_split_without_spaces():
+    seg = SentenceSegmenter()
+    out = seg.feed("你好。在吗？我很好。")
+    assert out == ["你好。", "在吗？", "我很好。"]

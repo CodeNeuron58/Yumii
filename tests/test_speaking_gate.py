@@ -313,3 +313,40 @@ async def test_stale_generation_payload_is_dropped():
 
     assert sent == []  # stale audio dropped, no broadcasts, no crash
     assert e.tts_queue.empty()
+
+
+class _FailSecondSpeaker:
+    """First stream_speak call succeeds; the second explodes mid-reply."""
+
+    def __init__(self):
+        self.calls = 0
+
+    async def stream_speak(self, text: str):
+        self.calls += 1
+        yield {"type": "metadata", "sampleRate": 24000}
+        yield "AAA"
+        if self.calls >= 2:
+            raise RuntimeError("second sentence exploded")
+
+
+@pytest.mark.asyncio
+async def test_mid_reply_tts_failure_closes_the_session():
+    """A non-first sentence failing synthesis used to truncate audio with no
+    signal at all — now the session closes (audio_end) so the webui state
+    and the speaking gate recover."""
+    e, sent, disarm = _speaker_engine()
+    e.speaker = _FailSecondSpeaker()
+    e.is_speaking = True  # the stream is open — continuations must flow
+    e.tts_queue.put_nowait(_payload("stream_start"))
+    e.tts_queue.put_nowait(_payload("stream_text"))
+    e.tts_queue.put_nowait({"kind": "stream_end", "gen": 0})
+
+    await _run_speaker_until(e, lambda: any(p.get("type") == "audio_end" for p in sent))
+
+    types = [p.get("type") for p in sent if p.get("type")]
+    # opener + its chunk, the second payload's chunk (before it explodes),
+    # then the graceful audio_end that closes the session. (The harness's
+    # disarm stub never clears is_speaking, so stream_end may append a second
+    # audio_end — in the real engine _disarm_speaking_gate prevents it.)
+    assert types[:4] == ["audio_start", "audio_chunk", "audio_chunk", "audio_end"]
+    assert disarm

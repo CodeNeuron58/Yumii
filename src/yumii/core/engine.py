@@ -315,6 +315,25 @@ class YumiiEngine:
         await self._rebuild_session_context(include_current=True)
         log.info("last_session_restored", session_id=session.id, name=session.name)
 
+    async def purge_session_checkpoints(self, session_id: str) -> None:
+        """Remove a deleted session's LangGraph checkpoint thread.
+
+        Without this a "hard-deleted" conversation survives forever in
+        checkpoints.db — which is also what the messages endpoint renders
+        from, so it would resurface in recall.
+        """
+        if self._conn is None:
+            return
+        for table in ("checkpoints", "checkpoint_blobs", "checkpoint_writes"):
+            try:
+                await self._conn.execute(
+                    f"DELETE FROM {table} WHERE thread_id = ?", (session_id,)
+                )
+            except Exception:
+                log.warning("checkpoint_purge_table_failed", table=table, exc_info=True)
+        await self._conn.commit()
+        log.info("session_checkpoints_purged", session_id=session_id)
+
     async def _backfill_transcript_once(self) -> None:
         """Populate the transcript from checkpoints, first boot only (fresh-upgrade gate)."""
         from langchain_core.messages import AIMessage, HumanMessage
@@ -703,11 +722,17 @@ class YumiiEngine:
         return True
 
     async def broadcast_payload(self, payload: Dict[str, Any]) -> None:
-        """Push a JSON payload to all currently connected WebSocket clients."""
+        """Push a JSON payload to all currently connected WebSocket clients.
+
+        Serialized once (one non-serializable payload can't evict every
+        client), and each send is time-bounded — a client that stops
+        draining must not backpressure the voice loop.
+        """
+        text = json.dumps(payload)
         dead_connections = []
         for connection in self.active_connections:
             try:
-                await connection.send_text(json.dumps(payload))
+                await asyncio.wait_for(connection.send_text(text), timeout=5.0)
             except Exception as e:
                 log.warning("ws_send_error", error=str(e))
                 dead_connections.append(connection)
@@ -794,6 +819,20 @@ class YumiiEngine:
             self._disarm_speaking_gate()
             self._cancel_speech()
             self.interrupt_event.set()
+            # A barge-in denies any pending tool approval NOW — the orb's
+            # modal must close instead of hanging for the 30s timeout while
+            # she answers the new utterance.
+            for request_id, future in list(self.pending_confirmations.items()):
+                if not future.done():
+                    future.set_result(False)
+                    self._spawn(
+                        self.broadcast_payload(
+                            {
+                                "type": "confirmation_timeout",
+                                "request_id": request_id,
+                            }
+                        )
+                    )
             self._spawn(self.broadcast_payload({"type": "interrupt"}))
 
         log.info("listener_task_started")
@@ -1239,6 +1278,12 @@ class YumiiEngine:
                                     "error": f"TTS failed: {stream_err}",
                                 }
                             )
+                            self._disarm_speaking_gate()
+                        else:
+                            # Mid-reply synthesis failure: close the audio
+                            # session gracefully — the text card already shows
+                            # the full reply — and drop the remaining chunks.
+                            await self.broadcast_payload({"type": "audio_end"})
                             self._disarm_speaking_gate()
                         continue
 

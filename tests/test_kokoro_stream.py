@@ -134,3 +134,9 @@ async def test_cache_evicts_oldest_beyond_capacity():
 
     _ = [i async for i in s.stream_speak("phrase number 49.")]
     assert fake.calls == 51  # still cached → no new synthesis
+
+
+def test_abbreviation_stays_one_atom():
+    from yumii.tts.kokoro_speaker import _atoms
+
+    assert _atoms("Mr. Smith and Dr. Who came.") == ["Mr. Smith and Dr. Who came."]
