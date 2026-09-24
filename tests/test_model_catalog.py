@@ -319,3 +319,41 @@ def test_background_llm_falls_back_to_the_selected_model(monkeypatch):
     monkeypatch.setattr(mc, "cheap_model_for", lambda p: None)
     monkeypatch.setattr(mc, "key_for", lambda p: "test-key")
     assert build_background_llm().model_name == "the-selected-model"
+
+
+def test_no_non_chat_models_are_pickable_anywhere():
+    """Embeddings, image-gen, guards and TTS voices shipped in the snapshot
+    and were selectable as the 'mind' — every catalog model must now clear
+    the chat gate."""
+    pattern = mc._NON_CHAT_PATTERN
+    for provider in ("openai", "groq", "mistral", "openrouter", "togetherai", "google"):
+        for m in mc.models(provider):
+            assert not pattern.search(m["id"].lower()), (provider, m["id"])
+            assert m["context"] != 0, (provider, m["id"])
+
+
+def test_get_model_rejects_non_chat_ids():
+    assert mc.get_model("openai", "text-embedding-3-large") is None
+    assert mc.get_model("openai", "gpt-image-1.5") is None
+
+
+def test_chat_models_still_pickable_after_filter():
+    models = mc.models("openai")
+    assert models  # the filter didn't empty the slice
+
+
+@pytest.mark.asyncio
+async def test_agent_llm_call_has_a_wall_clock(monkeypatch):
+    """A provider that accepts the request and stalls must abort the turn,
+    not freeze the single reasoning task forever."""
+    import asyncio
+
+    from yumii.agent import graph as graph_module
+
+    class _Slow:
+        async def ainvoke(self, messages):
+            await asyncio.sleep(60)
+
+    monkeypatch.setattr(graph_module, "_AGENT_CALL_TIMEOUT_SEC", 0.05)
+    with pytest.raises(TimeoutError):
+        await graph_module._ainvoke_with_timeout(_Slow(), [])

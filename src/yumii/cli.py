@@ -71,7 +71,15 @@ def _run_server() -> None:
 
     port = _pick_free_port()
     _write_port_file(port)
-    uvicorn.run(fastapi_app, host="127.0.0.1", port=port, log_config=None)
+    # Cap WS frames (audio chunks are ~1KB; 2 MB is generous) — uvicorn's
+    # 16 MB default is an unbounded read of client data.
+    uvicorn.run(
+        fastapi_app,
+        host="127.0.0.1",
+        port=port,
+        log_config=None,
+        ws_max_size=2 * 1024 * 1024,
+    )
 
 
 def main() -> None:

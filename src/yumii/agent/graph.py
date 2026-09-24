@@ -38,6 +38,25 @@ _HISTORY_WINDOW = 40
 # Bound tool runs so a stalled HTTP call can't hang the turn forever.
 _TOOL_EXECUTION_TIMEOUT_SEC = 90.0
 
+# Same for the model call itself: a provider that accepts the request and
+# then stalls would hang the single reasoning task forever — no events, no
+# error, no further turns. Generous: slow models on long replies still fit.
+_AGENT_CALL_TIMEOUT_SEC = 180.0
+
+
+async def _ainvoke_with_timeout(bound: Any, messages: list) -> Any:
+    """``bound.ainvoke`` with a hard wall clock. Raises ``TimeoutError`` so
+    the engine's error classification turns it into a user-facing card
+    instead of a frozen "Thinking" state."""
+    try:
+        return await asyncio.wait_for(
+            bound.ainvoke(messages), timeout=_AGENT_CALL_TIMEOUT_SEC
+        )
+    except asyncio.TimeoutError:
+        raise TimeoutError(
+            f"the model produced nothing for {_AGENT_CALL_TIMEOUT_SEC:.0f}s — abandoning the turn"
+        )
+
 
 def _request_budgets() -> tuple[int, int]:
     """Return ``(max_tool_result_chars, history_window)`` for the active provider."""
@@ -168,13 +187,13 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
 
     # Groq/Llama sometimes 400 with tool_use_failed — retry once, then apologize instead of crashing.
     try:
-        response: AIMessage = await bound.ainvoke(messages)
+        response: AIMessage = await _ainvoke_with_timeout(bound, messages)
     except Exception as e:
         if "tool_use_failed" not in str(e):
             raise
         log.warning("tool_call_generation_failed_retrying", error=str(e)[:300])
         try:
-            response = await bound.ainvoke(messages)
+            response = await _ainvoke_with_timeout(bound, messages)
         except Exception as e2:
             if "tool_use_failed" not in str(e2):
                 raise

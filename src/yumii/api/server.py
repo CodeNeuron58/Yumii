@@ -188,8 +188,14 @@ async def resume_session_endpoint(session_id: str) -> dict[str, Any]:
 
 @app.delete("/api/sessions/{session_id}")
 async def delete_session_endpoint(session_id: str) -> dict[str, Any]:
-    """Hard-delete a session and its summary."""
+    """Hard-delete a session, its summary, and its checkpoint thread."""
+    if session_id == engine.active_session_id:
+        raise HTTPException(
+            status_code=409,
+            detail="That chat is active — start a new chat before deleting it.",
+        )
     await session_manager.delete_session(session_id)
+    await engine.purge_session_checkpoints(session_id)
     return {"deleted": True, "session_id": session_id}
 
 
@@ -550,8 +556,15 @@ async def llm_select(body: dict[str, Any]) -> dict[str, Any]:
                 status_code=400,
                 detail=f"'{model}' is not installed on your Ollama server.",
             )
-    elif model_catalog.get_model(wiring.id, model) is not None:
-        pass  # in the (bundled or refreshed) catalog
+    elif (m := model_catalog.get_model(wiring.id, model)) is not None:
+        if m.get("tool_call") is False:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"'{model}' can't use tools — Yumii's tool system needs a "
+                    "tool-capable model."
+                ),
+            )
     elif wiring.id == "google" and (gkey := model_catalog.key_for(wiring.id)) and any(
         m["id"] == model for m in await model_catalog.google_live_models(gkey)
     ):
@@ -747,6 +760,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     # Phase 1: session negotiation — first frame is session_select; stash early audio.
     data: dict[str, Any] = {}
     stashed_audio: list[bytes] = []
+    stashed_bytes = 0
     loop = asyncio.get_running_loop()
     deadline = loop.time() + 3.0
     while True:
@@ -764,19 +778,26 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 data = json.loads(message["text"])
             except json.JSONDecodeError:
                 data = {}
+            if not isinstance(data, dict):
+                data = {}  # a valid-JSON non-object frame must not crash below
             break
         if message.get("bytes") is not None:
-            stashed_audio.append(message["bytes"])
+            # Cap the handshake stash (~2 MB) — frames are otherwise unbounded.
+            if stashed_bytes < 2 * 1024 * 1024:
+                stashed_audio.append(message["bytes"])
+                stashed_bytes += len(message["bytes"])
 
-    action = (
-        data.get("action", "auto")
-        if data.get("type") == "session_select"
-        else "auto"
-    )
+    if data.get("type") != "session_select":
+        # Take-over (and session minting) only for a client that negotiated
+        # properly — a stray local probe or a silent connection must not
+        # evict the live orb.
+        await websocket.close(code=1008)
+        return
+    action = data.get("action", "auto")
     if action == "new":
         await engine.create_new_session()
     elif action == "resume":
-        await engine.resume_session(data.get("session_id", ""))
+        await engine.resume_session(str(data.get("session_id", "")))
     elif engine.active_session_id is None:
         await engine.create_new_session()
     # "auto" with an active session keeps it — reconnects must not mint a new one.

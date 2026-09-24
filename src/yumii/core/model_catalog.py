@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -79,6 +80,21 @@ _MIND_EXCLUDE = (
 def _is_chat_mind(model_id: str) -> bool:
     i = model_id.lower()
     return i.startswith(("gemini", "gemma")) and not any(x in i for x in _MIND_EXCLUDE)
+
+
+# Names that mark non-chat models across every provider: embeddings,
+# image/music generation, moderation guards, TTS/transcription. A context
+# window of 0 is the snapshot's way of saying "not a text model".
+_NON_CHAT_PATTERN = re.compile(
+    r"embed|image|guard|lyria|tts|transcri|whisper|diariz|moderation|-omni",
+    re.IGNORECASE,
+)
+
+
+def _pickable_chat_model(model_id: str, slim: dict) -> bool:
+    if _NON_CHAT_PATTERN.search(model_id.lower()):
+        return False
+    return slim.get("context") != 0
 
 
 def canonical_provider(provider: str) -> str | None:
@@ -173,6 +189,10 @@ def models(provider: str) -> list[dict]:
         _slim(mid, m)
         for mid, m in (_get().get(pid, {}).get("models", {})).items()
     ]
+    # Every provider: embeddings, image/music generation, moderation guards
+    # and TTS voices must never be pickable as the "mind" — binding tools to
+    # them 400s at the provider or silently loses tool calling.
+    slimmed = [m for m in slimmed if _pickable_chat_model(m["id"], m)]
     if pid == "google":
         # models.dev carries image/TTS/Live models whose text modality flags
         # slip past the snapshot filter — only true chat minds survive here.
@@ -187,7 +207,10 @@ def get_model(provider: str, model_id: str) -> dict | None:
     if pid == "google" and not _is_chat_mind(model_id):
         return None
     m = _get().get(pid, {}).get("models", {}).get(model_id)
-    return _slim(model_id, m) if m else None
+    slim = _slim(model_id, m) if m else None
+    if slim is not None and not _pickable_chat_model(model_id, slim):
+        return None
+    return slim
 
 
 def key_for(provider: str) -> str | None:

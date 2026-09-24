@@ -235,3 +235,37 @@ def test_llm_select_applies_live(client: TestClient) -> None:
     assert os.environ["LLM_PROVIDER"] == "openrouter"
     assert settings.llm_provider == "openrouter"
     assert settings.llm_model == model_id
+
+
+# ── Session deletion guard ─────────────────────────────────────────────
+
+
+def test_delete_active_session_returns_409(client, monkeypatch):
+    """The orb keeps writing into the active session — deleting it must be
+    refused, not leave her talking into a ghost."""
+    from yumii.api import server
+
+    monkeypatch.setattr(server.engine, "active_session_id", "sess-live")
+    r = client.delete("/api/sessions/sess-live")
+    assert r.status_code == 409
+
+
+def test_delete_other_session_succeeds(client, monkeypatch):
+    from yumii.api import server
+    from yumii.core import session_manager as sm
+
+    monkeypatch.setattr(server.engine, "active_session_id", "sess-live")
+
+    async def fake_delete(session_id):
+        return None
+
+    monkeypatch.setattr(sm.session_manager, "delete_session", fake_delete)
+    purged: list = []
+
+    async def fake_purge(session_id):
+        purged.append(session_id)
+
+    monkeypatch.setattr(server.engine, "purge_session_checkpoints", fake_purge)
+    r = client.delete("/api/sessions/sess-old")
+    assert r.status_code == 200
+    assert purged == ["sess-old"]
