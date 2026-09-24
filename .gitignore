@@ -12,7 +12,10 @@ wheels/
 
 Trash/
 src/yumii/Yumii_Avatar/
-src/yumii/webui/test.html
+
+# Personal planning/tracking files — never meant for the repo
+checklists/
+checklist-to-complete.md
 
 # Old docs backup
 docs-old/
@@ -25,7 +28,8 @@ Experiments/
 *.wav
 
 # Assets — user-provided Live2D models live in ~/.yumii/avatar/, not here
-assets/avatar/
+# (anchored to src/yumii — a mid-pattern slash would anchor to the repo root)
+src/yumii/assets/avatar/
 
 # IDE / OS clutter
 .idea/
