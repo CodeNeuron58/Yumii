@@ -9,6 +9,7 @@ import re
 import threading
 import time
 import wave
+from collections import OrderedDict
 from typing import Any, AsyncGenerator
 
 import numpy as np
@@ -37,6 +38,13 @@ _CONJ_SPLIT = re.compile(r"\s+(?=(?:and|but|so|because|while|or|then)\b)", re.IG
 # in-flight synthesis never outlives a barge-in by long.
 _FIRST_CHUNK_BUDGET = 32  # chars — ~1s of speech
 _STEADY_BUDGET = 96       # chars — ~6s of audio
+
+# Synthesis cache: greetings, tool-narration fillers and confirmations repeat
+# constantly ("On it, give me a second."), so their audio is kept keyed by
+# (voice, text) and replayed without running ONNX. Only short phrases are
+# cached (the repeatable class), oldest-evicted.
+_CACHEABLE_CHARS = 120
+_SYNTHESIS_CACHE_MAX = 48
 
 
 def _atoms(text: str) -> list[str]:
@@ -102,6 +110,7 @@ class KokoroSpeaker(BaseSpeaker):
             voice = DEFAULT_VOICE if DEFAULT_VOICE in available else available[0]
         self.voice = voice
         log.info("kokoro_ready", voice=self.voice, sample_rate=self.sample_rate)
+        self._synthesis_cache: OrderedDict[tuple[str, str], np.ndarray] = OrderedDict()
 
         # Warm up in the background — the first ONNX run is ~30% slower.
         threading.Thread(target=self._warmup, daemon=True).start()
@@ -137,25 +146,35 @@ class KokoroSpeaker(BaseSpeaker):
         async def _synth_worker() -> None:
             try:
                 for i, chunk_text in enumerate(chunk_texts):
-                    t0 = time.perf_counter()
-                    samples, _sr = await asyncio.to_thread(
-                        self.kokoro.create,
-                        chunk_text,
-                        voice=self.voice,
-                        speed=1.0,
-                        lang="en-us",
-                    )
-                    synth_sec = time.perf_counter() - t0
-                    if samples is None or len(samples) == 0:
-                        continue
-                    audio_sec = len(samples) / self.sample_rate
-                    log.debug(
-                        "kokoro_chunk",
-                        chars=len(chunk_text),
-                        synth=round(synth_sec, 2),
-                        audio=round(audio_sec, 2),
-                        rtf=round(synth_sec / audio_sec, 2) if audio_sec else None,
-                    )
+                    cache_key = (self.voice, chunk_text)
+                    cached = self._synthesis_cache.get(cache_key)
+                    if cached is not None:
+                        self._synthesis_cache.move_to_end(cache_key)
+                        samples = cached
+                    else:
+                        t0 = time.perf_counter()
+                        samples, _sr = await asyncio.to_thread(
+                            self.kokoro.create,
+                            chunk_text,
+                            voice=self.voice,
+                            speed=1.0,
+                            lang="en-us",
+                        )
+                        synth_sec = time.perf_counter() - t0
+                        if samples is None or len(samples) == 0:
+                            continue
+                        audio_sec = len(samples) / self.sample_rate
+                        log.debug(
+                            "kokoro_chunk",
+                            chars=len(chunk_text),
+                            synth=round(synth_sec, 2),
+                            audio=round(audio_sec, 2),
+                            rtf=round(synth_sec / audio_sec, 2) if audio_sec else None,
+                        )
+                        if len(chunk_text) <= _CACHEABLE_CHARS:
+                            self._synthesis_cache[cache_key] = samples
+                            while len(self._synthesis_cache) > _SYNTHESIS_CACHE_MAX:
+                                self._synthesis_cache.popitem(last=False)
                     if i > 0:
                         samples = np.concatenate([gap, samples])
                     await out.put(

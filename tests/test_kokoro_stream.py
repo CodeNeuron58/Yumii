@@ -41,6 +41,9 @@ def _speaker(fake: _FakeKokoro) -> KokoroSpeaker:
     s.kokoro = fake
     s.sample_rate = 24000
     s.voice = "af_heart"
+    from collections import OrderedDict
+
+    s._synthesis_cache = OrderedDict()
     return s
 
 
@@ -88,3 +91,46 @@ async def test_empty_text_yields_nothing_but_metadata():
     s = _speaker(_FakeKokoro(delay=0))
     items = [item async for item in s.stream_speak("   ")]
     assert items == []
+
+
+# ── Synthesis cache: repeated short phrases skip ONNX ──────────────────
+
+
+@pytest.mark.asyncio
+async def test_repeated_short_phrase_uses_the_cache():
+    fake = _FakeKokoro(delay=0)
+    s = _speaker(fake)
+    text = "On it, give me a second."
+
+    first = [i async for i in s.stream_speak(text)]
+    second = [i async for i in s.stream_speak(text)]
+
+    assert fake.calls == 1          # synthesized once
+    assert first[1:] == second[1:]  # identical audio from the cache
+
+
+@pytest.mark.asyncio
+async def test_long_text_is_not_cached():
+    fake = _FakeKokoro(delay=0)
+    s = _speaker(fake)
+    text = "word " * 40  # well past the 120-char cacheable bound
+
+    chunks = len(_split_speech_chunks(text))
+    _ = [i async for i in s.stream_speak(text)]
+    _ = [i async for i in s.stream_speak(text)]
+
+    assert fake.calls == chunks * 2  # re-synthesized both times
+
+
+@pytest.mark.asyncio
+async def test_cache_evicts_oldest_beyond_capacity():
+    fake = _FakeKokoro(delay=0)
+    s = _speaker(fake)
+    for n in range(50):  # cap is 48 → phrases 0 and 1 evicted
+        _ = [i async for i in s.stream_speak(f"phrase number {n}.")]
+
+    _ = [i async for i in s.stream_speak("phrase number 0.")]
+    assert fake.calls == 51  # evicted → synthesized again
+
+    _ = [i async for i in s.stream_speak("phrase number 49.")]
+    assert fake.calls == 51  # still cached → no new synthesis
