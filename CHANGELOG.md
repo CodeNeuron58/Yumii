@@ -5,6 +5,71 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] — 2026-10-03
+
+The voice release — she speaks while she thinks, you talk over her,
+and the failure modes went quiet in the good way.
+
+### Added
+- **Real-time voice loop, rebuilt.** LLM tokens stream into sentences
+  and TTS starts speaking while the model is still generating — a
+  sentence segmenter feeds a bounded Kokoro prefetch worker, so the
+  reply begins before the model finishes thinking.
+- **Real barge-in.** Talk over her mid-reply and her speech cancels at
+  the next chunk boundary; a monotonic turn-generation counter replaced
+  the old flag that could be cleared before it was observed. Session
+  switches and new turns cancel cleanly too.
+- **Smart Turn v3.** A local ONNX end-of-turn model asks "finished
+  thinking?" after ~190ms of silence instead of waiting a fixed tail —
+  and speech resets its recheck stride, so hesitant speakers are never
+  force-cut.
+- **The Model Picker.** Twelve providers — Google Gemini, OpenRouter,
+  DeepSeek, xAI, Together, Mistral and OpenCode Zen join Groq, Ollama,
+  OpenAI and Anthropic — validated, applied live without a restart,
+  with key management in the same panel. Non-chat models
+  (embeddings/image/guards) can no longer be picked as the mind.
+- **Session continuity.** A backend restart no longer drops you into a
+  context-free new chat; she resumes your last conversation.
+- **Typed input + commands.** The orb accepts text on the same channel
+  voice uses, and short utterances are commands, not chat: stop, mute,
+  new chat, repeat — typed or spoken.
+
+### Fixed
+- **Memory works on every provider.** The background review and session
+  summaries were silently dead on 7 of 12 providers; they now route
+  through the catalog on each provider's cheap tier. Reviews serialize,
+  dedupe over all facts, and the store survives concurrent writers
+  (WAL). Summaries fold instead of overwriting, so long conversations
+  keep their beginnings.
+- **The first-run loop for Google/Together users is gone** — the status
+  endpoint resolves key names through the provider wiring — and keys
+  saved in the dashboard are visible to the picker immediately.
+- **Replies keep playing after tool calls.** Tool narration no longer
+  opens a second audio session (which dropped the rest of the reply),
+  pre-tool text is no longer spoken twice, and the webui's completion
+  timer is sequence-guarded.
+- **Search recalls everyone.** Non-Latin queries match (the FTS
+  tokenizer was ASCII-only), and per-session dedupe happens before
+  limiting — one chatty conversation no longer starves the rest.
+- **Reliability sweep.** Model downloads can't hang boot (shared
+  timeout+atomic downloader; vosk gained a completeness check), the LLM
+  call has a wall clock, WS sends are time-bounded, frames and the
+  handshake stash are capped, odd audio frames are dropped instead of
+  fatal, utterances hard-cap at 60s, Composio keeps its tools on a
+  failed reload, Groq STT times out and retries, and the active session
+  can't be deleted out from under her (its checkpoint thread is purged
+  with it).
+
+### Changed
+- **The release pipeline is gated.** Tagged releases now run the test
+  suite first, verify the tag matches the project version, and chain
+  test → PyPI → shell — the installer's two artifacts can no longer
+  skew — with the Tauri CLI pinned to v2.
+
+### Notes
+- **406 tests.** Experimental preview. Install with one command at
+  https://yumii.me.
+
 ## [0.13.0] — 2026-07-19
 
 The polish release — sharper search, a tidier orb, and an installer

@@ -13,6 +13,10 @@ name: Release
 # PyPI auth is Trusted Publishing (GitHub OIDC) — no tokens, no secrets.
 # The PyPI project's publisher must point at THIS workflow filename and
 # the `pypi` environment.
+#
+# Chain: test → pypi → shell. A red test job stops the wheel; a failed
+# wheel stops the exe — the installer's contract is "backend from PyPI +
+# exe from releases/latest", and the two must never skew.
 
 on:
   push:
@@ -23,9 +27,38 @@ permissions:
   contents: write # create the release + upload the shell exe
 
 jobs:
+  test:
+    name: Tests (gate the release)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Sync deps (incl. dev tools)
+        run: uv sync --extra dev
+
+      - name: Verify the pushed tag matches the project version
+        run: python .github/scripts/check_tag.py
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+
+      - name: Verify versions stay aligned (pyproject / tauri / cargo)
+        run: python .github/scripts/check_versions.py
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Test
+        run: uv run pytest tests/ -q
+
   pypi:
     name: Publish wheel to PyPI
     runs-on: ubuntu-latest
+    needs: test
     environment: pypi
     permissions:
       id-token: write # OIDC for PyPI trusted publishing
@@ -46,6 +79,7 @@ jobs:
   shell:
     name: Desktop shell (Windows)
     runs-on: windows-latest
+    needs: pypi
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +93,9 @@ jobs:
 
       - name: Build the bare shell (no bundling)
         working-directory: desktop
-        run: npx @tauri-apps/cli@latest build
+        # Pinned to the v2 line — @latest would let a Tauri v3 change the
+        # release behavior at tag time.
+        run: npx @tauri-apps/cli@^2 build
 
       - name: Stage the exe under its public name
         run: Copy-Item desktop/src-tauri/target/release/yumii-desktop.exe Yumii.exe
