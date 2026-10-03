@@ -9,10 +9,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_anthropic import ChatAnthropic
-from langchain_groq import ChatGroq
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from yumii.core.config import settings
@@ -50,8 +46,10 @@ _DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 _DEFAULT_ANTHROPIC_MODEL = "claude-3-5-haiku-latest"
 
 
-def build_ollama_llm(model: str, temperature: float = 0.7) -> ChatOllama:
+def build_ollama_llm(model: str, temperature: float = 0.7) -> Any:
     """Build a ChatOllama for Ollama Cloud (Bearer key via client_kwargs) or a local base_url."""
+    from langchain_ollama import ChatOllama
+
     client_kwargs: dict = {}
     if settings.ollama_api_key:
         client_kwargs["headers"] = {
@@ -112,6 +110,8 @@ def _build_base_llm(temperature: float = 0.7, model: str | None = None) -> Any:
     wiring = get_wiring(provider)
     if wiring is None:
         # Unknown provider string — legacy behavior: Groq with its configured model.
+        from langchain_groq import ChatGroq
+
         return ChatGroq(
             model=model or settings.groq_model,
             temperature=temperature,
@@ -121,6 +121,8 @@ def _build_base_llm(temperature: float = 0.7, model: str | None = None) -> Any:
     chosen = model or _resolve_model(wiring.id)
 
     if wiring.kind == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
         api_key = _provider_api_key(wiring.id)
         if not api_key:
             raise ValueError(
@@ -129,6 +131,8 @@ def _build_base_llm(temperature: float = 0.7, model: str | None = None) -> Any:
         return ChatAnthropic(model=chosen, temperature=temperature, api_key=api_key)
 
     if wiring.kind == "groq":
+        from langchain_groq import ChatGroq
+
         api_key = _provider_api_key(wiring.id)
         if not api_key:
             raise ValueError("Groq needs an API key — add it in Settings → Model picker.")
@@ -144,6 +148,8 @@ def _build_base_llm(temperature: float = 0.7, model: str | None = None) -> Any:
         raise ValueError(
             f"{wiring.name} needs an API key — add it in Settings → Model picker."
         )
+    from langchain_openai import ChatOpenAI
+
     return ChatOpenAI(
         model=chosen,
         temperature=temperature,

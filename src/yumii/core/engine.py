@@ -197,6 +197,21 @@ class YumiiEngine:
         self._conn: aiosqlite.Connection | None = None
         self._saver: AsyncSqliteSaver | None = None
 
+    async def _load_composio_background(self) -> None:
+        """Boot-time Composio load, off the critical path: fetch, register,
+        then rebuild the graph so the new tools are bound before use."""
+        try:
+            from yumii.tools.composio_loader import load_and_register_composio_tools
+
+            registered = await load_and_register_composio_tools()
+            if registered:
+                log.info("composio_ready", count=len(registered))
+            if self._saver is not None:
+                self.graph_app = await build_graph(checkpointer=self._saver)
+                log.info("graph_rebuilt_with_composio")
+        except Exception:
+            log.warning("composio_background_load_failed", exc_info=True)
+
     def _spawn(self, coro: Any) -> asyncio.Task:
         """create_task that keeps a reference and is cancellable by shutdown()."""
         task = asyncio.get_running_loop().create_task(coro)
@@ -209,12 +224,11 @@ class YumiiEngine:
         log.info("engine_initializing")
         await init_db()
 
-        # Load Composio tools before building the graph so bind_tools sees them.
-        from yumii.tools.composio_loader import load_and_register_composio_tools
-
-        composio_tools = await load_and_register_composio_tools()
-        if composio_tools:
-            log.info("composio_ready", count=len(composio_tools))
+        # Composio's 62-tool fetch adds several seconds to boot — load it in
+        # the background and rebuild the graph when it lands (the dashboard's
+        # hot-reload path). Tools only bind into the LLM at the first turn,
+        # so they just need to arrive before real conversation starts.
+        self._spawn(self._load_composio_background())
 
         # Keep one long-lived connection; from_conn_string() would GC-close it after one turn.
         _CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
