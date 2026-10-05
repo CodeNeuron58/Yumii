@@ -42,3 +42,7 @@ packaging/build-models/
 
 # demo/export videos — 90MB+ binaries never belong in git
 *.mp4
+
+# Native bar experiment build output + personal research notes
+native/yumii-bar/target/
+research-stt.md
