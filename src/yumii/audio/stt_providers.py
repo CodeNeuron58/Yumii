@@ -25,7 +25,22 @@ def _seg_field(seg: object, key: str, default: object) -> object:
 
 
 class LocalSTT(BaseSTTProvider):
-    """faster-whisper on CPU, loaded from a local dir (mirrored on GitHub; HF never contacted)."""
+    """faster-whisper on CPU, loaded from a local dir (mirrored on GitHub; HF never contacted).
+
+    Streaming partials: Whisper can't stream, so while the user speaks we
+    re-decode the last few seconds every couple of seconds — small batch jobs
+    that make the text appear live. The final decode at end-of-turn always
+    covers the whole utterance, so what reaches memory and the transcript is
+    exactly as accurate as the batch path.
+    """
+
+    # Rolling window and re-decadence interval. A 4s window on int8 CPU costs
+    # ~200-400ms per decode; asking every 2s of new audio keeps Whisper busy
+    # ~15-20% of one core, only while the user is speaking.
+    _PARTIAL_WINDOW_SEC = 4.0
+    _PARTIAL_INTERVAL_SEC = 2.0
+    _RATE = 16000
+    _MIN_UTTERANCE_SEC = 0.7  # same floor as the batch path
 
     def __init__(self, model_size: str = "base", model_dir: str | None = None) -> None:
         """Initialize the local Whisper model."""
@@ -35,12 +50,12 @@ class LocalSTT(BaseSTTProvider):
         log.info("whisper_loading", source=source)
         self._whisper = WhisperModel(source, device="cpu", compute_type="int8")
         log.info("whisper_ready", model_size=model_size)
+        self._utterance: list[np.ndarray] = []
+        self._tail = np.empty(0, dtype=np.int16)
+        self._frames_since_partial = 0
+        self._last_partial = ""
 
-    def transcribe(self, audio_data: np.ndarray) -> str | None:
-        """Transcribe an audio array using the local Whisper model."""
-        # faster-whisper expects float32 in [-1, 1].
-        audio_float = audio_data.astype(np.float32) / 32768.0
-
+    def _decode(self, audio_float: np.ndarray) -> str | None:
         segments, _ = self._whisper.transcribe(
             audio_float,
             beam_size=1,
@@ -56,6 +71,46 @@ class LocalSTT(BaseSTTProvider):
             text_parts.append(segment.text)
 
         return "".join(text_parts).strip() or None
+
+    def transcribe(self, audio_data: np.ndarray) -> str | None:
+        """Transcribe an audio array using the local Whisper model."""
+        # faster-whisper expects float32 in [-1, 1].
+        return self._decode(audio_data.astype(np.float32) / 32768.0)
+
+    def process_chunk(self, pcm16_bytes: bytes) -> dict | None:
+        """Streaming interface: consume one frame; emit a live partial when
+        enough new audio has accumulated since the last one."""
+        frame = np.frombuffer(pcm16_bytes, dtype=np.int16)
+        self._utterance.append(frame)
+        self._tail = np.concatenate([self._tail, frame])[
+            -int(self._PARTIAL_WINDOW_SEC * self._RATE):
+        ]
+        self._frames_since_partial += len(frame)
+        if self._frames_since_partial < int(self._PARTIAL_INTERVAL_SEC * self._RATE):
+            return None
+        self._frames_since_partial = 0
+
+        text = self._decode(self._tail.astype(np.float32) / 32768.0)
+        if not text or text == self._last_partial:
+            return None  # unchanged — the orb already shows it
+        self._last_partial = text
+        return {"type": "partial_transcript", "text": text}
+
+    def get_final(self) -> str | None:
+        """End of turn: decode the FULL utterance (full context — this is the
+        text that enters memory and the transcript), then reset streaming
+        state. Called automatically at end-of-turn, on the mute sentinel, and
+        at capture start (residue discard)."""
+        frames, self._utterance = self._utterance, []
+        self._tail = np.empty(0, dtype=np.int16)
+        self._frames_since_partial = 0
+        self._last_partial = ""
+
+        total = sum(len(f) for f in frames)
+        if total < int(self._MIN_UTTERANCE_SEC * self._RATE):
+            return None
+        audio = np.concatenate(frames).astype(np.float32) / 32768.0
+        return self._decode(audio)
 
 
 class GroqSTT(BaseSTTProvider):
