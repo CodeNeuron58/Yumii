@@ -192,6 +192,26 @@ fn restart_backend(app: tauri::AppHandle) {
     });
 }
 
+/// Resize the bar window and keep it top-center of the primary monitor.
+/// The webview calls this to grow into the panel and shrink back to the
+/// tucked lip; the setup hook uses it to land the bar on first boot.
+fn set_bar_height(app: &tauri::AppHandle, height: f64) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_size(tauri::LogicalSize::new(560.0, height));
+        if let Ok(Some(monitor)) = win.current_monitor() {
+            let scale = monitor.scale_factor();
+            let monitor_w = monitor.size().width as f64 / scale;
+            let x = ((monitor_w - 560.0) / 2.0).max(0.0);
+            let _ = win.set_position(tauri::LogicalPosition::new(x, 6.0));
+        }
+    }
+}
+
+#[tauri::command]
+fn set_bar_height_cmd(app: tauri::AppHandle, height: f64) {
+    set_bar_height(&app, height);
+}
+
 fn main() {
     // Ctrl+Shift+Space toggles the window from anywhere.
     let toggle_shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Space);
@@ -210,7 +230,7 @@ fn main() {
                 .build(),
         )
         .manage(Backend(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![open_dashboard, restart_backend])
+        .invoke_handler(tauri::generate_handler![open_dashboard, restart_backend, set_bar_height_cmd])
         .setup(move |app| {
             // 1. Launch the Python brain in the background.
             let child = spawn_backend(app.handle());
@@ -235,6 +255,9 @@ fn main() {
 
             // 3. Register the global hotkey (handler was set on the plugin above).
             app.global_shortcut().register(toggle_shortcut)?;
+
+            // 4. Land the bar top-center at its resting height.
+            set_bar_height(app.handle(), 64.0);
 
             Ok(())
         })

@@ -13,15 +13,15 @@
       {
         "label": "main",
         "title": "Yumii",
-        "width": 360,
-        "height": 520,
+        "width": 560,
+        "height": 64,
         "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "shadow": false,
-        "center": false
+        "center": true
       }
     ],
     "security": {

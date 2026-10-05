@@ -15,18 +15,16 @@
             --c-text: #e6f1f0;
             --c-dim: #9aa7a5;
 
-            /* Orb gradient stops — recoloured per emotion by setOrbColor() */
+            /* Accent recoloured per emotion by setOrbColor() */
             --orb-c1: #00ff88;
             --orb-c2: #00b8d4;
-            /* Speaking amplitude 0..1, written by the RMS pulse loop */
-            --amp: 0;
         }
 
         html, body {
             margin: 0;
             padding: 0;
             height: 100%;
-            /* Transparent so the Tauri window shows only the orb + card.
+            /* Transparent so the Tauri window shows only the bar + panel.
                In a normal browser this just falls back to the page default. */
             background: transparent;
             color: var(--c-text);
@@ -35,141 +33,91 @@
             user-select: none;
         }
 
-        /* ── Stage: orb pinned near the top, card below it ─────────────── */
-        #stage {
+        /* ── The bar: docked to the top edge, slides up when idle ─────── */
+        #bar {
             position: absolute;
-            inset: 0;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            height: 48px;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
-            padding-top: 44px;
+            gap: 10px;
+            padding: 0 8px 0 14px;
             box-sizing: border-box;
+            background: rgba(13, 17, 23, 0.94);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+            cursor: default;
+            transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
         }
-
-        /* ── The orb ───────────────────────────────────────────────────── */
-        #orb-wrap {
-            position: relative;
-            width: 116px;
-            height: 116px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-
-        #orb {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 32% 28%,
-                var(--orb-c1) 0%,
-                var(--orb-c2) 70%,
-                rgba(0, 0, 0, 0.25) 100%);
-            box-shadow:
-                0 0 24px 4px color-mix(in srgb, var(--orb-c1) 55%, transparent),
-                0 0 60px 12px color-mix(in srgb, var(--orb-c2) 35%, transparent);
-            /* Base scale reacts to speaking amplitude */
-            transform: scale(calc(1 + var(--amp) * 0.22));
-            transition: transform 0.06s linear, box-shadow 0.25s ease, background 0.4s ease;
-            will-change: transform;
-        }
-
-        /* Expanding ring used by listening / thinking states */
-        #orb-wrap::after {
+        /* Tucked: the bar slides up, leaving a thin lip in the strip with
+           a small handle so the resting presence is discoverable */
+        body.tucked #bar { transform: translateY(-42px); }
+        body.tucked #bar::after {
             content: "";
             position: absolute;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            border: 2px solid color-mix(in srgb, var(--orb-c1) 60%, transparent);
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        /* Idle — gentle breathing */
-        #stage[data-state="idle"] #orb { animation: breathe 3.6s ease-in-out infinite; }
-        @keyframes breathe {
-            0%, 100% { transform: scale(1); }
-            50%      { transform: scale(1.05); }
-        }
-
-        /* Boot — dim, slow pulse while the brain wakes up */
-        #stage[data-state="boot"] #orb { opacity: 0.45; animation: breathe 2s ease-in-out infinite; }
-
-        /* Listening — expanding ring */
-        #stage[data-state="listening"] #orb-wrap::after { animation: ring 1.3s ease-out infinite; }
-        @keyframes ring {
-            0%   { opacity: 0.6; transform: scale(1); }
-            100% { opacity: 0;   transform: scale(1.6); }
-        }
-
-        /* Thinking — rotating shimmer ring */
-        #stage[data-state="thinking"] #orb-wrap::after {
-            opacity: 1;
-            border-color: transparent;
-            border-top-color: var(--orb-c1);
-            border-right-color: var(--orb-c2);
-            animation: spin 0.9s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ── Subtitle / transcript card ────────────────────────────────── */
-        #card {
-            margin-top: 26px;
-            max-width: 320px;
-            width: 80vw;
-            background: rgba(16, 20, 26, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 14px;
-            padding: 14px 18px;
-            font-size: 16px;
-            line-height: 1.5;
-            text-align: center;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 6px 26px rgba(0, 0, 0, 0.45);
-            opacity: 0;
-            transition: opacity 0.25s ease;
-            pointer-events: none;
-        }
-        #card.visible { opacity: 1; }
-
-        /* ── Tiny hint under the orb ───────────────────────────────────── */
-        #hint {
-            margin-top: 14px;
-            font-size: 13px;
-            color: var(--c-dim);
-            transition: opacity 0.25s ease;
-        }
-
-        /* ── Status pill (top center) ──────────────────────────────────── */
-        #status-bar {
-            position: absolute;
-            z-index: 15;
-            top: 14px;
+            bottom: 4px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.85);
-            background: rgba(0, 0, 0, 0.45);
-            padding: 5px 14px;
-            border-radius: 999px;
-            backdrop-filter: blur(4px);
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            pointer-events: none;
-            white-space: nowrap;
+            width: 36px;
+            height: 3px;
+            border-radius: 2px;
+            background: rgba(0, 255, 136, 0.45);
         }
-        #status-bar.visible { opacity: 1; }
 
-        /* ── Mic + gear: small round satellites flanking the orb ───────── */
-        #mic-btn, #gear {
-            position: absolute;
-            top: 88px;               /* vertically centered on the orb */
-            z-index: 20;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
+        /* ── Wave: her voice / your voice, animated by state ──────────── */
+        #wave {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 22px;
+            width: 26px;
+            flex: none;
+        }
+        #wave span {
+            width: 3px;
+            border-radius: 2px;
+            background: var(--orb-c1);
+            height: 6px;
+            transition: background 0.4s ease;
+        }
+        body[data-state="listening"] #wave span,
+        body[data-state="speaking"] #wave span,
+        body[data-state="thinking"] #wave span { animation: wave 0.9s ease-in-out infinite; }
+        #wave span:nth-child(2) { animation-delay: 0.12s; }
+        #wave span:nth-child(3) { animation-delay: 0.24s; }
+        #wave span:nth-child(4) { animation-delay: 0.36s; }
+        #wave span:nth-child(5) { animation-delay: 0.48s; }
+        @keyframes wave {
+            0%, 100% { height: 6px; }
+            50%      { height: 18px; }
+        }
+        /* While she speaks, the wave rides the playback amplitude */
+        body[data-state="speaking"] #wave span {
+            height: calc(6px + var(--amp) * 14px);
+            animation: none;
+        }
+
+        /* ── Bar text: the one-line live readout ───────────────────────── */
+        #bar-text {
+            flex: 1;
+            min-width: 0;
+            font-size: 14px;
+            color: var(--c-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #bar-text.dim { color: var(--c-dim); font-style: italic; }
+
+        /* ── Bar buttons ───────────────────────────────────────────────── */
+        .bar-btn {
+            flex: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -177,24 +125,15 @@
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.08);
             cursor: pointer;
-            opacity: 0.5;
             transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
         }
-        #mic-btn svg, #gear svg { pointer-events: none; }
-        #mic-btn { left: calc(50% - 92px); }
-        #gear    { right: calc(50% - 92px); }
-        #mic-btn:hover, #gear:hover {
-            opacity: 1;
-            background: rgba(255, 255, 255, 0.12);
-            color: var(--c-text);
-        }
-        #mic-btn.muted {
-            opacity: 1;
+        .bar-btn:hover { background: rgba(255, 255, 255, 0.12); color: var(--c-text); }
+        .bar-btn svg { pointer-events: none; }
+        #bar-mic.muted {
             background: rgba(248, 81, 73, 0.16);
             color: #f8a5a0;
         }
-        /* Red diagonal strike across the mic when muted */
-        #mic-btn.muted::after {
+        #bar-mic.muted::after {
             content: "";
             position: absolute;
             width: 18px;
@@ -202,82 +141,136 @@
             background: #f85149;
             transform: rotate(-45deg);
             border-radius: 1px;
-            pointer-events: none;
         }
+        #bar-mic { position: relative; }
+        #bar-stop { display: none; }
+        body[data-state="speaking"] #bar-stop,
+        body[data-state="listening"] #bar-stop { display: flex; }
+        #bar-stop:hover { background: rgba(248, 81, 73, 0.2); color: #f8a5a0; }
 
-        #mode-menu {
+        /* ── Panel: everything that expands below the bar ──────────────── */
+        #panel {
             position: absolute;
-            top: 124px;
-            right: calc(50% - 92px);
-            z-index: 20;
-            background: rgba(16, 20, 26, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
-            padding: 6px;
-            min-width: 190px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-        }
-        #mode-menu.hidden { display: none; }
-        .mode-item {
-            padding: 9px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
+            top: 62px;
+            left: 8px;
+            right: 8px;
+            bottom: 10px;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             gap: 10px;
+            opacity: 0;
+            transform: translateY(-12px);
+            pointer-events: none;
+            transition: opacity 0.24s ease, transform 0.24s ease;
         }
-        .mode-item:hover { background: rgba(255, 255, 255, 0.06); }
-        .mode-item .tag { color: var(--c-primary); font-size: 12px; }
-        .mode-item .soon { color: var(--c-dim); font-size: 12px; }
+        body.panel-open #panel {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        body.panel-open #bar { border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
 
-        /* ── Modal cards (coming-soon + confirm) ───────────────────────── */
-        .modal {
-            position: absolute;
-            z-index: 30;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(18, 22, 30, 0.96);
-            color: #fff;
-            padding: 22px 24px;
-            border-radius: 16px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(10px);
-            min-width: 260px;
-            max-width: 86vw;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+        #panel-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 4px;
         }
-        .modal.hidden { display: none; }
-        .modal h3 { margin: 0 0 8px; font-size: 17px; color: var(--c-primary); }
-        .modal p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: var(--c-text); }
-        .modal button {
-            padding: 8px 18px;
-            border-radius: 9px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.06);
-            color: #fff;
+        #panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--orb-c1);
+            letter-spacing: 0.5px;
+        }
+        #panel-status {
+            flex: 1;
+            font-size: 12.5px;
+            color: var(--c-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .p-btn {
+            padding: 5px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--c-text);
+            font-size: 12.5px;
             cursor: pointer;
-            font-size: 14px;
         }
-        .modal button:hover { background: rgba(255, 255, 255, 0.16); }
-        .confirm-buttons { display: flex; gap: 10px; justify-content: center; }
-        #confirm-yes { background: rgba(0, 212, 170, 0.22); border-color: rgba(0, 212, 170, 0.5); }
-        #confirm-yes:hover { background: rgba(0, 212, 170, 0.38); }
+        .p-btn:hover { background: rgba(255, 255, 255, 0.12); }
 
-        /* ── First-run download progress ───────────────────────────────── */
+        /* ── Conversation card in the panel ────────────────────────────── */
+        #conv-card {
+            background: rgba(13, 17, 23, 0.86);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-left: 3px solid var(--orb-c1);
+            border-radius: 14px;
+            padding: 12px 16px 14px;
+            font-size: 15px;
+            line-height: 1.55;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 60px;
+        }
+        #conv-card .tag-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--orb-c1);
+            margin: 0 0 6px;
+        }
+        #conv-card .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--orb-c1);
+            animation: livepulse 1.2s ease-in-out infinite;
+        }
+        @keyframes livepulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.35; transform: scale(0.72); }
+        }
+        #conv-card .body { white-space: pre-wrap; word-break: break-word; }
+        #conv-card[data-live="1"] .body { color: var(--c-dim); font-style: italic; }
+
+        /* ── Typed input ───────────────────────────────────────────────── */
+        #text-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(0, 0, 0, 0.35);
+            color: #eef2f6;
+            font-size: 14px;
+            outline: none;
+        }
+        #text-input:focus { border-color: rgba(255, 255, 255, 0.32); }
+        #text-input::placeholder { color: rgba(238, 242, 246, 0.4); }
+
+        /* ── Panel blocks (progress / onboarding / errors / confirm) ───── */
+        .p-block {
+            background: rgba(13, 17, 23, 0.86);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 14px;
+            padding: 16px 18px;
+        }
+        .p-block h3 { margin: 0 0 8px; font-size: 16px; color: var(--c-primary); }
+        .p-block p { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--c-text); }
+        .p-block.hidden, #conv.hidden, #text-wrap.hidden, #progress.hidden { display: none; }
+
         #progress {
-            margin-top: 18px;
-            width: 200px;
             height: 5px;
             border-radius: 999px;
             background: rgba(255, 255, 255, 0.08);
             overflow: hidden;
-            opacity: 0;
-            transition: opacity 0.25s ease;
         }
-        #progress.visible { opacity: 1; }
         #progress-fill {
             height: 100%;
             width: 0%;
@@ -285,7 +278,6 @@
             background: linear-gradient(90deg, var(--c-neon), var(--c-cyan));
             transition: width 0.3s ease;
         }
-        /* Indeterminate: a sweeping bar for stages with no byte-% */
         #progress.indeterminate #progress-fill {
             width: 40%;
             animation: sweep 1.2s ease-in-out infinite;
@@ -295,7 +287,6 @@
             100% { margin-left: 100%; }
         }
 
-        /* ── First-run onboarding (one key) ────────────────────────────── */
         #onboard .field {
             width: 100%;
             box-sizing: border-box;
@@ -334,119 +325,105 @@
         #onboard .more:hover { color: var(--c-text); }
         #onboard .err { color: #f8a; font-size: 12.5px; min-height: 16px; margin: 0 0 4px; }
 
-        /* ── Error card (auth / quota / network / generic) ─────────────── */
-        #error-modal h3 { color: #ffcf6b; }
-        #error-modal .err-buttons { display: flex; gap: 10px; justify-content: center; }
-        #error-modal #err-fix { background: rgba(0, 212, 170, 0.22); border-color: rgba(0, 212, 170, 0.5); }
+        #error-box h3 { color: #ffcf6b; }
+        #error-box .err-buttons { display: flex; gap: 10px; justify-content: center; }
+        #error-box #err-fix { background: rgba(0, 212, 170, 0.22); border-color: rgba(0, 212, 170, 0.5); }
 
-        /* ── Typed input — same command channel voice uses ────────────── */
-        #text-row {
-            position: absolute;
-            bottom: 26px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: min(440px, 84vw);
-            z-index: 5;
-        }
-        #text-input {
-            width: 100%;
-            box-sizing: border-box;
-            background: rgba(10, 14, 20, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 999px;
-            padding: 10px 18px;
-            color: #eef2f6;
+        #confirm-box .confirm-text { font-size: 14.5px; }
+        #confirm-box .confirm-buttons { display: flex; gap: 10px; justify-content: center; }
+        #confirm-box #confirm-yes { background: rgba(0, 212, 170, 0.22); border-color: rgba(0, 212, 170, 0.5); }
+        #confirm-box #confirm-yes:hover { background: rgba(0, 212, 170, 0.38); }
+        .p-block button {
+            padding: 8px 18px;
+            border-radius: 9px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+            cursor: pointer;
             font-size: 14px;
-            outline: none;
-            backdrop-filter: blur(6px);
         }
-        #text-input:focus { border-color: rgba(255, 255, 255, 0.32); }
-        #text-input::placeholder { color: rgba(238, 242, 246, 0.4); }
+        .p-block button:hover { background: rgba(255, 255, 255, 0.16); }
     </style>
 </head>
 
-<body>
-    <!-- The orb itself is the drag handle in Tauri; ignored in a browser. -->
-    <div id="mic-btn" title="Mute microphone">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="22"/>
-        </svg>
-    </div>
-    <div id="gear" title="Mode">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
+<body class="tucked" data-state="boot">
+
+    <!-- ── The bar: live status, mic, stop, more ────────────────────── -->
+    <div id="bar">
+        <div id="wave"><span></span><span></span><span></span><span></span><span></span></div>
+        <div id="bar-text"></div>
+        <button id="bar-mic" class="bar-btn" title="Mute microphone">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+        </button>
+        <button id="bar-stop" class="bar-btn" title="Stop">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2"/>
+            </svg>
+        </button>
+        <button id="bar-more" class="bar-btn" title="More">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+            </svg>
+        </button>
     </div>
 
-    <div id="mode-menu" class="hidden">
-        <div class="mode-item" data-mode="orb">
-            <span>Orb</span><span class="tag">active</span>
+    <!-- ── Panel: conversation, input, onboarding, errors ───────────── -->
+    <div id="panel">
+        <div id="panel-head">
+            <span id="panel-title">YUMII</span>
+            <span id="panel-status"></span>
+            <button class="p-btn" id="panel-dash">Dashboard</button>
+            <button class="p-btn" id="panel-mute">Mute</button>
         </div>
-        <div class="mode-item" data-mode="companion">
-            <span>Companion (avatar)</span><span class="soon">soon</span>
+
+        <div id="progress" class="hidden"><div id="progress-fill"></div></div>
+
+        <div id="conv" class="hidden">
+            <div id="conv-card" data-live="0">
+                <div class="tag-row">
+                    <span class="live-dot"></span>
+                    <span class="tag-label"></span>
+                </div>
+                <div class="body"></div>
+            </div>
+            <div id="text-wrap">
+                <input id="text-input" type="text" autocomplete="off"
+                       placeholder="Type to Yumii… (or say stop / mute / new chat)" />
+            </div>
         </div>
-        <div class="mode-item" data-mode="dashboard">
-            <span>Dashboard</span><span class="tag">⇱</span>
+
+        <div id="onboard" class="p-block hidden">
+            <h3>Hi — I'm Yumii</h3>
+            <p>My ears and voice are ready. I just need a mind to think with —
+               one key and we're talking.</p>
+            <a class="getkey" id="onboard-getkey">Get a free Ollama key ↗</a>
+            <input class="field" id="onboard-key" type="password"
+                   placeholder="paste your Ollama key" autocomplete="off" spellcheck="false" />
+            <p class="err" id="onboard-err"></p>
+            <button id="onboard-save">Wake her up</button>
+            <span class="more" id="onboard-more">more options →</span>
         </div>
-    </div>
 
-    <div id="status-bar"></div>
-
-    <div id="stage" data-state="boot">
-        <div id="orb-wrap">
-            <div id="orb"></div>
+        <div id="error-box" class="p-block hidden">
+            <h3 id="err-title">Hmm</h3>
+            <p id="err-msg"></p>
+            <div class="err-buttons">
+                <button id="err-dismiss">OK</button>
+                <button id="err-fix" class="hidden">Open dashboard</button>
+            </div>
         </div>
-        <div id="hint">Waking Yumii up…</div>
-        <div id="progress"><div id="progress-fill"></div></div>
-        <div id="card"></div>
-        <div id="text-row">
-            <input id="text-input" type="text" autocomplete="off"
-                   placeholder="Type to Yumii… (or say stop / mute / new chat)" />
-        </div>
-    </div>
 
-    <!-- Companion "coming soon" -->
-    <div id="soon-modal" class="modal hidden">
-        <h3>Companion mode — coming soon</h3>
-        <p>An animated avatar you can watch react in real time is on the way.
-           For now, meet Yumii as an orb.</p>
-        <button id="soon-close">Got it</button>
-    </div>
-
-    <!-- First-run onboarding: one key and she wakes up -->
-    <div id="onboard" class="modal hidden">
-        <h3>Hi — I'm Yumii</h3>
-        <p>My ears and voice are ready. I just need a mind to think with —
-           one key and we're talking.</p>
-        <a class="getkey" id="onboard-getkey">Get a free Ollama key ↗</a>
-        <input class="field" id="onboard-key" type="password"
-               placeholder="paste your Ollama key" autocomplete="off" spellcheck="false" />
-        <p class="err" id="onboard-err"></p>
-        <button id="onboard-save">Wake her up</button>
-        <span class="more" id="onboard-more">more options →</span>
-    </div>
-
-    <!-- Something went wrong (never a silent freeze) -->
-    <div id="error-modal" class="modal hidden">
-        <h3 id="err-title">Hmm</h3>
-        <p id="err-msg"></p>
-        <div class="err-buttons">
-            <button id="err-dismiss">OK</button>
-            <button id="err-fix" class="hidden">Open dashboard</button>
-        </div>
-    </div>
-
-    <!-- HITL tool confirmation -->
-    <div id="confirm-prompt" class="modal hidden">
-        <p class="confirm-text"></p>
-        <div class="confirm-buttons">
-            <button id="confirm-no">Deny</button>
-            <button id="confirm-yes">Approve</button>
+        <div id="confirm-box" class="p-block hidden">
+            <p class="confirm-text"></p>
+            <div class="confirm-buttons">
+                <button id="confirm-no">Deny</button>
+                <button id="confirm-yes">Approve</button>
+            </div>
         </div>
     </div>
 
@@ -459,7 +436,7 @@
         let HTTP_BASE = IS_TAURI ? 'http://127.0.0.1:8000' : '';
         let WS_URL = IS_TAURI ? 'ws://127.0.0.1:8000/ws' : `ws://${window.location.host}/ws`;
 
-        // ── Shared audio / socket state (unchanged from the Live2D build) ─
+        // ── Shared audio / socket state ─────────────────────────────────
         let audioContext = null;
         let analyser = null;
         let socket = null;
@@ -471,20 +448,23 @@
         let sessionNegotiated = false; // first connect may deep-link a session
         let appReady = false;          // false until models downloaded + LLM key set
 
-        // ── Orb state machine ──────────────────────────────────────────
-        const stage = document.getElementById('stage');
-        const orb = document.getElementById('orb');
-        const hintEl = document.getElementById('hint');
-        const cardEl = document.getElementById('card');
+        const bodyEl = document.body;
+        const barText = document.getElementById('bar-text');
+        const panelStatus = document.getElementById('panel-status');
+        const hintEl = document.getElementById('panel-status'); // legacy alias
+        const convCard = document.getElementById('conv-card');
 
+        // ── Bar state machine ──────────────────────────────────────────
         let orbState = 'boot';   // boot | idle | listening | thinking | speaking
+        let hadConversation = false;   // suppresses the auto-tuck on a fresh boot
         function setOrbState(s) {
             orbState = s;
-            stage.setAttribute('data-state', s);
-            if (s !== 'speaking') orb.style.setProperty('--amp', 0);
+            bodyEl.dataset.state = s;
+            if (s === 'listening' || s === 'thinking' || s === 'speaking') hadConversation = true;
+            _uiSync(s);
         }
 
-        // Map the backend's emotion label onto the orb's gradient colours.
+        // Map the backend's emotion label onto the accent colours.
         const ORB_COLORS = {
             smile:    ['#00ff88', '#00d4aa'],
             surprise: ['#ffe066', '#00b8d4'],
@@ -500,14 +480,109 @@
             document.documentElement.style.setProperty('--orb-c2', c2);
         }
 
-        function showCard(text) {
-            cardEl.textContent = text;
-            cardEl.classList.add('visible');
+        // ── Window heights (Tauri resizes the strip; browser ignores) ──
+        const H_TUCK = 14, H_BAR = 64, H_PANEL = 505;
+        function setBarHeight(h) {
+            if (!IS_TAURI || !window.__TAURI__?.core?.invoke) return;
+            window.__TAURI__.core.invoke('set_bar_height_cmd', { height: h }).catch(() => {});
         }
-        function hideCard() { cardEl.classList.remove('visible'); }
+
+        // ── Tuck / open / panel ─────────────────────────────────────────
+        let barOpen = false;
+        let panelOpen = false;
+        let panelPinned = false;   // onboarding / errors / confirm hold it open
+        let tuckTimer = null;
+        const TUCK_DELAY_MS = 3000;
+
+        function tuckBar() {
+            if (!IS_TAURI) return;   // a browser tab can't tuck — stay visible
+            barOpen = false;
+            panelOpen = false;
+            bodyEl.classList.add('tucked');
+            bodyEl.classList.remove('panel-open');
+            setBarHeight(H_TUCK);
+        }
+        function openBar() {
+            barOpen = true;
+            bodyEl.classList.remove('tucked');
+            setBarHeight(H_BAR);
+        }
+        function openPanel() {
+            panelOpen = true;
+            barOpen = true;
+            bodyEl.classList.remove('tucked');
+            bodyEl.classList.add('panel-open');
+            setBarHeight(H_PANEL);
+        }
+        function closePanel() {
+            panelOpen = false;
+            bodyEl.classList.remove('panel-open');
+            if (orbState === 'idle' && !panelPinned) tuckBar();
+            else openBar();
+        }
+        function togglePanel() {
+            if (panelOpen && !panelPinned) closePanel();
+            else openPanel();
+        }
+
+        function _uiSync(s) {
+            if (s === 'idle') {
+                if (tuckTimer) clearTimeout(tuckTimer);
+                tuckTimer = setTimeout(() => {
+                    tuckTimer = null;
+                    // A fresh boot stays open until the user has actually
+                    // talked once — tucking before that reads as "broken".
+                    if (orbState === 'idle' && !panelPinned && hadConversation) tuckBar();
+                }, TUCK_DELAY_MS);
+            } else {
+                if (tuckTimer) { clearTimeout(tuckTimer); tuckTimer = null; }
+                openBar();
+            }
+        }
+
+        // ── Card: bar one-liner + panel conversation ────────────────────
+        function showCard(text, opts = {}) {
+            const live = !!opts.live;
+            convCard.dataset.live = live ? "1" : "0";
+
+            // the bar shows the latest line, truncated
+            barText.textContent = text;
+            barText.classList.toggle('dim', live);
+
+            let tag = convCard.querySelector('.tag-row');
+            if (!tag) {
+                tag = document.createElement('div');
+                tag.className = 'tag-row';
+                const dot = document.createElement('span');
+                dot.className = 'live-dot';
+                const label = document.createElement('span');
+                label.className = 'tag-label';
+                tag.appendChild(dot);
+                tag.appendChild(label);
+                const bodyEl = document.createElement('div');
+                bodyEl.className = 'body';
+                convCard.appendChild(tag);
+                convCard.appendChild(bodyEl);
+            }
+            tag.querySelector('.tag-label').textContent = live ? 'Listening' : 'Yumii';
+            convCard.querySelector('.body').textContent = text;
+        }
+        function hideCard() {
+            convCard.dataset.live = "0";
+            barText.textContent = '';
+        }
+
+        // ── Panel status line ───────────────────────────────────────────
+        function setStatus(text) {
+            panelStatus.textContent = text || '';
+        }
 
         // ── Typed input — the WS command channel doubles as text chat ──
         const textInput = document.getElementById('text-input');
+        textInput.addEventListener('focus', () => {
+            if (orbState === 'idle') openBar();
+            openPanel();
+        });
         textInput.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter') return;
             const text = textInput.value.trim();
@@ -521,33 +596,26 @@
             if (orbState === 'idle' || orbState === 'listening') showCard(text);
         });
 
-        // ── Mode menu + coming-soon ────────────────────────────────────
-        const modeMenu = document.getElementById('mode-menu');
-        document.getElementById('gear').addEventListener('click', (e) => {
+        // ── Bar buttons ─────────────────────────────────────────────────
+        document.getElementById('panel-dash').addEventListener('click', () => {
+            if (IS_TAURI && window.__TAURI__?.core?.invoke) {
+                window.__TAURI__.core.invoke('open_dashboard');
+            } else {
+                window.open(HTTP_BASE + '/dashboard.html', '_blank');
+            }
+        });
+        document.getElementById('panel-mute').addEventListener('click', () => {
+            setMicMuted(!micMuted);
+        });
+        document.getElementById('bar-more').addEventListener('click', (e) => {
             e.stopPropagation();
-            modeMenu.classList.toggle('hidden');
+            togglePanel();
         });
-        document.addEventListener('click', () => modeMenu.classList.add('hidden'));
-        modeMenu.addEventListener('click', (e) => e.stopPropagation());
-        modeMenu.querySelectorAll('.mode-item').forEach((item) => {
-            item.addEventListener('click', () => {
-                modeMenu.classList.add('hidden');
-                if (item.dataset.mode === 'companion') {
-                    document.getElementById('soon-modal').classList.remove('hidden');
-                }
-                if (item.dataset.mode === 'dashboard') {
-                    // Tauri: ask the shell for a proper second window;
-                    // browser mode: just open a tab.
-                    if (IS_TAURI && window.__TAURI__?.core?.invoke) {
-                        window.__TAURI__.core.invoke('open_dashboard');
-                    } else {
-                        window.open(HTTP_BASE + '/dashboard.html', '_blank');
-                    }
-                }
-            });
-        });
-        document.getElementById('soon-close').addEventListener('click', () => {
-            document.getElementById('soon-modal').classList.add('hidden');
+        document.getElementById('bar-stop').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'command', command: 'stop' }));
+            }
         });
 
         // ── Manual mic mute ────────────────────────────────────────────
@@ -556,7 +624,7 @@
         // leave the page (and the backend drops/resets anything in
         // flight). Unmute is instant. Speaking is unaffected.
         let micMuted = false;
-        const micBtn = document.getElementById('mic-btn');
+        const micBtn = document.getElementById('bar-mic');
         function setMicMuted(muted) {
             micMuted = muted;
             micBtn.classList.toggle('muted', muted);
@@ -570,18 +638,9 @@
                 socket.send(JSON.stringify({ type: 'mic_mute', muted }));
             }
             if (muted && orbState === 'listening') setOrbState('idle');
-            if (started) {
-                hintEl.textContent = muted ? "Muted — Yumii can't hear you" : 'Listening… just talk';
-            }
         }
-        micBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setMicMuted(!micMuted);
-        });
 
         // ── Microphone capture (16 kHz PCM16 → WebSocket) ──────────────
-        // Identical to the Live2D build, plus a local RMS tick so the orb
-        // can show a "listening" state while the user talks.
         async function initMicrophone() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -618,7 +677,7 @@
                 console.log("Microphone initialized and streaming.");
             } catch (err) {
                 console.error("Error initializing microphone:", err);
-                hintEl.textContent = "🎙️ Mic error: " + err.message;
+                barText.textContent = "🎙️ Mic error: " + err.message;
             }
         }
 
@@ -661,9 +720,6 @@
                     socket.send(JSON.stringify({ type: 'mic_mute', muted: true }));
                 }
                 if (!micStream) initMicrophone();
-                hintEl.textContent = micMuted
-                    ? "Muted — Yumii can't hear you"
-                    : "Listening… just talk";
                 setOrbState('idle');
             };
 
@@ -675,21 +731,9 @@
             let currentSeq = 0;          // speech session id echoed back on playback_finished
             let audioEndTimer = null;    // pending audio_end completion timer (seq-guarded)
 
-            // ── Status pill ────────────────────────────────────────────
-            const statusBar = document.getElementById('status-bar');
-            let _statusHideTimer = null;
+            // ── Panel status line ──────────────────────────────────────
             function setStatus(text) {
-                if (!statusBar) return;
-                if (_statusHideTimer) { clearTimeout(_statusHideTimer); _statusHideTimer = null; }
-                if (text) {
-                    statusBar.textContent = text;
-                    statusBar.classList.add('visible');
-                } else {
-                    _statusHideTimer = setTimeout(() => {
-                        statusBar.classList.remove('visible');
-                        statusBar.textContent = '';
-                    }, 250);
-                }
+                panelStatus.textContent = text || '';
             }
 
             function _humanToolName(name) {
@@ -705,15 +749,18 @@
             }
 
             // ── HITL confirmation prompt ────────────────────────────────
-            const confirmPrompt = document.getElementById('confirm-prompt');
-            const confirmText = confirmPrompt.querySelector('.confirm-text');
+            const confirmBox = document.getElementById('confirm-box');
+            const confirmText = confirmBox.querySelector('.confirm-text');
             function showConfirmPrompt(requestId, tool, args) {
                 const pretty = _humanToolName(tool);
                 const argStr = args && Object.keys(args).length ? ` with ${JSON.stringify(args)}` : '';
                 confirmText.textContent = `Allow Yumii to ${pretty.toLowerCase()}${argStr}?`;
-                confirmPrompt.classList.remove('hidden');
+                confirmBox.classList.remove('hidden');
+                panelPinned = true;
+                openPanel();
                 const reply = (approved) => {
-                    confirmPrompt.classList.add('hidden');
+                    confirmBox.classList.add('hidden');
+                    panelPinned = false;
                     socket.send(JSON.stringify({ type: 'confirmation_response', request_id: requestId, approve: approved }));
                 };
                 document.getElementById('confirm-yes').onclick = () => reply(true);
@@ -732,21 +779,25 @@
                 nextPlayTime = 0;
             }
 
-            // Orb pulse: read playback RMS and write --amp while speaking.
-            let orbPulseReq = null;
-            function startOrbPulse() {
-                if (orbPulseReq) return;
+            // Wave amplitude: read playback RMS and write --amp while speaking.
+            let wavePulseReq = null;
+            function startWavePulse() {
+                if (wavePulseReq) return;
                 const pcm = new Float32Array(analyser.fftSize);
                 const loop = () => {
-                    if (orbState !== 'speaking') { orb.style.setProperty('--amp', 0); orbPulseReq = null; return; }
+                    if (orbState !== 'speaking') {
+                        document.documentElement.style.setProperty('--amp', 0);
+                        wavePulseReq = null;
+                        return;
+                    }
                     analyser.getFloatTimeDomainData(pcm);
                     let sum = 0;
                     for (const a of pcm) sum += a * a;
                     const rms = Math.sqrt(sum / pcm.length);
-                    orb.style.setProperty('--amp', Math.min(1, rms * 14));
-                    orbPulseReq = requestAnimationFrame(loop);
+                    document.documentElement.style.setProperty('--amp', Math.min(1, rms * 14));
+                    wavePulseReq = requestAnimationFrame(loop);
                 };
-                orbPulseReq = requestAnimationFrame(loop);
+                wavePulseReq = requestAnimationFrame(loop);
             }
 
             socket.onmessage = async (event) => {
@@ -762,7 +813,7 @@
                 }
 
                 // A turn failed with nothing to say — show a clear,
-                // actionable card instead of a frozen "Thinking…".
+                // actionable panel instead of a frozen "Thinking…".
                 if (data.type === "error") {
                     stopAllAudio();
                     hideCard();
@@ -799,7 +850,8 @@
                     return;
                 }
                 if (data.type === "confirmation_timeout") {
-                    confirmPrompt.classList.add('hidden');
+                    confirmBox.classList.add('hidden');
+                    panelPinned = false;
                     return;
                 }
 
@@ -811,12 +863,13 @@
                 }
 
                 // Live user transcription (word-by-word) from the streaming STT.
-                // Only shown while she's idle/listening so it doesn't clobber
-                // Yumii's own reply once she starts thinking/speaking.
+                // Shown as provisional ("Listening") text while she's idle or
+                // already listening — her own reply takes the card over once
+                // she starts thinking/speaking.
                 if (data.type === "partial_transcript") {
                     if (orbState === 'idle' || orbState === 'listening') {
                         setOrbState('listening');
-                        if (data.text && data.text.trim()) showCard(data.text);
+                        if (data.text && data.text.trim()) showCard(data.text, { live: true });
                     }
                     return;
                 }
@@ -831,9 +884,9 @@
                     setOrbColor(data.expression);
                     setOrbState('speaking');
                     // A streamed reply already wrote the card via reply_text —
-                    // don't rewind it to the first sentence.
+                    // don't rewind it to the first words.
                     if (!replyCardActive) showCard(data.text);
-                    startOrbPulse();
+                    startWavePulse();
                     return;
                 }
                 if (data.type === "audio_chunk") {
@@ -903,12 +956,12 @@
             socket.onclose = () => {
                 console.log("Disconnected. Reconnecting in 3s…");
                 setOrbState('boot');
-                hintEl.textContent = "Reconnecting…";
+                setStatus('Reconnecting…');
                 setTimeout(initWebSocket, 3000);
             };
 
             // expose the pulse starter to the legacy path
-            window._startOrbPulse = startOrbPulse;
+            window._startWavePulse = startWavePulse;
         }
 
         function pcm16Base64ToFloat32(base64) {
@@ -932,7 +985,7 @@
         }
 
         // Legacy MP3 payload path (ElevenLabs/CAMB both stream today, so
-        // this is effectively dead but harmless). Drives the orb pulse.
+        // this is effectively dead but harmless). Drives the wave.
         async function playAudioLegacy(base64Audio) {
             if (!audioContext) return;
             const binary = window.atob(base64Audio);
@@ -946,7 +999,7 @@
             src.connect(analyser);
             analyser.connect(audioContext.destination);
             setOrbState('speaking');
-            if (window._startOrbPulse) window._startOrbPulse();
+            if (window._startWavePulse) window._startWavePulse();
             src.start(0);
 
             return new Promise(resolve => { src.onended = () => resolve(); });
@@ -960,64 +1013,99 @@
         // at it. Returns true once found. In a plain browser (no Tauri)
         // the page is same-origin, so no probing is needed.
         const PORT_BASE = 8000, PORT_TRIES = 12;
-        async function discoverBackend(deadlineMs = 30000) {
+        async function discoverBackend(deadlineMs = 150000) {
             if (!IS_TAURI) {
                 try { return (await fetch('/health', { cache: 'no-store' })).ok; }
                 catch (e) { return false; }
             }
             const until = Date.now() + deadlineMs;
+            let sweep = 0;
             while (Date.now() < until) {
                 for (let p = PORT_BASE; p < PORT_BASE + PORT_TRIES; p++) {
                     try {
                         const r = await fetch(`http://127.0.0.1:${p}/health`, { cache: 'no-store' });
-                        if (r.ok) {
-                            HTTP_BASE = `http://127.0.0.1:${p}`;
-                            WS_URL = `ws://127.0.0.1:${p}/ws`;
-                            return true;
-                        }
-                    } catch (e) { /* nothing on this port yet */ }
+                        if (r.ok) return true;
+                    } catch (e) { /* try the next port */ }
+                }
+                sweep++;
+                if (sweep % 6 === 0) {
+                    // Cold starts are SLOW: the backend's Python imports alone
+                    // take ~20s, plus AV scanning and Composio's tool fetch —
+                    // the first boot of the day can legitimately need a minute.
+                    setStatus('Still waking her up\u2026 (cold start can take a minute)');
+                    barText.textContent = 'Waking her up\u2026';
                 }
                 await sleep(500);
             }
             return false;
         }
 
-        // Also re-checked after a backend restart (onboarding key save).
-        async function pollHealth() {
-            for (;;) {
-                try {
-                    const r = await fetch(HTTP_BASE + '/health', { cache: 'no-store' });
-                    if (r.ok) return;
-                } catch (e) { /* server not up yet */ }
-                await sleep(500);
+        async function boot() {
+            setOrbState('boot');
+            setStatus('Waking Yumii up\u2026');
+            barText.textContent = 'Waking her up\u2026';
+            // Two full probe rounds (2 x 150s): the shell SPAWNED the
+            // backend, so a cold first boot gets all the time it needs
+            // before we declare it dead.
+            const up = (await discoverBackend()) || (await discoverBackend());
+            if (!up) {
+                // Her brain never came up — say so instead of pretending
+                // to wake up forever. Almost always her port is taken by
+                // another app, or the install didn't finish.
+                setOrbState('idle');
+                setStatus('');
+                barText.textContent = '';
+                showErrorCard(
+                    "startup",
+                    "Yumii's backend didn't start after a full cold-start wait. "
+                    + "Another app may be using her port (8000\u20138011), or the "
+                    + "install didn't finish. Close that app, then reopen Yumii."
+                );
+                return;
             }
+            await firstRunFlow();
         }
 
         async function fetchStatus() {
-            try {
-                const r = await fetch(HTTP_BASE + '/api/status', { cache: 'no-store' });
-                if (r.ok) return await r.json();
-            } catch (e) { /* server restarting */ }
-            return null;
+            try { return await (await fetch(HTTP_BASE + '/api/status', { cache: 'no-store' })).json(); }
+            catch (e) { return null; }
         }
 
-        // ── First-run download progress ────────────────────────────────
-        const progressEl = document.getElementById('progress');
-        const progressFill = document.getElementById('progress-fill');
-        function showProgress(frac, indeterminate) {
-            progressEl.classList.add('visible');
-            progressEl.classList.toggle('indeterminate', !!indeterminate);
-            if (!indeterminate) progressFill.style.width = Math.round((frac || 0) * 100) + '%';
+        async function pollHealth() {
+            // The onboarding restarts the backend after saving a key — wait
+            // until the fresh process is reachable again (cold restart).
+            const until = Date.now() + 150000;
+            while (Date.now() < until) {
+                try {
+                    const r = await fetch(HTTP_BASE + '/health', { cache: 'no-store' });
+                    if (r.ok) return true;
+                } catch (e) { /* not up yet */ }
+                await sleep(500);
+            }
+            return false;
         }
-        function hideProgress() { progressEl.classList.remove('visible', 'indeterminate'); }
+
+        function showProgress(frac, indeterminate) {
+            const p = document.getElementById('progress');
+            p.classList.remove('hidden');
+            p.classList.toggle('indeterminate', !!indeterminate);
+            if (!indeterminate) {
+                document.getElementById('progress-fill').style.width = Math.round((frac || 0) * 100) + '%';
+            }
+        }
+        function hideProgress() {
+            document.getElementById('progress').classList.add('hidden');
+        }
 
         // ── First-run onboarding (one key) ─────────────────────────────
-        const onboardModal = document.getElementById('onboard');
+        const onboardBox = document.getElementById('onboard');
         function showOnboarding() {
             hideProgress();
             setOrbState('idle');
-            hintEl.textContent = "";
-            onboardModal.classList.remove('hidden');
+            setStatus('');
+            onboardBox.classList.remove('hidden');
+            panelPinned = true;
+            openPanel();
             document.getElementById('onboard-key').focus();
         }
         document.getElementById('onboard-getkey').addEventListener('click', () => {
@@ -1060,10 +1148,11 @@
             }
             // The backend reads the key once at import, so restart it to
             // pick up the new key, then re-run the first-run flow.
-            onboardModal.classList.add('hidden');
+            onboardBox.classList.add('hidden');
+            panelPinned = false;
             saveBtn.disabled = false; saveBtn.textContent = "Wake her up";
             setOrbState('boot');
-            hintEl.textContent = "Waking her up…";
+            setStatus('Waking her up…');
             if (IS_TAURI && window.__TAURI__?.core?.invoke) {
                 try { await window.__TAURI__.core.invoke('restart_backend'); } catch (e) {}
             }
@@ -1073,7 +1162,7 @@
         }
 
         // ── Error card — never a silent frozen "Thinking…" ─────────────
-        const errorModal = document.getElementById('error-modal');
+        const errorBox = document.getElementById('error-box');
         function showErrorCard(kind, message) {
             document.getElementById('err-title').textContent =
                 kind === 'auth' ? "I can't reach my mind" :
@@ -1082,11 +1171,17 @@
                 kind === 'startup' ? "Couldn't start" : "Hmm";
             document.getElementById('err-msg').textContent = message || "Something went wrong.";
             document.getElementById('err-fix').classList.toggle('hidden', kind !== 'auth');
-            errorModal.classList.remove('hidden');
+            errorBox.classList.remove('hidden');
+            panelPinned = true;
+            openPanel();
         }
-        document.getElementById('err-dismiss').addEventListener('click', () => errorModal.classList.add('hidden'));
+        document.getElementById('err-dismiss').addEventListener('click', () => {
+            errorBox.classList.add('hidden');
+            panelPinned = false;
+        });
         document.getElementById('err-fix').addEventListener('click', () => {
-            errorModal.classList.add('hidden');
+            errorBox.classList.add('hidden');
+            panelPinned = false;
             if (IS_TAURI && window.__TAURI__?.core?.invoke) window.__TAURI__.core.invoke('open_dashboard');
             else window.open(HTTP_BASE + '/dashboard.html', '_blank');
         });
@@ -1099,11 +1194,11 @@
                 const m = status.models || {};
                 setOrbState('boot');
                 if (m.stage === 'error') {
-                    hintEl.textContent = "Trouble downloading — retrying…";
+                    setStatus("Trouble downloading — retrying…");
                 } else if (m.stage && m.stage !== 'starting' && m.stage !== 'ready') {
-                    hintEl.textContent = m.stage + "…";
+                    setStatus(m.stage + "…");
                 } else {
-                    hintEl.textContent = "Getting ready…";
+                    setStatus("Getting ready…");
                 }
                 showProgress(m.progress, m.indeterminate);
                 await sleep(700);
@@ -1118,29 +1213,10 @@
         function becomeReady() {
             hideProgress();
             appReady = true;
+            panelPinned = false;
             setOrbState('idle');
-            hintEl.textContent = "Tap the orb to talk";
-        }
-
-        async function boot() {
-            setOrbState('boot');
-            hintEl.textContent = "Waking Yumii up…";
-            const up = await discoverBackend();
-            if (!up) {
-                // Her brain never started — say so instead of pretending
-                // to wake up forever. Almost always her port is taken by
-                // another app, or the install didn't finish.
-                setOrbState('idle');
-                hintEl.textContent = "";
-                showErrorCard(
-                    "startup",
-                    "Yumii's backend didn't start. Another app may be using her "
-                    + "port (8000–8011), or the install didn't finish. Close that "
-                    + "app, then reopen Yumii."
-                );
-                return;
-            }
-            await firstRunFlow();
+            setStatus('Tap the bar or just say something');
+            startSession();   // voice-first: the mic opens with the app
         }
 
         async function startSession() {
@@ -1149,22 +1225,20 @@
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 512;
-            hintEl.textContent = "Connecting…";
             // The socket connects first; the mic starts from onopen so the
             // session_select frame is guaranteed to precede any audio.
             initWebSocket();
         }
 
-        document.getElementById('orb-wrap').addEventListener('click', startSession);
-
-        // Drag the window by grabbing the orb. A built-in drag region would
-        // swallow the tap (drag starts on mousedown), so this starts the OS
-        // drag only after ~4px of movement — a plain tap still clicks.
+        // Drag the bar itself (buttons excluded). A built-in drag region
+        // would swallow taps, so this starts the OS drag only after ~4px
+        // of movement — a plain click still lands on the bar.
         (function () {
-            const wrap = document.getElementById('orb-wrap');
+            const bar = document.getElementById('bar');
             let armed = false, downX = 0, downY = 0;
-            wrap.addEventListener('mousedown', (e) => {
+            bar.addEventListener('mousedown', (e) => {
                 if (e.button !== 0) return;
+                if (e.target.closest('.bar-btn')) return;   // buttons aren't handles
                 armed = true; downX = e.clientX; downY = e.clientY;
             });
             window.addEventListener('mousemove', (e) => {
@@ -1178,6 +1252,17 @@
             });
             window.addEventListener('mouseup', () => { armed = false; });
         })();
+
+        // ── Hover affordance: the tucked lip opens on mouse-over ───────
+        document.getElementById('bar').addEventListener('mouseenter', () => {
+            if (!barOpen) openBar();
+        });
+        document.getElementById('bar').addEventListener('mouseleave', () => {
+            if (orbState === 'idle' && !panelPinned && !panelOpen) tuckBar();
+        });
+        document.getElementById('panel').addEventListener('mouseleave', () => {
+            if (orbState === 'idle' && !panelPinned && !panelOpen) closePanel();
+        });
 
         boot();
     </script>
