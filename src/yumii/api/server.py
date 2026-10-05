@@ -316,7 +316,7 @@ def _llm_provider_choices() -> list[str]:
 _SETTING_CHOICES: dict[str, list[str]] = {
     "LLM_PROVIDER": _llm_provider_choices(),
     "TTS_PROVIDER": ["Kokoro", "ElevenLabs", "CAMB.ai"],
-    "STT_PROVIDER": ["local", "groq", "vosk"],
+    "STT_PROVIDER": ["nemotron", "nemotron-multi", "moonshine", "local", "groq", "vosk"],
     "PERSONALITY": ["caring", "tsundere", "genki", "kuudere", "yandere", "dandere"],
     "WHISPER_MODEL_SIZE": ["tiny", "base", "small"],
     "KOKORO_VOICE": [

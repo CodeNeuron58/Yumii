@@ -11,6 +11,19 @@ def get_stt_provider() -> BaseSTTProvider:
 
     if provider == "groq":
         return GroqSTT(api_key=settings.groq_api_key)
+    elif provider in ("nemotron", "nemotron-multi"):
+        from yumii.audio.nemotron_model import get_nemotron_model_dir
+        from yumii.audio.stt_providers import NemotronStreamingSTT
+
+        # get_nemotron_model_dir() downloads if missing (self-healing, like
+        # the whisper path) — the first launch also prefetches via models.py.
+        variant = "multi" if provider == "nemotron-multi" else "en"
+        return NemotronStreamingSTT(model_dir=get_nemotron_model_dir(variant))
+    elif provider == "moonshine":
+        from yumii.audio.moonshine_model import get_moonshine_model_dir
+        from yumii.audio.stt_providers import MoonshineStreamingSTT
+
+        return MoonshineStreamingSTT(model_dir=get_moonshine_model_dir())
     elif provider == "vosk":
         from yumii.audio.vosk_provider import VoskSTT
         from yumii.audio.vosk_model import get_vosk_model_path

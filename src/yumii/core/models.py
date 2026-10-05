@@ -47,11 +47,36 @@ def _probe_whisper(model: Any) -> None:
     list(segments)  # the generator is where generate() actually runs
 
 
+def _nemotron_variant() -> str:
+    """Provider id -> nemotron archive variant ("nemotron" / "nemotron-multi")."""
+    provider = settings.stt_provider.lower()
+    return "multi" if provider == "nemotron-multi" else "en"
+
+
+def _nemotron_present() -> bool:
+    from yumii.audio.nemotron_model import is_present
+
+    return is_present(_nemotron_variant())
+
+
+def _moonshine_present() -> bool:
+    from yumii.audio.moonshine_model import is_present
+
+    return is_present()
+
+
 def needs_download() -> bool:
-    """True if any configured local model (Kokoro / local Whisper) is missing."""
+    """True if any configured local model (Kokoro / local Whisper / Nemotron / Moonshine) is missing."""
     if settings.tts_provider == "Kokoro" and not _kokoro_present():
         return True
-    if settings.stt_provider.lower() == "local" and not _whisper_present():
+    stt = settings.stt_provider.lower()
+    if stt == "local" and not _whisper_present():
+        return True
+    if stt == "nemotron" and not _nemotron_present():
+        return True
+    if stt == "nemotron-multi" and not _nemotron_present():
+        return True
+    if stt == "moonshine" and not _moonshine_present():
         return True
     return False
 
@@ -92,6 +117,27 @@ def ensure_models_ready(on_progress: ProgressCb | None = None) -> None:
             size, on_progress=lambda f: report("Downloading her voice", f)
         )
         log.info("kokoro_prefetched")
+
+    if settings.stt_provider.lower() == "nemotron" and not _nemotron_present():
+        from yumii.audio.nemotron_model import ensure
+
+        report("Getting her ears ready", 0.0)
+        ensure(on_progress=lambda f: report("Getting her ears ready", f))
+        log.info("nemotron_prefetched")
+
+    if settings.stt_provider.lower() == "nemotron-multi" and not _nemotron_present():
+        from yumii.audio.nemotron_model import ensure
+
+        report("Getting her ears ready", 0.0)
+        ensure("multi", on_progress=lambda f: report("Getting her ears ready", f))
+        log.info("nemotron_multi_prefetched")
+
+    if settings.stt_provider.lower() == "moonshine" and not _moonshine_present():
+        from yumii.audio.moonshine_model import ensure
+
+        report("Getting her ears ready", 0.0)
+        ensure(on_progress=lambda f: report("Getting her ears ready", f))
+        log.info("moonshine_prefetched")
 
     if settings.stt_provider.lower() == "local" and not _whisper_present():
         from yumii.audio.whisper_model import get_whisper_model_dir, purge

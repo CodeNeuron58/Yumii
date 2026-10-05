@@ -1,7 +1,7 @@
-"""STT providers: local faster-whisper (CPU) and cloud Groq Whisper."""
-
+"""STT providers: local faster-whisper (CPU), cloud Groq Whisper, Moonshine v2, and true-streaming Nemotron."""
 
 import time
+from pathlib import Path
 
 import numpy as np
 
@@ -24,36 +24,86 @@ def _seg_field(seg: object, key: str, default: object) -> object:
     return getattr(seg, key, default)
 
 
-class LocalSTT(BaseSTTProvider):
-    """faster-whisper on CPU, loaded from a local dir (mirrored on GitHub; HF never contacted).
+# ---------------------------------------------------------------------------
+# Shared streaming pattern for offline decoders
+# ---------------------------------------------------------------------------
 
-    Streaming partials: Whisper can't stream, so while the user speaks we
-    re-decode the last few seconds every couple of seconds — small batch jobs
-    that make the text appear live. The final decode at end-of-turn always
-    covers the whole utterance, so what reaches memory and the transcript is
-    exactly as accurate as the batch path.
+
+class _RollingWindowSTT(BaseSTTProvider):
+    """Live partials for decoders that cannot stream (Whisper, Moonshine...).
+
+    Whisper-style models can't stream — so while the user speaks, re-decode
+    the last few seconds every couple of seconds (small batch jobs,
+    diff-suppressed partials), and decode the FULL utterance at end-of-turn
+    so what reaches memory and the transcript has full context.
+    Subclasses implement :meth:`_decode` (float32 audio in [-1, 1] → text).
     """
 
-    # Rolling window and re-decadence interval. A 4s window on int8 CPU costs
-    # ~200-400ms per decode; asking every 2s of new audio keeps Whisper busy
-    # ~15-20% of one core, only while the user is speaking.
     _PARTIAL_WINDOW_SEC = 4.0
     _PARTIAL_INTERVAL_SEC = 2.0
     _RATE = 16000
-    _MIN_UTTERANCE_SEC = 0.7  # same floor as the batch path
+    _MIN_UTTERANCE_SEC = 0.7
+
+    def __init__(self) -> None:
+        self._utterance: list[np.ndarray] = []
+        self._tail = np.empty(0, dtype=np.int16)
+        self._frames_since_partial = 0
+        self._last_partial = ""
+
+    def _decode(self, audio_float: np.ndarray) -> str | None:
+        raise NotImplementedError
+
+    def process_chunk(self, pcm16_bytes: bytes) -> dict | None:
+        frame = np.frombuffer(pcm16_bytes, dtype=np.int16)
+        self._utterance.append(frame)
+        self._tail = np.concatenate([self._tail, frame])[
+            -int(self._PARTIAL_WINDOW_SEC * self._RATE):
+        ]
+        self._frames_since_partial += len(frame)
+        if self._frames_since_partial < int(self._PARTIAL_INTERVAL_SEC * self._RATE):
+            return None
+        self._frames_since_partial = 0
+
+        text = self._decode(self._tail.astype(np.float32) / 32768.0)
+        if not text or text == self._last_partial:
+            return None
+        self._last_partial = text
+        return {"type": "partial_transcript", "text": text}
+
+    def get_final(self) -> str | None:
+        frames, self._utterance = self._utterance, []
+        self._tail = np.empty(0, dtype=np.int16)
+        self._frames_since_partial = 0
+        self._last_partial = ""
+
+        total = sum(len(f) for f in frames)
+        if total < int(self._MIN_UTTERANCE_SEC * self._RATE):
+            return None
+        return self._decode(np.concatenate(frames).astype(np.float32) / 32768.0)
+
+
+class LocalSTT(_RollingWindowSTT):
+    """faster-whisper on CPU, loaded from a local dir (mirrored on GitHub; HF never contacted).
+
+    Live partials via the shared rolling-window pattern; the end-of-turn
+    decode always covers the whole utterance, so what reaches memory and the
+    transcript is exactly as accurate as the batch path.
+    """
 
     def __init__(self, model_size: str = "base", model_dir: str | None = None) -> None:
         """Initialize the local Whisper model."""
         from faster_whisper import WhisperModel
 
+        super().__init__()
         source = model_dir or model_size
         log.info("whisper_loading", source=source)
         self._whisper = WhisperModel(source, device="cpu", compute_type="int8")
         log.info("whisper_ready", model_size=model_size)
-        self._utterance: list[np.ndarray] = []
-        self._tail = np.empty(0, dtype=np.int16)
-        self._frames_since_partial = 0
-        self._last_partial = ""
+
+    def transcribe(self, audio_data: np.ndarray) -> str | None:
+        """Transcribe an audio array using the local Whisper model."""
+        # faster-whisper expects float32 in [-1, 1].
+        return self._decode(audio_data.astype(np.float32) / 32768.0)
 
     def _decode(self, audio_float: np.ndarray) -> str | None:
         segments, _ = self._whisper.transcribe(
@@ -71,46 +121,6 @@ class LocalSTT(BaseSTTProvider):
             text_parts.append(segment.text)
 
         return "".join(text_parts).strip() or None
-
-    def transcribe(self, audio_data: np.ndarray) -> str | None:
-        """Transcribe an audio array using the local Whisper model."""
-        # faster-whisper expects float32 in [-1, 1].
-        return self._decode(audio_data.astype(np.float32) / 32768.0)
-
-    def process_chunk(self, pcm16_bytes: bytes) -> dict | None:
-        """Streaming interface: consume one frame; emit a live partial when
-        enough new audio has accumulated since the last one."""
-        frame = np.frombuffer(pcm16_bytes, dtype=np.int16)
-        self._utterance.append(frame)
-        self._tail = np.concatenate([self._tail, frame])[
-            -int(self._PARTIAL_WINDOW_SEC * self._RATE):
-        ]
-        self._frames_since_partial += len(frame)
-        if self._frames_since_partial < int(self._PARTIAL_INTERVAL_SEC * self._RATE):
-            return None
-        self._frames_since_partial = 0
-
-        text = self._decode(self._tail.astype(np.float32) / 32768.0)
-        if not text or text == self._last_partial:
-            return None  # unchanged — the orb already shows it
-        self._last_partial = text
-        return {"type": "partial_transcript", "text": text}
-
-    def get_final(self) -> str | None:
-        """End of turn: decode the FULL utterance (full context — this is the
-        text that enters memory and the transcript), then reset streaming
-        state. Called automatically at end-of-turn, on the mute sentinel, and
-        at capture start (residue discard)."""
-        frames, self._utterance = self._utterance, []
-        self._tail = np.empty(0, dtype=np.int16)
-        self._frames_since_partial = 0
-        self._last_partial = ""
-
-        total = sum(len(f) for f in frames)
-        if total < int(self._MIN_UTTERANCE_SEC * self._RATE):
-            return None
-        audio = np.concatenate(frames).astype(np.float32) / 32768.0
-        return self._decode(audio)
 
 
 class GroqSTT(BaseSTTProvider):
@@ -198,3 +208,108 @@ class GroqSTT(BaseSTTProvider):
 
         combined = " ".join(kept).strip()
         return combined or None
+
+
+class MoonshineStreamingSTT(_RollingWindowSTT):
+    """Moonshine v2 via sherpa-onnx's offline decoder — the lightweight tier.
+
+    The v2 models (123M params, MIT) beat Whisper large-v3 on WER and decode
+    far faster on CPU; sherpa-onnx ships them offline-only, so live partials
+    come from the shared rolling-window pattern.
+    """
+
+    _PARTIAL_WINDOW_SEC = 6.0  # v2's sliding-window encoder likes more context
+    _PARTIAL_INTERVAL_SEC = 2.0
+
+    def __init__(self, model_dir: str) -> None:
+        import sherpa_onnx
+
+        super().__init__()
+        d = Path(model_dir)
+        self._recognizer = sherpa_onnx.OfflineRecognizer.from_moonshine_v2(
+            encoder=str(d / "encoder_model.ort"),
+            decoder=str(d / "decoder_model_merged.ort"),
+            tokens=str(d / "tokens.txt"),
+            num_threads=1,
+        )
+        log.info("moonshine_stt_ready")
+
+    def transcribe(self, audio_data: np.ndarray) -> str | None:
+        """Fallback for non-streaming usage: one offline decode."""
+        return self._decode(audio_data.astype(np.float32) / 32768.0)
+
+    def _decode(self, audio_float: np.ndarray) -> str | None:
+        stream = self._recognizer.create_stream()
+        stream.accept_waveform(self._RATE, audio_float)
+        self._recognizer.decode_stream(stream)
+        return (stream.result.text or "").strip() or None
+
+
+class NemotronStreamingSTT(BaseSTTProvider):
+    """True streaming STT: NVIDIA Nemotron Speech Streaming via sherpa-onnx.
+
+    A cache-aware transducer — every frame is processed ONCE (unlike the
+    rolling-window Whisper re-decode), so live partials arrive at the model's
+    native chunk cadence (~560ms) for ~15% of one core. Provisioned by
+    yumii.audio.nemotron_model (EN default; the 3.5 multilingual archive
+    uses the same runtime with auto language detection).
+    """
+
+    _RATE = 16000
+
+    def __init__(self, model_dir: str) -> None:
+        import sherpa_onnx
+
+        d = Path(model_dir)
+        self._recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
+            tokens=str(d / "tokens.txt"),
+            encoder=str(d / "encoder.int8.onnx"),
+            decoder=str(d / "decoder.int8.onnx"),
+            joiner=str(d / "joiner.int8.onnx"),
+            num_threads=1,
+            sample_rate=self._RATE,
+            feature_dim=80,
+            decoding_method="greedy_search",
+        )
+        self._stream = None
+        self._last_partial = ""
+        log.info("nemotron_stt_ready")
+
+    def process_chunk(self, pcm16_bytes: bytes) -> dict | None:
+        """Streaming interface: feed one frame; emit a partial whenever the
+        recognizer's text changes (its internal 560ms chunks set the cadence)."""
+        if self._stream is None:
+            self._stream = self._recognizer.create_stream()
+        samples = np.frombuffer(pcm16_bytes, dtype=np.int16).astype(np.float32) / 32768.0
+        self._stream.accept_waveform(self._RATE, samples)
+        while self._recognizer.is_ready(self._stream):
+            self._recognizer.decode_stream(self._stream)
+
+        text = self._recognizer.get_result(self._stream).strip()
+        if not text or text == self._last_partial:
+            return None
+        self._last_partial = text
+        return {"type": "partial_transcript", "text": text}
+
+    def transcribe(self, audio_data: np.ndarray) -> str | None:
+        """Fallback for non-streaming usage: one shot through a fresh stream."""
+        samples = audio_data.astype(np.float32) / 32768.0
+        stream = self._recognizer.create_stream()
+        stream.accept_waveform(self._RATE, samples)
+        stream.input_finished()
+        while self._recognizer.is_ready(stream):
+            self._recognizer.decode_stream(stream)
+        return self._recognizer.get_result(stream).strip() or None
+
+    def get_final(self) -> str | None:
+        """End of turn: flush the stream tail, return the final text, and
+        reset to a fresh stream for the next utterance."""
+        text = ""
+        if self._stream is not None:
+            self._stream.input_finished()
+            while self._recognizer.is_ready(self._stream):
+                self._recognizer.decode_stream(self._stream)
+            text = self._recognizer.get_result(self._stream).strip()
+            self._stream = None
+        self._last_partial = ""
+        return text or None
