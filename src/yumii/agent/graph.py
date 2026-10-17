@@ -117,10 +117,32 @@ def _window_history(history: list, window: int | None = None) -> list:
     """Recent history slice for the request; never starts on an orphaned ToolMessage, repairs dangling calls."""
     if window is None:
         _, window = _request_budgets()
+    if window <= 0:
+        return []
     windowed = history[-window:]
     while windowed and isinstance(windowed[0], ToolMessage):
         windowed = windowed[1:]
     return _repair_dangling_tool_calls(windowed)
+
+
+def _turn_request(history: list, new_human: HumanMessage) -> list:
+    """The messages for one agent pass: windowed past + this turn, in order.
+
+    First pass: the question goes last. Later passes (after tools ran): the
+    question is already in history, followed by this turn's tool calls and
+    results — it must stay there, not be re-appended after them (models
+    read a repeated question as a fresh request and call the tools again).
+    This turn is never windowed away; the window trims only what came before.
+    """
+    start = next(
+        (i for i in range(len(history) - 1, -1, -1) if getattr(history[i], "id", None) == new_human.id),
+        None,
+    )
+    if start is None:
+        return _window_history(history) + [new_human]
+    _, window = _request_budgets()
+    current = history[start:]
+    return _window_history(history[:start], window - len(current)) + _repair_dangling_tool_calls(current)
 
 
 def _build_state_class() -> type:
@@ -183,7 +205,7 @@ async def agent_node(state: dict[str, Any]) -> dict[str, Any]:
     turn_id: str = state.get("turn_id") or f"{session_id}_{hash(user_input)}"
     human_id = f"hum_{turn_id}"
     new_human = HumanMessage(content=user_input, id=human_id)
-    messages: list = _window_history(list(history)) + [new_human]
+    messages = _turn_request(list(history), new_human)
 
     # Groq/Llama sometimes 400 with tool_use_failed — retry once, then apologize instead of crashing.
     try:
