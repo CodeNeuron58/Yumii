@@ -221,23 +221,31 @@ async def test_clear_all_queues_leaves_a_capture_reset_sentinel():
 async def test_purge_session_checkpoints_removes_the_thread():
     """A 'hard-deleted' session must not survive forever in checkpoints.db —
     that's what the messages endpoint renders from."""
+    import aiosqlite
+    from langgraph.checkpoint.base import empty_checkpoint
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+    # A REAL saver: the old test faked the connection and enshrined table
+    # names that don't exist, so every message payload survived "delete".
+    conn = await aiosqlite.connect(":memory:")
+    saver = AsyncSqliteSaver(conn)
+    for thread in ("s-gone", "s-keep"):
+        cfg = {"configurable": {"thread_id": thread, "checkpoint_ns": ""}}
+        saved = await saver.aput(cfg, empty_checkpoint(), {}, {})
+        await saver.aput_writes(saved, [("messages", f"private words in {thread}")], "task-1")
+
     e = YumiiEngine()
+    e._conn, e._saver = conn, saver
+    try:
+        await e.purge_session_checkpoints("s-gone")
 
-    class _Conn:
-        def __init__(self):
-            self.deleted = []
+        async def rows(table: str, thread: str) -> int:
+            cur = await conn.execute(f"SELECT COUNT(*) FROM {table} WHERE thread_id = ?", (thread,))
+            return (await cur.fetchone())[0]
 
-        async def execute(self, sql, params=None):
-            self.deleted.append((sql.split()[2], params[0]))
-
-        async def commit(self):
-            pass
-
-    conn = _Conn()
-    e._conn = conn
-
-    await e.purge_session_checkpoints("s-gone")
-
-    tables = {t for t, _ in conn.deleted}
-    assert tables == {"checkpoints", "checkpoint_blobs", "checkpoint_writes"}
-    assert all(sid == "s-gone" for _, sid in conn.deleted)
+        assert await rows("checkpoints", "s-gone") == 0
+        assert await rows("writes", "s-gone") == 0  # the payloads go too
+        assert await rows("checkpoints", "s-keep") == 1
+        assert await rows("writes", "s-keep") == 1
+    finally:
+        await conn.close()

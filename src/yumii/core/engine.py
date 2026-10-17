@@ -336,16 +336,15 @@ class YumiiEngine:
         checkpoints.db — which is also what the messages endpoint renders
         from, so it would resurface in recall.
         """
-        if self._conn is None:
+        if self._saver is None:
             return
-        for table in ("checkpoints", "checkpoint_blobs", "checkpoint_writes"):
-            try:
-                await self._conn.execute(
-                    f"DELETE FROM {table} WHERE thread_id = ?", (session_id,)
-                )
-            except Exception:
-                log.warning("checkpoint_purge_table_failed", table=table, exc_info=True)
-        await self._conn.commit()
+        # The saver knows its own schema (checkpoints + writes) and takes its
+        # lock; hand-written DELETEs named tables that don't exist and left
+        # every message payload behind in `writes`.
+        try:
+            await self._saver.adelete_thread(session_id)
+        except Exception:
+            log.warning("checkpoint_purge_failed", session_id=session_id, exc_info=True)
         log.info("session_checkpoints_purged", session_id=session_id)
 
     async def _backfill_transcript_once(self) -> None:
