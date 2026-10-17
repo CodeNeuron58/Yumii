@@ -1024,7 +1024,11 @@
                 for (let p = PORT_BASE; p < PORT_BASE + PORT_TRIES; p++) {
                     try {
                         const r = await fetch(`http://127.0.0.1:${p}/health`, { cache: 'no-store' });
-                        if (r.ok) return true;
+                        if (r.ok) {
+                            HTTP_BASE = `http://127.0.0.1:${p}`;
+                            WS_URL = `ws://127.0.0.1:${p}/ws`;
+                            return true;
+                        }
                     } catch (e) { /* try the next port */ }
                 }
                 sweep++;
