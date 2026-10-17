@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "master", "feat/one-command-install" ]
+    branches: [ "master", "develop" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "develop" ]
 
 jobs:
   build:
@@ -30,7 +30,10 @@ jobs:
         version: "latest"
 
     - name: Install dependencies
-      run: uv sync --extra dev
+      # --locked: fail if uv.lock drifted from pyproject.toml instead of
+      # silently re-resolving (a lock missing sherpa-onnx-core shipped a
+      # Windows segfault).
+      run: uv sync --locked --extra dev
 
     - name: Lint with ruff
       run: uv run ruff check .
@@ -65,3 +68,8 @@ jobs:
 
     - name: Build the Tauri shell
       run: cargo build --manifest-path desktop/src-tauri/Cargo.toml
+
+    # The installed shell is a release build, and its backend spawn path is
+    # #[cfg(not(debug_assertions))] — a debug build never compiles it.
+    - name: Check release-only code paths
+      run: cargo check --release --manifest-path desktop/src-tauri/Cargo.toml
