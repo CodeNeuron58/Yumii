@@ -1,6 +1,7 @@
 """STT providers: local faster-whisper (CPU), cloud Groq Whisper, Moonshine v2, and true-streaming Nemotron."""
 
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -37,21 +38,76 @@ class _RollingWindowSTT(BaseSTTProvider):
     diff-suppressed partials), and decode the FULL utterance at end-of-turn
     so what reaches memory and the transcript has full context.
     Subclasses implement :meth:`_decode` (float32 audio in [-1, 1] → text).
+
+    Partials are strictly opportunistic. They decode on a background thread
+    (one at a time, skipped while busy) so capture never waits on them, and
+    they switch themselves off when the hardware can't afford them: Whisper
+    pads every decode to 30s, so on a laptop CPU a 4s partial costs ~2.2s
+    and a decode can't be cancelled — an in-flight partial delays the final
+    decode by whatever it has left. Live text is a nicety; a slow end of
+    turn is not.
     """
 
     _PARTIAL_WINDOW_SEC = 4.0
     _PARTIAL_INTERVAL_SEC = 2.0
     _RATE = 16000
     _MIN_UTTERANCE_SEC = 0.7
+    # A partial may cost at most this fraction of the interval; this many
+    # over-budget partials in a row switch partials off for the provider's
+    # lifetime (one slow decode during a CPU spike shouldn't).
+    _MAX_PARTIAL_COST = 0.5
+    _SLOW_PARTIALS_TO_DISABLE = 2
+    _clock = staticmethod(time.perf_counter)
 
     def __init__(self) -> None:
         self._utterance: list[np.ndarray] = []
         self._tail = np.empty(0, dtype=np.int16)
         self._frames_since_partial = 0
         self._last_partial = ""
+        self._executor: ThreadPoolExecutor | None = None
+        self._partial_future: Future | None = None
+        self._epoch = 0  # bumped per utterance; stale partials are dropped
+        self._partials_enabled = True
+        self._slow_partials = 0
 
     def _decode(self, audio_float: np.ndarray) -> str | None:
         raise NotImplementedError
+
+    def _partial_executor(self) -> ThreadPoolExecutor:
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt-partial")
+        return self._executor
+
+    def _timed_decode(self, audio_float: np.ndarray, epoch: int) -> tuple[str | None, float, int]:
+        start = self._clock()
+        text = self._decode(audio_float)
+        return text, self._clock() - start, epoch
+
+    def _harvest_partial(self) -> dict | None:
+        """Collect a finished background partial, if any (never waits)."""
+        future = self._partial_future
+        if future is None or not future.done():
+            return None
+        self._partial_future = None
+        try:
+            text, elapsed, epoch = future.result()
+        except Exception:
+            log.warning("stt_partial_decode_failed", exc_info=True)
+            return None
+
+        budget = self._MAX_PARTIAL_COST * self._PARTIAL_INTERVAL_SEC
+        self._slow_partials = self._slow_partials + 1 if elapsed > budget else 0
+        if self._slow_partials >= self._SLOW_PARTIALS_TO_DISABLE and self._partials_enabled:
+            self._partials_enabled = False
+            log.info(
+                "stt_partials_disabled_too_slow",
+                decode_sec=round(elapsed, 2), budget_sec=budget,
+            )
+
+        if epoch != self._epoch or not text or text == self._last_partial:
+            return None  # stale (previous utterance), empty, or unchanged
+        self._last_partial = text
+        return {"type": "partial_transcript", "text": text}
 
     def process_chunk(self, pcm16_bytes: bytes) -> dict | None:
         frame = np.frombuffer(pcm16_bytes, dtype=np.int16)
@@ -60,26 +116,42 @@ class _RollingWindowSTT(BaseSTTProvider):
             -int(self._PARTIAL_WINDOW_SEC * self._RATE):
         ]
         self._frames_since_partial += len(frame)
-        if self._frames_since_partial < int(self._PARTIAL_INTERVAL_SEC * self._RATE):
-            return None
-        self._frames_since_partial = 0
 
-        text = self._decode(self._tail.astype(np.float32) / 32768.0)
-        if not text or text == self._last_partial:
-            return None
-        self._last_partial = text
-        return {"type": "partial_transcript", "text": text}
+        event = self._harvest_partial()
+        due = self._frames_since_partial >= int(self._PARTIAL_INTERVAL_SEC * self._RATE)
+        if due and self._partials_enabled and self._partial_future is None:
+            self._frames_since_partial = 0
+            window = self._tail.astype(np.float32) / 32768.0
+            self._partial_future = self._partial_executor().submit(
+                self._timed_decode, window, self._epoch
+            )
+            event = self._harvest_partial() or event  # an inline executor finishes at once
+        return event
 
-    def get_final(self) -> str | None:
-        frames, self._utterance = self._utterance, []
+    def reset(self) -> None:
+        """Drop the current utterance without decoding it (mute, aborted capture)."""
+        self._utterance = []
         self._tail = np.empty(0, dtype=np.int16)
         self._frames_since_partial = 0
         self._last_partial = ""
+        self._epoch += 1
+        self._partial_future = None  # its result would be stale; let it finish unseen
+
+    def get_final(self) -> str | None:
+        """End of turn: decode the WHOLE utterance. Blocks — call it off the event loop."""
+        frames = self._utterance
+        self.reset()
 
         total = sum(len(f) for f in frames)
         if total < int(self._MIN_UTTERANCE_SEC * self._RATE):
             return None
-        return self._decode(np.concatenate(frames).astype(np.float32) / 32768.0)
+        audio = np.concatenate(frames).astype(np.float32) / 32768.0
+        # Peak-normalize like the batch path does (quiet mics shift
+        # Whisper's log-mel features and cost accuracy).
+        peak = float(np.max(np.abs(audio)))
+        if peak > 0:
+            audio = audio * (0.9 / peak)
+        return self._decode(audio)
 
 
 class LocalSTT(_RollingWindowSTT):
@@ -99,6 +171,23 @@ class LocalSTT(_RollingWindowSTT):
         log.info("whisper_loading", source=source)
         self._whisper = WhisperModel(source, device="cpu", compute_type="int8")
         log.info("whisper_ready", model_size=model_size)
+        self._calibrate_partials()
+
+    def _calibrate_partials(self) -> None:
+        """Decide up front whether live partials are affordable on this machine.
+
+        Whisper pads every decode to 30s, so one decode of a second of silence
+        costs what a live partial will (base on an i5-13500H: 2.07s vs 2.20s
+        for a real 4s window). Over budget → partials start switched off, so
+        no turn pays to find out. Also warms the model before the first turn.
+        """
+        start = self._clock()
+        self._decode(np.zeros(self._RATE, dtype=np.float32))
+        cost = self._clock() - start
+        budget = self._MAX_PARTIAL_COST * self._PARTIAL_INTERVAL_SEC
+        if cost > budget:
+            self._partials_enabled = False
+            log.info("stt_partials_off_too_slow", decode_sec=round(cost, 2), budget_sec=budget)
 
     def transcribe(self, audio_data: np.ndarray) -> str | None:
         """Transcribe an audio array using the local Whisper model."""
@@ -300,6 +389,11 @@ class NemotronStreamingSTT(BaseSTTProvider):
         while self._recognizer.is_ready(stream):
             self._recognizer.decode_stream(stream)
         return self._recognizer.get_result(stream).strip() or None
+
+    def reset(self) -> None:
+        """Drop the current utterance without flushing it (mute, aborted capture)."""
+        self._stream = None
+        self._last_partial = ""
 
     def get_final(self) -> str | None:
         """End of turn: flush the stream tail, return the final text, and

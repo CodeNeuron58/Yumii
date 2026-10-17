@@ -3,6 +3,7 @@
 
 import asyncio
 import collections
+import inspect
 from typing import Any, Callable
 
 import numpy as np
@@ -242,8 +243,7 @@ class AudioPipeline:
         self._reset_vad()
         # Discard residue from an aborted capture: without this, a dead
         # capture's half-utterance is prepended to the next transcript.
-        if hasattr(self.transcriber, "get_final"):
-            self.transcriber.get_final()
+        await self._discard_utterance()
         pre_buffer: collections.deque = collections.deque(maxlen=15)
         triggered = False
         rechecks = 0
@@ -265,8 +265,7 @@ class AudioPipeline:
                 utterance_frames = 0
                 consecutive_silence = 0
                 accumulation_buffer = np.array([], dtype=np.float32)
-                if hasattr(self.transcriber, "get_final"):
-                    self.transcriber.get_final()  # discard the half-utterance
+                await self._discard_utterance()
                 log.debug("capture_reset_by_mute")
                 continue
             if len(chunk_bytes) % 2 != 0:
@@ -295,17 +294,11 @@ class AudioPipeline:
                         log.debug("speech_started")
                         if on_speech_start:
                             on_speech_start()
-
-                        if hasattr(self.transcriber, "process_chunk"):
-                            for f, _ in pre_buffer:
-                                event = await asyncio.to_thread(self.transcriber.process_chunk, f.tobytes())
-                                if event and event.get("type") == "partial_transcript" and on_partial:
-                                    log.info("partial_transcript_generated", text=event["text"])
-                                    import inspect
-                                    if inspect.iscoroutinefunction(on_partial):
-                                        await on_partial(event["text"])
-                                    else:
-                                        on_partial(event["text"])
+                        # Smart Turn judges the whole utterance — keep the
+                        # onset, exactly like the batch path does.
+                        recording.extend(f for f, _ in pre_buffer)
+                        for f, _ in pre_buffer:
+                            await self._feed_transcriber(f, on_partial)
                         pre_buffer.clear()
                 else:
                     recording.append(pcm16)
@@ -315,15 +308,7 @@ class AudioPipeline:
                         rechecks = 0  # speech resets the climbing recheck stride
                     else:
                         consecutive_silence += 1
-                    if hasattr(self.transcriber, "process_chunk"):
-                        event = await asyncio.to_thread(self.transcriber.process_chunk, pcm16.tobytes())
-                        if event and event.get("type") == "partial_transcript" and on_partial:
-                            log.info("partial_transcript_generated", text=event["text"])
-                            import inspect
-                            if inspect.iscoroutinefunction(on_partial):
-                                await on_partial(event["text"])
-                            else:
-                                on_partial(event["text"])
+                    await self._feed_transcriber(pcm16, on_partial)
 
                     if utterance_frames >= _MAX_UTTERANCE_FRAMES:
                         log.info("utterance_force_capped", seconds=_MAX_UTTERANCE_SEC)
@@ -334,11 +319,28 @@ class AudioPipeline:
                         )
                     if should_end:
                         log.debug("speech_ended")
-                        if hasattr(self.transcriber, "get_final"):
-                            return self.transcriber.get_final()
-                        return None
+                        # The final decode takes seconds on CPU Whisper —
+                        # never on the event loop (it would freeze the WS,
+                        # TTS and /health for every turn).
+                        return await asyncio.to_thread(self.transcriber.get_final)
 
         return None
+
+    async def _discard_utterance(self) -> None:
+        """Throw away the transcriber's half-utterance without blocking the loop."""
+        if hasattr(self.transcriber, "reset"):
+            self.transcriber.reset()  # cheap: drops state, no decode
+        elif hasattr(self.transcriber, "get_final"):
+            await asyncio.to_thread(self.transcriber.get_final)
+
+    async def _feed_transcriber(self, pcm16: np.ndarray, on_partial: Callable[[str], Any] | None) -> None:
+        """Hand one frame to the streaming transcriber; forward any partial."""
+        event = await asyncio.to_thread(self.transcriber.process_chunk, pcm16.tobytes())
+        if event and event.get("type") == "partial_transcript" and on_partial:
+            log.info("partial_transcript_generated", text=event["text"])
+            result = on_partial(event["text"])
+            if inspect.isawaitable(result):
+                await result
 
     def process_audio(self, audio: np.ndarray) -> np.ndarray:
         """Apply post-capture processing (normalization) to the audio array."""

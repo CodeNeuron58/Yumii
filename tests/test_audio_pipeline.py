@@ -318,3 +318,83 @@ async def test_playback_end_sentinel_preserves_speech_onset():
             pass
 
     assert triggered  # onset preserved → the preserved frames counted toward the trigger
+
+
+# ── Streaming path: the event loop never waits on a decode ─────────────
+
+
+class _ResettableTranscriber(FakeStreamingTranscriber):
+    """A streaming transcriber with a cheap reset() and thread bookkeeping."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.resets = 0
+        self.final_threads: list[int] = []
+
+    def reset(self) -> None:
+        self.resets += 1
+
+    def get_final(self) -> str | None:
+        import threading
+
+        self.final_threads.append(threading.get_ident())
+        return super().get_final()
+
+
+@pytest.mark.asyncio
+async def test_streaming_final_decode_runs_off_the_event_loop() -> None:
+    """CPU Whisper's final decode takes seconds — on the loop it froze the
+    WS, TTS and /health every turn."""
+    import threading
+
+    transcriber = _ResettableTranscriber()
+    pipeline = _make_pipeline(transcriber)
+    queue: asyncio.Queue = asyncio.Queue()
+    for chunk in _utterance():
+        await queue.put(chunk)
+
+    text = await asyncio.wait_for(pipeline.stream_capture_and_transcribe(queue), timeout=5)
+
+    assert text == "post-mute words"
+    assert transcriber.final_threads
+    assert threading.get_ident() not in transcriber.final_threads
+
+
+@pytest.mark.asyncio
+async def test_streaming_discards_use_reset_not_a_decode() -> None:
+    """Throwing away a half-utterance (capture start, mute) must not pay for
+    a full decode just to drop the text."""
+    transcriber = _ResettableTranscriber()
+    pipeline = _make_pipeline(transcriber)
+    queue: asyncio.Queue = asyncio.Queue()
+    for _ in range(SPEECH_TRIGGER_FRAMES):
+        await queue.put(_SPEECH)
+    await queue.put(None)
+    for chunk in _utterance():
+        await queue.put(chunk)
+
+    await asyncio.wait_for(pipeline.stream_capture_and_transcribe(queue), timeout=5)
+
+    assert transcriber.resets == 2       # capture start + the mute sentinel
+    assert transcriber.final_calls == 1  # only the real end of turn decodes
+
+
+@pytest.mark.asyncio
+async def test_streaming_path_gives_smart_turn_the_speech_onset() -> None:
+    """Smart Turn judges the utterance from its first phoneme — the trigger
+    frames must be in the recording it sees (the batch path always did)."""
+    pipeline = _make_pipeline(FakeStreamingTranscriber())
+    seen: list[int] = []
+
+    async def fake_check(recording, consecutive_silence, rechecks):
+        seen.append(len(recording))
+        return True, 0
+
+    pipeline._check_turn_end = fake_check
+    queue: asyncio.Queue = asyncio.Queue()
+    for chunk in _utterance():
+        await queue.put(chunk)
+
+    await asyncio.wait_for(pipeline.stream_capture_and_transcribe(queue), timeout=5)
+
+    assert seen[0] == SPEECH_TRIGGER_FRAMES + 1  # onset + the first post-trigger frame

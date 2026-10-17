@@ -6,9 +6,11 @@ partials every ~2s of new audio (diff-suppressed), full-utterance decode at
 end-of-turn.
 """
 
+from concurrent.futures import Future
+
 import numpy as np
 
-from yumii.audio.stt_providers import MoonshineStreamingSTT
+from yumii.audio.stt_providers import MoonshineStreamingSTT, _RollingWindowSTT
 
 _FRAME_BYTES = (np.full(512, 1000, dtype=np.int16)).tobytes()  # 512 samples = 32ms
 
@@ -48,12 +50,17 @@ class _FakeOfflineRecognizer:
 def _moonshine(texts: list[str]) -> tuple[MoonshineStreamingSTT, _FakeOfflineRecognizer]:
     fake = _FakeOfflineRecognizer(texts)
     s = MoonshineStreamingSTT.__new__(MoonshineStreamingSTT)  # no sherpa import
+    _RollingWindowSTT.__init__(s)
+    s._executor = _InlineExecutor()  # partial decodes run at submit time
     s._recognizer = fake
-    s._utterance = []
-    s._tail = np.empty(0, dtype=np.int16)
-    s._frames_since_partial = 0
-    s._last_partial = ""
     return s, fake
+
+
+class _InlineExecutor:
+    def submit(self, fn, *args):
+        f: Future = Future()
+        f.set_result(fn(*args))
+        return f
 
 
 def _feed_frames(stt: MoonshineStreamingSTT, seconds: float) -> list[dict | None]:
