@@ -343,6 +343,15 @@ def _mask(value: str) -> str:
     return f"{value[:4]}···{value[-4:]}"
 
 
+def _engine_value(settings: Any, key: str, fallback: str) -> str:
+    """The live Settings value whose alias is ``key`` (what the engine runs)."""
+    for name, field in type(settings).model_fields.items():
+        if field.alias == key:
+            value = getattr(settings, name)
+            return str(value) if value is not None else fallback
+    return fallback
+
+
 @app.get("/api/settings")
 async def get_settings() -> dict[str, Any]:
     """Current preferences + masked credentials for the dashboard."""
@@ -350,14 +359,14 @@ async def get_settings() -> dict[str, Any]:
     from yumii.core.credential_store import CREDENTIAL_KEYS, get_credential
 
     config = load_global_config()
+    # An unset key shows what the engine actually runs (config.py), never
+    # choices[0]: the dashboard saves every preference it displays, so a
+    # wrong display silently becomes a real setting (it reported "Groq" on
+    # a fresh Ollama install, then "nemotron" when it led the STT list).
     preferences = {
-        key: config.get(key, choices[0])
+        key: config.get(key, _engine_value(settings, key, choices[0]))
         for key, choices in _SETTING_CHOICES.items()
     }
-    # The engine's actual default (config.py) — not the first choice in the
-    # list, which used to report "Groq" on a fresh Ollama install.
-    if "LLM_PROVIDER" not in config:
-        preferences["LLM_PROVIDER"] = settings.llm_provider
     text_settings = {
         key: config.get(key, default) for key, default in _TEXT_SETTINGS.items()
     }

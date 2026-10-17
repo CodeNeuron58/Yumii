@@ -137,6 +137,33 @@ def test_settings_reports_real_default_provider(client: TestClient) -> None:
     assert body["choices"]["LLM_PROVIDER"][0] != "Ollama"  # the default isn't a coincidence
 
 
+def test_settings_reports_real_defaults_for_every_unset_preference(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dashboard saves every preference it shows — showing choices[0]
+    ("nemotron", "tiny") for an unset key silently switched users to it."""
+    monkeypatch.setattr(settings, "stt_provider", "local")
+    monkeypatch.setattr(settings, "whisper_model_size", "base")
+    monkeypatch.setattr(settings, "hitl_mode", "external")
+
+    prefs = client.get("/api/settings").json()["preferences"]
+
+    assert prefs["STT_PROVIDER"] == "local"
+    assert prefs["WHISPER_MODEL_SIZE"] == "base"
+    assert prefs["HITL_MODE"] == "external"
+    for key, choices in server._SETTING_CHOICES.items():
+        assert prefs[key] == server._engine_value(settings, key, choices[0])
+
+
+def test_settings_prefers_the_saved_value_over_the_engine_default(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(settings, "stt_provider", "local")
+    gc.update_global_config("STT_PROVIDER", "groq")
+
+    assert client.get("/api/settings").json()["preferences"]["STT_PROVIDER"] == "groq"
+
+
 def test_put_settings_accepts_lowercase_catalog_provider(client: TestClient) -> None:
     """The picker writes 'google' — the old whitelist 400'd it, so any other
     settings save made through a stale UI silently flipped the provider."""
