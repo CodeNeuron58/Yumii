@@ -1,9 +1,8 @@
 """Download and resolve the Moonshine v2 model (sherpa-onnx offline decode).
 
-Moonshine v2 Small (123M params, MIT) beats Whisper large-v3 on WER and
-decodes far faster on CPU — the lightweight STT tier for weak hardware.
-sherpa-onnx ships it offline-only; live partials come from the shared
-rolling-window pattern.
+Moonshine v2 base, English, int8-quantized (MIT) — the lightweight STT
+tier for weak hardware. sherpa-onnx ships it offline-only; live partials
+come from the shared rolling-window pattern.
 """
 
 from __future__ import annotations
@@ -17,19 +16,17 @@ from yumii.core.logging import get_logger
 
 log = get_logger(__name__)
 
-# Moonshine v2 Small (English) — the 123M-param tier from the research.
 _ARCHIVE_NAME = "sherpa-onnx-moonshine-base-en-quantized-2026-02-27"
 _URL = f"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/{_ARCHIVE_NAME}.tar.bz2"
 
-# Moonshine's file layout differs from transducers: a preprocessor, one
-# encoder, and TWO decoders (cached for streaming-style reuse, uncached
-# otherwise) — all four are the completeness bar.
+# The v2 layout: one encoder + one merged decoder (.ort), loaded by
+# sherpa_onnx.OfflineRecognizer.from_moonshine_v2. These MUST match the
+# files MoonshineStreamingSTT opens — the old v1 names here made a good
+# download look "incomplete", so it was purged and re-fetched forever.
 _REQUIRED_FILES = (
     "tokens.txt",
-    "preprocess.onnx",
-    "encode.int8.onnx",
-    "cached_decode.int8.onnx",
-    "uncached_decode.int8.onnx",
+    "encoder_model.ort",
+    "decoder_model_merged.ort",
 )
 
 
@@ -73,7 +70,7 @@ def ensure(on_progress=None) -> str:
     download_file(_URL, archive_path, progress=on_progress)
     try:
         with tarfile.open(archive_path, "r:bz2") as tf:
-            tf.extractall(_models_root())
+            tf.extractall(_models_root(), filter="data")
     finally:
         archive_path.unlink(missing_ok=True)
 

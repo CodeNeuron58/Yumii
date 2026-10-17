@@ -71,7 +71,7 @@ def ensure(variant: str = "en", on_progress=None) -> str:
     download_file(url, archive_path, progress=on_progress)
     try:
         with tarfile.open(archive_path, "r:bz2") as tf:
-            tf.extractall(_models_root())
+            tf.extractall(_models_root(), filter="data")
     finally:
         archive_path.unlink(missing_ok=True)
 
