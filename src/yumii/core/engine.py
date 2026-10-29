@@ -204,7 +204,10 @@ class YumiiEngine:
         self.graph_app: Any | None = None
         self._conn: aiosqlite.Connection | None = None
         self._saver: AsyncSqliteSaver | None = None
-        self._llm_last_used = 0.0  # monotonic time of the last turn / warm-up
+        # Monotonic time of the last turn / warm-up; None = never. (Not 0.0: the
+        # monotonic clock counts from boot, so right after a reboot "0.0" looked
+        # like a recent use and the boot warm-up was skipped for 4 minutes.)
+        self._llm_last_used: float | None = None
         self._llm_warming = False
 
     async def _load_composio_background(self) -> None:
@@ -828,7 +831,11 @@ class YumiiEngine:
 
     def _maybe_warm_llm(self) -> None:
         """Warm the mind's endpoint if it may have gone cold (fire-and-forget)."""
-        if self._llm_warming or time.monotonic() - self._llm_last_used < _LLM_IDLE_REWARM_SEC:
+        recently_used = (
+            self._llm_last_used is not None
+            and time.monotonic() - self._llm_last_used < _LLM_IDLE_REWARM_SEC
+        )
+        if self._llm_warming or recently_used:
             return
         self._llm_warming = True
         self._spawn(self._warm_llm())

@@ -289,7 +289,7 @@ async def test_cold_mind_is_warmed_with_one_token(monkeypatch):
     await _drain(e)
 
     assert calls == [{"max_tokens": 1}]
-    assert e._llm_last_used > 0 and e._llm_warming is False
+    assert e._llm_last_used is not None and e._llm_warming is False
 
 
 @pytest.mark.asyncio
@@ -316,5 +316,23 @@ async def test_warmup_failure_is_harmless(monkeypatch):
     e._maybe_warm_llm()
     await _drain(e)
 
-    assert e._llm_last_used == 0.0      # not marked warm
+    assert e._llm_last_used is None     # not marked warm
     assert e._llm_warming is False      # free to retry on the next speech
+
+
+@pytest.mark.asyncio
+async def test_boot_warmup_runs_right_after_a_reboot(monkeypatch):
+    """The monotonic clock counts from boot: a fresh machine reads ~seconds.
+    "Never used" must still warm (CI runners exposed this — so would Yumii
+    starting at login)."""
+    from types import SimpleNamespace
+
+    calls: list = []
+    _patch_llm(monkeypatch, calls)
+    monkeypatch.setattr(engine_module, "time", SimpleNamespace(monotonic=lambda: 5.0))
+    e = YumiiEngine()
+
+    e._maybe_warm_llm()
+    await _drain(e)
+
+    assert calls == [{"max_tokens": 1}]
