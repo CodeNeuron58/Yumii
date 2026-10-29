@@ -187,19 +187,36 @@ def build_background_llm(temperature: float = 0.0) -> Any:
 # ----------------------------------------------------------------------
 
 
+# Re-stated AFTER the conversation history on every call. Long histories wear
+# instructions down (persona adherence measurably drops within ~8 turns, and
+# Nemotron 3 Super's thinking-off mode is weakest at multi-turn instruction
+# following), and a 9-scenario baseline showed exactly these rules slipping.
+# Sitting at the end, it never disturbs the cacheable prompt prefix.
+VOICE_ANCHOR = (
+    "Reminder from the system, not from them. It is {now}. First: if a tool is needed — a search, "
+    "remembering or forgetting something, their email — call it now, before you say anything. "
+    "Then speak out loud: usually one or two sentences, under twenty-five words, unless they "
+    "asked for more; words only, no emojis, symbols, lists or stage directions; most replies end "
+    "without a question, never two. Only say something was saved, sent or found if a tool did it "
+    "in this turn. Stay in character."
+)
+
+
 @dataclass(frozen=True)
 class BoundLLM:
-    """A tool-bound LLM plus the system prompt the agent prepends."""
+    """A tool-bound LLM plus the system prompt the agent prepends (and the voice anchor it appends)."""
 
     llm: Any  # BaseChatModel with tools bound
     system_prompt: str
     personality: str
+    voice_anchor: str | None = None
 
     async def ainvoke(self, messages: list) -> Any:
-        """Convenience wrapper that prepends the system prompt."""
+        """Prepend the system prompt; append the voice anchor after the history."""
         from langchain_core.messages import SystemMessage
 
-        return await self.llm.ainvoke([SystemMessage(content=self.system_prompt), *messages])
+        tail = [SystemMessage(content=self.voice_anchor)] if self.voice_anchor else []
+        return await self.llm.ainvoke([SystemMessage(content=self.system_prompt), *messages, *tail])
 
 
 # Tool-bound LLM built once (tool schemas are static); the system prompt is rebuilt per call.
@@ -211,6 +228,35 @@ def _get_bound_llm() -> Any:
     if _bound_llm is None:
         _bound_llm = bind_to_llm(_build_base_llm())
     return _bound_llm
+
+
+def _mind_line() -> str:
+    """Name the model she thinks with, so "does my conversation leave my computer?" gets a true answer."""
+    from yumii.core.model_catalog import get_model, get_wiring
+
+    wiring = get_wiring(settings.llm_provider)
+    if wiring is None:
+        return ""
+    try:
+        model = _resolve_model(wiring.id)
+    except ValueError:
+        return ""
+    name = (get_model(wiring.id, model) or {}).get("name") or model
+    if model.lower().startswith("nvidia/") and "nvidia" not in name.lower():
+        name = f"NVIDIA {name}"
+    if wiring.kind == "ollama":
+        base = (settings.ollama_base_url or "").lower()
+        if "localhost" in base or "127.0.0.1" in base:
+            return (
+                f"Your mind right now is {name}, running entirely on this computer: "
+                "your conversations and memories never need to leave it."
+            )
+    provider = wiring.name.split(" (")[0]
+    return (
+        f"Your mind right now is {name}, running in the cloud on {provider}: what the two of you "
+        "say is sent there so you can think and reply, while your memories of them stay on this computer. "
+        "You don't know what the provider keeps, so never promise anything about that."
+    )
 
 
 def _build_system_prompt(
@@ -231,6 +277,9 @@ def _build_system_prompt(
     core = personality_manager.load_core_prompt()
     persona = personality_manager.load_personality(personality_name)
     prompt = f"{core}\n\n{persona}"
+    mind = _mind_line()  # changes only when they switch models — still cache-friendly
+    if mind:
+        prompt += f"\n\n{mind}"
     prompt += f"\n\nToday is {datetime.datetime.now().strftime('%A, %B %d, %Y')}."
     if session_context:
         prompt += f"\n\n{session_context}"
@@ -251,12 +300,28 @@ def get_agent_llm(
     """
     from yumii.agent.personality_manager import personality_manager
 
+    from yumii.core.model_catalog import get_wiring
+
     personality = personality_manager.get_current_personality()
+    wiring = get_wiring(settings.llm_provider)
+    # Anthropic's API takes a system prompt only at the start — no trailing anchor there.
+    anchored = wiring is None or wiring.kind != "anthropic"
     return BoundLLM(
         llm=_get_bound_llm(),
         system_prompt=_build_system_prompt(personality, user_facts, session_context),
         personality=personality,
+        voice_anchor=voice_anchor() if anchored else None,
     )
+
+
+def voice_anchor() -> str:
+    """The per-turn anchor, carrying the clock time — after the history, so the cached
+    prefix never changes. A model asked "what time is it?" without one guessed wrong
+    (Nemotron missed the time tool on 1 in 4 tries and invented an hour)."""
+    import datetime
+
+    now = datetime.datetime.now().strftime("%I:%M %p on %A, %B %d").lstrip("0")
+    return VOICE_ANCHOR.format(now=now)
 
 
 def clear_llm_cache() -> None:
