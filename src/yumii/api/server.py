@@ -94,8 +94,10 @@ async def health() -> dict[str, str]:
 
 # Allowlisted sign-in pages the orb may open — never an arbitrary URL.
 _EXTERNAL_LINKS = {
+    "nebius": "https://tokenfactory.nebius.com/project/api-keys",
     "ollama": "https://ollama.com/settings/keys",
     "groq": "https://console.groq.com/keys",
+    "tavily": "https://app.tavily.com",
 }
 
 
@@ -137,9 +139,15 @@ async def status() -> dict[str, Any]:
         # Key name comes from the wiring (Google stores GEMINI_API_KEY, not
         # GOOGLE_API_KEY); other key-optional providers pass without one.
         configured = wiring.key_optional or bool(get_credential(wiring.env_key))
+    # What first-run onboarding should ask for: the provider's own key (and
+    # its sign-up page, when it is on the open-external allowlist).
+    wid = wiring.id if wiring else None
     return {
         "configured": configured,
         "provider": provider,
+        "provider_name": wiring.name if wiring else provider,
+        "key_env": wiring.env_key if wiring else None,
+        "key_link": wid if wid in _EXTERNAL_LINKS else None,
         "audio_ready": engine.audio_ready,
         "models": engine.model_status,
     }
@@ -520,6 +528,10 @@ async def llm_models(provider_id: str) -> dict[str, Any]:
             live = await model_catalog.google_live_models(key)
             if live:
                 return {"models": live, "source": "live"}
+    if wiring.id == "nebius" and (nkey := model_catalog.key_for("nebius")):
+        live = await model_catalog.nebius_live_models(nkey)
+        if live:
+            return {"models": live, "source": "live"}
     return {"models": model_catalog.models(wiring.id), "source": "catalog"}
 
 
@@ -578,6 +590,10 @@ async def llm_select(body: dict[str, Any]) -> dict[str, Any]:
         m["id"] == model for m in await model_catalog.google_live_models(gkey)
     ):
         pass  # live-listed by Google — newer than the bundled snapshot
+    elif wiring.id == "nebius" and (nkey := api_key or model_catalog.key_for(wiring.id)) and any(
+        m["id"] == model for m in await model_catalog.nebius_live_models(nkey)
+    ):
+        pass  # live-listed by Token Factory (tool-capable only)
     else:
         raise HTTPException(
             status_code=400, detail=f"'{model}' is not a known {wiring.name} model."

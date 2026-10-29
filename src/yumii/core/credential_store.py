@@ -40,6 +40,9 @@ CREDENTIAL_KEYS: frozenset[str] = frozenset(
         "TOGETHER_API_KEY",
         "MISTRAL_API_KEY",
         "OPENCODE_API_KEY",
+        "NEBIUS_API_KEY",
+        # Tool keys.
+        "TAVILY_API_KEY",
     }
 )
 

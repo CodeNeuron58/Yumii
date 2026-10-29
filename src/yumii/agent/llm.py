@@ -67,7 +67,10 @@ def _resolve_model(provider: str) -> str:
     """The model to speak with: catalog selection first, per-provider key, legacy default."""
     if settings.llm_model:
         return settings.llm_model
+    from yumii.core.model_catalog import NEBIUS_DEFAULT_MODEL
+
     per_provider = {
+        "nebius": NEBIUS_DEFAULT_MODEL,
         "openai": settings.openai_model or _DEFAULT_OPENAI_MODEL,
         "anthropic": settings.anthropic_model or _DEFAULT_ANTHROPIC_MODEL,
         "groq": settings.groq_model,
@@ -141,8 +144,8 @@ def _build_base_llm(temperature: float = 0.7, model: str | None = None) -> Any:
     if wiring.kind == "ollama":
         return build_ollama_llm(chosen, temperature=temperature)
 
-    # "openai" and every "openai-compatible" provider (Google, OpenRouter,
-    # DeepSeek, xAI, Together, Mistral) speak the OpenAI wire protocol.
+    # "openai" and every "openai-compatible" provider (Nebius, Google,
+    # OpenRouter, DeepSeek, xAI, Together, Mistral) speak the OpenAI wire protocol.
     api_key = _provider_api_key(wiring.id)
     if not api_key and not wiring.key_optional:
         raise ValueError(
@@ -150,11 +153,15 @@ def _build_base_llm(temperature: float = 0.7, model: str | None = None) -> Any:
         )
     from langchain_openai import ChatOpenAI
 
+    kwargs: dict[str, Any] = {}
+    if wiring.extra_body:
+        kwargs["extra_body"] = dict(wiring.extra_body)
     return ChatOpenAI(
         model=chosen,
         temperature=temperature,
         api_key=api_key or "unused",
         base_url=wiring.base_url,
+        **kwargs,
     )
 
 

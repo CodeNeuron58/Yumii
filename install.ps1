@@ -209,7 +209,8 @@ function Start-Onboarding {
 
     # -- Mind --------------------------------------------------------------
     $mindIdx = Show-Menu -Title "Her mind (the AI she thinks with)" -Options @(
-        "Groq (free tier -- recommended)"
+        "NVIDIA Nemotron on Nebius Token Factory (recommended)"
+        "Groq (free tier)"
         "Ollama Cloud"
         "Google Gemini"
         "OpenAI"
@@ -218,8 +219,8 @@ function Start-Onboarding {
         "Choose later in the app"
     ) -Hint "You can change this any time in the dashboard."
 
-    $mindIds    = @("groq", "ollama", "google", "openai", "anthropic", "openrouter", $null)
-    $mindKeys   = @("GROQ_API_KEY", "OLLAMA_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", $null)
+    $mindIds    = @("nebius", "groq", "ollama", "google", "openai", "anthropic", "openrouter", $null)
+    $mindKeys   = @("NEBIUS_API_KEY", "GROQ_API_KEY", "OLLAMA_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY", $null)
     $mind = $mindIds[$mindIdx]
     $mindKeyName = $mindKeys[$mindIdx]
 
@@ -227,9 +228,12 @@ function Start-Onboarding {
     $creds = @{}
     if ($mind) {
         $prefs["LLM_PROVIDER"] = $mind
+        if ($mind -eq "nebius") {
+            Write-Host "  Get a key at https://tokenfactory.nebius.com/project/api-keys" -ForegroundColor DarkGray
+        }
         $key = Read-Secret -Prompt "Paste your $mind API key"
         $creds[$mindKeyName] = $key
-        if ($mind -notin @("groq", "ollama")) {
+        if ($mind -notin @("nebius", "groq", "ollama")) {
             Write-Host "  (You'll pick the exact model in Yumii's dashboard on first launch.)" -ForegroundColor DarkGray
         }
     }

@@ -32,7 +32,8 @@ class Settings(BaseSettings):
     # fp32 default: int8 measured ~3.7x slower on x86 (slow quantized kernels).
     kokoro_voice: str = Field(default="af_heart", alias="KOKORO_VOICE")
     kokoro_model_size: str = Field(default="fp32", alias="KOKORO_MODEL_SIZE")
-    llm_provider: str = Field(default="Ollama", alias="LLM_PROVIDER")
+    # Fresh installs think with NVIDIA Nemotron on Nebius Token Factory.
+    llm_provider: str = Field(default="nebius", alias="LLM_PROVIDER")
     # Catalog-driven selection (Settings → Model picker) wins over per-provider keys.
     llm_model: str | None = Field(default=None, alias="LLM_MODEL")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")

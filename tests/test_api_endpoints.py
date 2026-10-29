@@ -164,6 +164,37 @@ def test_settings_prefers_the_saved_value_over_the_engine_default(
     assert client.get("/api/settings").json()["preferences"]["STT_PROVIDER"] == "groq"
 
 
+def test_status_tells_onboarding_which_key_to_ask_for(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fresh installs default to Nebius — onboarding must ask for THAT key."""
+    monkeypatch.setattr(settings, "llm_provider", "nebius")
+
+    body = client.get("/api/status").json()
+
+    assert body["configured"] is False
+    assert body["key_env"] == "NEBIUS_API_KEY"
+    assert body["key_link"] == "nebius"
+    assert body["provider_name"].startswith("Nebius Token Factory")
+
+    cs.save_credential("NEBIUS_API_KEY", "test-key")
+    assert client.get("/api/status").json()["configured"] is True
+
+
+def test_open_external_allows_the_nebius_key_page(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import webbrowser
+
+    opened: list[str] = []
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened.append(url))
+
+    r = client.post("/api/open-external", json={"target": "nebius"})
+
+    assert r.status_code == 200
+    assert opened == ["https://tokenfactory.nebius.com/project/api-keys"]
+
+
 def test_put_settings_accepts_lowercase_catalog_provider(client: TestClient) -> None:
     """The picker writes 'google' — the old whitelist 400'd it, so any other
     settings save made through a stale UI silently flipped the provider."""

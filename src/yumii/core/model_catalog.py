@@ -18,7 +18,7 @@ import logging
 import os
 import re
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -38,11 +38,23 @@ class ProviderWiring:
     env_key: str  # auth.json / env var name for the API key
     base_url: str | None = None  # openai-compatible endpoints
     key_optional: bool = False  # local Ollama needs no key
+    # Sent with every request (openai-compatible only), e.g. chat-template switches.
+    extra_body: dict | None = field(default=None, hash=False, compare=False)
 
 
 # Base URLs are Yumii's own constants — models.dev lists SDK packages, not
 # endpoints. These are the providers' documented OpenAI-compatible surfaces.
 PROVIDER_WIRING: dict[str, ProviderWiring] = {
+    # Fresh-install default: NVIDIA Nemotron on Nebius Token Factory. Thinking
+    # is switched off — on a voice path a reasoning pass costs seconds before
+    # the first word (measured: Nano 0.8s vs 8.4s, Lightning 0.9s vs 10.7s),
+    # and some Nemotron chat templates otherwise put the thinking in `content`,
+    # where it would be spoken aloud.
+    "nebius": ProviderWiring(
+        "nebius", "Nebius Token Factory (NVIDIA Nemotron)", "openai-compatible", "NEBIUS_API_KEY",
+        base_url="https://api.tokenfactory.nebius.com/v1",
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+    ),
     "anthropic": ProviderWiring("anthropic", "Anthropic", "anthropic", "ANTHROPIC_API_KEY"),
     "openai": ProviderWiring("openai", "OpenAI", "openai", "OPENAI_API_KEY"),
     "groq": ProviderWiring("groq", "Groq", "groq", "GROQ_API_KEY"),
@@ -66,7 +78,27 @@ PROVIDER_WIRING: dict[str, ProviderWiring] = {
 }
 
 # legacy aliases users may have typed in config.json
-_PROVIDER_ALIASES = {"together": "togetherai", "x.ai": "xai", "grok": "xai"}
+_PROVIDER_ALIASES = {"together": "togetherai", "x.ai": "xai", "grok": "xai",
+                     "tokenfactory": "nebius", "nemotron": "nebius"}
+
+# models.dev carries no Token Factory entry, so its Nemotron line-up lives
+# here — ids, context and per-1M-token prices as the live /v1/models listing
+# reported them (2026-10-29). With a key, the picker lists live models instead.
+NEBIUS_DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b"
+
+
+def _nebius_entry(mid: str, name: str, context: int, cost_in: float, cost_out: float) -> dict:
+    return {"id": mid, "name": name, "tool_call": True, "reasoning": True, "context": context,
+            "max_output": None, "cost_in": cost_in, "cost_out": cost_out}
+
+
+_NEBIUS_MODELS: list[dict] = [
+    _nebius_entry(NEBIUS_DEFAULT_MODEL, "Nemotron 3 Super 120B", 262144, 0.30, 0.90),
+    _nebius_entry("nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B", "Nemotron 3 Nano 30B", 262144, 0.06, 0.24),
+    _nebius_entry("nvidia/Nemotron-3_5-Lightning", "Nemotron 3.5 Lightning", 1048576, 0.06, 0.24),
+    _nebius_entry("nvidia/Nemotron-3.5-Super-VL", "Nemotron 3.5 Super VL", 1048576, 0.30, 0.90),
+    _nebius_entry("nvidia/Nemotron-3-Ultra-550b-a55b", "Nemotron 3 Ultra 550B", 1048576, 1.00, 3.00),
+]
 
 # Google serves many text-capable endpoints that are not chat "minds":
 # image generation, TTS, Live-API audio, transcription, computer use,
@@ -154,7 +186,10 @@ def providers() -> list[dict]:
                 "env_key": wiring.env_key,
                 "doc": snapshot.get(pid, {}).get("doc"),
                 "key_optional": wiring.key_optional,
-                "model_count": len(models) if pid != "ollama" else None,
+                "model_count": (
+                    None if pid == "ollama" else len(_NEBIUS_MODELS) if pid == "nebius" and not models
+                    else len(models)
+                ),
                 "connected": bool(os.environ.get(wiring.env_key)) or wiring.key_optional,
             }
         )
@@ -185,6 +220,8 @@ def models(provider: str) -> list[dict]:
     pid = canonical_provider(provider)
     if not pid:
         return []
+    if pid == "nebius" and not _get().get(pid, {}).get("models"):
+        return [dict(m) for m in _NEBIUS_MODELS]
     slimmed = [
         _slim(mid, m)
         for mid, m in (_get().get(pid, {}).get("models", {})).items()
@@ -206,6 +243,8 @@ def get_model(provider: str, model_id: str) -> dict | None:
         return None
     if pid == "google" and not _is_chat_mind(model_id):
         return None
+    if pid == "nebius" and not _get().get(pid, {}).get("models"):
+        return next((dict(m) for m in _NEBIUS_MODELS if m["id"] == model_id), None)
     m = _get().get(pid, {}).get("models", {}).get(model_id)
     slim = _slim(model_id, m) if m else None
     if slim is not None and not _pickable_chat_model(model_id, slim):
@@ -244,6 +283,60 @@ def cheap_model_for(provider: str) -> str | None:
         if matches:
             return min(matches, key=lambda m: m.get("cost_in") or 0)["id"]
     return None
+
+
+def _parse_nebius_models(data: dict) -> list[dict]:
+    """Token Factory's verbose /v1/models payload -> Yumii's slim shape.
+
+    Only chat models that take tools are pickable (Yumii's agent binds
+    tools); prices arrive per token and are stored per 1M like models.dev.
+    NVIDIA's Nemotron line is listed first.
+    """
+    out = []
+    for m in data.get("data", []):
+        mid = m.get("id") or ""
+        features = m.get("supported_features") or []
+        if not mid or "tools" not in features or _NON_CHAT_PATTERN.search(mid.lower()):
+            continue
+        pricing = m.get("pricing") or {}
+
+        def per_million(v: object) -> float | None:
+            try:
+                return round(float(v) * 1_000_000, 4)
+            except (TypeError, ValueError):
+                return None
+
+        out.append({
+            "id": mid,
+            "name": m.get("name") or mid,
+            "tool_call": True,
+            "reasoning": "reasoning" in features,
+            "context": m.get("context_length"),
+            "max_output": None,
+            "cost_in": per_million(pricing.get("prompt")),
+            "cost_out": per_million(pricing.get("completion")),
+        })
+    out.sort(key=lambda m: (not m["id"].lower().startswith("nvidia/"), m["id"].lower()))
+    return out
+
+
+async def nebius_live_models(api_key: str) -> list[dict]:
+    """Tool-capable models this Token Factory key can use; [] on any failure."""
+    import aiohttp
+
+    url = f"{PROVIDER_WIRING['nebius'].base_url}/models?verbose=true"
+    try:
+        async with aiohttp.ClientSession(
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as s:
+            async with s.get(url) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+    except Exception as e:
+        log.warning("nebius_models_unreachable", extra={"error": str(e)})
+        return []
+    return _parse_nebius_models(data)
 
 
 def _parse_ollama_tags(data: dict) -> list[dict]:

@@ -401,9 +401,9 @@
             <h3>Hi — I'm Yumii</h3>
             <p>My ears and voice are ready. I just need a mind to think with —
                one key and we're talking.</p>
-            <a class="getkey" id="onboard-getkey">Get a free Ollama key ↗</a>
+            <a class="getkey" id="onboard-getkey">Get your Nebius Token Factory key ↗</a>
             <input class="field" id="onboard-key" type="password"
-                   placeholder="paste your Ollama key" autocomplete="off" spellcheck="false" />
+                   placeholder="paste your key" autocomplete="off" spellcheck="false" />
             <p class="err" id="onboard-err"></p>
             <button id="onboard-save">Wake her up</button>
             <span class="more" id="onboard-more">more options →</span>
@@ -1103,7 +1103,22 @@
 
         // ── First-run onboarding (one key) ─────────────────────────────
         const onboardBox = document.getElementById('onboard');
-        function showOnboarding() {
+        // Which mind the backend is set up for (from /api/status) — the card
+        // asks for that provider's key, not a hard-coded one.
+        let onboardMind = { provider: 'nebius', name: 'Nebius Token Factory', keyEnv: 'NEBIUS_API_KEY', link: 'nebius' };
+        function showOnboarding(status) {
+            if (status && status.key_env) {
+                onboardMind = {
+                    provider: status.provider,
+                    name: (status.provider_name || status.provider).replace(/\s*\(.*\)$/, ''),
+                    keyEnv: status.key_env,
+                    link: status.key_link,
+                };
+            }
+            const getKey = document.getElementById('onboard-getkey');
+            getKey.textContent = `Get your ${onboardMind.name} key ↗`;
+            getKey.style.display = onboardMind.link ? '' : 'none';
+            document.getElementById('onboard-key').placeholder = `paste your ${onboardMind.name} key`;
             hideProgress();
             setOrbState('idle');
             setStatus('');
@@ -1115,9 +1130,10 @@
         document.getElementById('onboard-getkey').addEventListener('click', () => {
             // Open the sign-in page in the system browser (window.open is a
             // no-op inside the Tauri webview, so the backend opens it).
+            if (!onboardMind.link) return;
             fetch(HTTP_BASE + '/api/open-external', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target: 'ollama' }),
+                body: JSON.stringify({ target: onboardMind.link }),
             }).catch(() => {});
         });
         document.getElementById('onboard-more').addEventListener('click', () => {
@@ -1140,8 +1156,8 @@
                 const r = await fetch(HTTP_BASE + '/api/settings', {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        preferences: { LLM_PROVIDER: 'Ollama' },
-                        credentials: { OLLAMA_API_KEY: key },
+                        preferences: { LLM_PROVIDER: onboardMind.provider },
+                        credentials: { [onboardMind.keyEnv]: key },
                     }),
                 });
                 if (!r.ok) throw new Error(await r.text());
@@ -1210,7 +1226,7 @@
             }
             hideProgress();
             // Models ready — does she have a mind (an LLM key)?
-            if (status && !status.configured) { showOnboarding(); return; }
+            if (status && !status.configured) { showOnboarding(status); return; }
             becomeReady();
         }
 
