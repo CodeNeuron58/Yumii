@@ -23,22 +23,24 @@ Yumii is an open-source AI companion — a persistent presence on your screen th
 She is **caring** when you are tired. **Energetic** when you need a push. **Calm** when you need to think clearly. She is not one fixed thing — she is yours to shape.
 
 Today, she can:
-- Hold natural, voice-driven conversations powered by real-time LLMs
-- Speak with an expressive, lifelike voice (ElevenLabs / CAMB.ai)
+- Hold natural, real-time voice conversations — you can talk over her, and she knows a pause from a finished thought
+- Think with NVIDIA Nemotron on Nebius Token Factory, or any of a dozen other models — including fully local ones
+- Speak with a local, free voice (Kokoro) or a cloud one (ElevenLabs / CAMB.ai)
 - Listen locally via Whisper or at cloud speed via Groq
-- Remember you across restarts — preferences and details, stored locally
-- Live on your desktop as a small floating presence — an orb today, with an expressive Live2D avatar as the long-term dream
+- Remember you across restarts — facts about your life, every past conversation, and what was going on last time, stored on your machine
+- Do things for you — search the web, read your email, check your calendar — with your permission
+- Live on your desktop as a small bar at the top of your screen — with a desktop pet and an expressive Live2D avatar as the dreams ahead
 - Switch personality modes to match your mood or workflow
 
 ---
 
 ## The Roadmap
 
-### ✦ Persistent Memory
-True companionship is built on shared history. Yumii will remember you across restarts — your preferences, past conversations, and the small details that make you *you*. Not just a context window. A real memory.
+### ✦ Persistent Memory — here, and growing
+True companionship is built on shared history. Yumii already remembers you across restarts — your preferences, past conversations, and the small details that make you *you*. Next: memory that consolidates over time, like a friend's does.
 
 ### ✦ Proactive Reach-Outs
-Right now, Yumii waits for you to speak. The goal is to give her the ability to reach out to *you* — a gentle reminder that your meeting is in ten minutes, a spontaneous check-in after a long day. Moving from reactive to genuinely present.
+Right now, Yumii waits for you to speak. The goal is to give her the ability to reach out to *you* — a gentle reminder that your meeting is in ten minutes, a check-in after the exam you mentioned. Done carefully: reminders you asked for first, offers instead of guesses, silence by default, and never a guilt trip. Moving from reactive to genuinely present.
 
 ### ✦ Seamless Integrations
 Calendar. Email. Smart home. Music. The digital world you already live in — accessible through Yumii without developer jargon, OAuth nightmares, or complex setup. Connecting your digital life should feel like clicking "yes", not writing a script.

@@ -1,6 +1,6 @@
 ---
 title: "Speech-to-Text"
-description: "Her ears: local Whisper, Groq Whisper, or streaming Vosk — plus the always-local speech detector."
+description: "Her ears: local Whisper, Groq Whisper, streaming Vosk, or experimental NVIDIA Nemotron Speech and Moonshine — plus the always-local speech detector."
 sidebarTitle: "Hearing"
 ---
 
@@ -16,40 +16,48 @@ configurable:
 
 Pick the transcriber in **Dashboard → Settings → Ears (STT)**.
 
-## The three backends
+## The backends
 
 | Backend | Privacy | Speed | Accuracy | Needs |
 |---|---|---|---|---|
 | **Local Whisper** *(default)* | ✅ Fully local | ~1–2s per utterance | Good | Nothing — downloads on first launch, with a progress bar |
-| **Groq Whisper** | ☁️ Cloud | ~0.3s per utterance | Best (whisper-large-v3) | A Groq key (reuses your LLM key) |
+| **Groq Whisper** | ☁️ Cloud | ~0.3s per utterance | Best (whisper-large-v3) | A Groq key |
 | **Vosk** | ✅ Fully local | Instant, streams as you speak | Weakest — not recommended | Nothing — model downloads on first use |
+| **NVIDIA Nemotron Speech** *(experimental)* | ✅ Fully local | True streaming, live text as you speak | Strong (English; a multilingual variant exists) | A ~470&nbsp;MB model download |
+| **Moonshine** *(experimental)* | ✅ Fully local | Fast on weak hardware | Good (English) | A ~110&nbsp;MB model download |
+
+The two experimental ears run through sherpa-onnx on your CPU. They load and
+transcribe correctly, but haven't had the real-microphone testing the others
+have — pick them in the dashboard if you'd like to try.
 
 ### Local Whisper
 
 The private default: `faster-whisper` running on your CPU. Choose the model
 size in settings — `tiny` (fastest), `base` (the balanced default), or
 `small` (most accurate, slower). The 1–2 seconds it takes to transcribe is
-the biggest chunk of her response delay on this backend.
+the biggest chunk of her response delay on this backend. On a fast machine
+she also shows your words live while you speak; on a laptop CPU she
+measures the cost once at startup and skips the live text rather than
+slowing your turn down.
 
 ### Groq Whisper
 
-The same key that powers her thinking also buys dramatically better ears:
-whisper-large-v3-turbo in the cloud, roughly five to ten times faster than
-local and noticeably more accurate. It also filters non-speech well — humming
-and background noise get discarded instead of hallucinated into words. If
-you're already on Groq for the LLM and are comfortable with audio going to
-the same provider, this is the best experience.
+Dramatically better ears from one free key: whisper-large-v3-turbo in the
+cloud, roughly five to ten times faster than local and noticeably more
+accurate. It also filters non-speech well — humming and background noise get
+discarded instead of hallucinated into words. If you're comfortable with
+audio going to Groq, this is the best experience.
 
 ### Vosk
 
-Fully offline *and* streaming — your words appear on screen as you say them,
-which neither Whisper backend does. The trade-off is real: recognition
-quality is clearly below Whisper. It exists for the niche where offline +
-live partial text matters more than accuracy.
+Fully offline *and* streaming — your words appear on screen as you say them.
+The trade-off is real: recognition quality is clearly below Whisper. It
+exists for the niche where offline + live partial text matters more than
+accuracy.
 
 ## Tuning your environment
 
-* **Echo:** the orb applies echo cancellation, so speakers are fine — but
+* **Echo:** the app applies echo cancellation, so speakers are fine — but
   headphones make barge-in crisper since she never hears herself.
 * **Background noise:** an energy gate plus the VAD ignores fans and hums.
   Distinct voices (TV, roommates) can still trigger listening — that's

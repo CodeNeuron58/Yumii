@@ -7,21 +7,46 @@ binary you downloaded. The "What's not in v1" section of
 
 ---
 
-## The desktop pivot (0.4.0 — first cut shipped, ongoing)
+## ✅ Shipped — 0.15.0 (October 2026)
 
-Yumii is moving from a browser-served Live2D page to a **native desktop app**
-(Tauri) with a small floating **orb** UI you can talk to any time. The Python
-brain is unchanged — the desktop app wraps it and launches it for you.
+The Nemotron release (built during the Nebius x NVIDIA Global AI Hackathon).
+See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
 
-- ✅ Orb UI replaces the full-screen Live2D page; the companion/avatar mode is
-  parked behind a "Coming soon" toggle.
-- ✅ Tauri v2 shell: frameless, transparent, always-on-top window; system tray;
-  global hotkey; launches the backend as a managed subprocess. Runs from source
-  today (`cd desktop && cargo tauri dev`).
-- ✅ Packaged one-click Windows installer (PyInstaller sidecar + `cargo tauri
-  build` + GitHub Actions) — shipped in 0.10.0.
+- **NVIDIA Nemotron on Nebius Token Factory** is the default mind —
+  Nemotron 3 Super for conversation and tools, Nemotron 3 Nano for
+  background memory work; reasoning off for voice latency; cold-start warm-up
+- **Companion-grade prompts, measured** on a scripted conversation suite:
+  shorter spoken replies, fewer stacked questions, honest answers, healthy
+  goodbyes; emojis/markdown never spoken (cleaned in code)
+- **Tavily web search**; new experimental ears (NVIDIA Nemotron Speech,
+  Moonshine); installer onboarding wizard; notch-style top bar
+- **Provider registry** for speech and voice; a long list of fixes
+- **501 tests** total
 
----
+## ✅ Shipped — 0.14.0 (October 2026)
+
+The voice release: token-to-speech streaming (~4 s → ~1 s to first word),
+real barge-in, Smart Turn v3 end-of-turn detection, the 12-provider model
+picker, session continuity across restarts, typed input + voice commands,
+memory that works on every provider.
+
+## ✅ Shipped — 0.13.0 (July 2026)
+
+The polish release: native web search, a refined orb, an installer that
+works on locked-down Windows, a leaner codebase.
+
+## ✅ Shipped — 0.12.0 (July 2026)
+
+The first-run release — the experimental preview: first-launch onboarding
+with model download progress, actionable error cards instead of silent
+freezes, Whisper models mirrored on GitHub, a backend that survives a taken
+port, DNS-rebinding protection.
+
+## ✅ Shipped — 0.11.0 (July 2026)
+
+The one-command release: `iex (irm https://yumii.me/install.ps1)` (uv +
+PyPI + an 8 MB desktop shell), searchable memory (FTS5), agent-written
+memory, session summaries with a sense of time, mic mute, Ollama Cloud.
 
 ## ✅ Shipped — 0.10.0 (July 2026)
 
@@ -174,22 +199,25 @@ The first public release.
 
 ## Next up
 
-The two features being tackled next:
-
-- **Seeing your screen.** Experimental screen awareness — she can look
-  at what you're looking at and help with it, using a multimodal LLM.
-- **Proactiveness.** Yumii is currently 100% reactive. The goal is for
-  her to notice and speak first instead of only answering ("It's been a
-  long day — how are you holding up?"). This needs a scheduler and a
-  permission model.
+- **Proactiveness, done properly.** Yumii is still 100% reactive. The
+  research (mixed-initiative HCI, interruptibility studies, ProactiveBench,
+  and how ChatGPT Pulse, OpenClaw and companion apps fared) points to one
+  design: reminders and routines you ask for first; things she infers become
+  *offers* ("want me to check in after your exam?"); deterministic checks
+  before she ever speaks (fullscreen, presentation, focus mode, mute, quiet
+  hours, cooldowns); a cheap "should I speak?" pass whose default is
+  silence; gentle delivery; full user control; and no guilt-trip messages.
+- **Seeing your screen.** Experimental, opt-in per session — she can look
+  at what you're looking at and help with it, using a multimodal model
+  (Nemotron 3.5 Super VL is a candidate).
+- **The desktop pet.** A pixel-art companion skin that sits on the taskbar
+  and talks in a thought bubble, beside the top bar.
 
 ---
 
 ## Later
 
-- **Direct MCP and tool integrations**, beyond Composio. (A client-side
-  MCP loader exists; the server side — exposing Yumii's tools to
-  external MCP clients — is pending.)
+- **Direct MCP and tool integrations**, beyond Composio.
 - **macOS and Linux desktop shells.**
 - **More voices, personalities, and languages.**
 - **Deeper, honest emotional support** grounded in real psychology.

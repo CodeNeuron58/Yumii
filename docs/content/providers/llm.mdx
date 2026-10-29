@@ -1,65 +1,83 @@
 ---
 title: "Language Models"
-description: "Yumii's mind is pluggable: Ollama Cloud (default), Groq, OpenAI, Anthropic — or a fully local Ollama."
+description: "Yumii's mind is pluggable: NVIDIA Nemotron on Nebius Token Factory (default), eleven other providers — or a fully local Ollama."
 sidebarTitle: "Thinking"
 ---
 
 The LLM is the one part of Yumii that is (by default) a cloud call — her
-ears and voice run on your machine, but the thinking uses a provider you
-choose. Pick it in **Dashboard → Settings → Mind (LLM)**, paste the matching
-key, save, and restart.
+memories, ears and voice stay on your machine, but the thinking uses a
+provider you choose. Pick it in **Dashboard → Model picker**: choose a
+provider, paste its key, choose a model. It applies on her next reply — no
+restart.
 
-## The four providers
+## The default: NVIDIA Nemotron on Nebius Token Factory
 
-| Provider | Default model | Why pick it |
+| Role | Model | Why |
 |---|---|---|
-| **Ollama** *(default)* | `minimax-m3` | Free tier with a huge context window (1M) — tool schemas and long conversations fit without squeezing. Cloud with one key, or point it at a local Ollama |
-| **Groq** | `qwen/qwen3.6-27b` | Extremely fast inference (matters for voice), free tier, no card |
-| **OpenAI** | `gpt-4o` | Strongest general capability |
-| **Anthropic** | `claude-3-5-sonnet` | Most nuanced conversational quality |
+| **Her mind** — every reply and tool call | `nvidia/nemotron-3-super-120b-a12b` | Strong tool calling and personality, ~1 s to the first word |
+| **Background thinking** — what to remember, conversation summaries | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | About a fifth of Super's price, on the same key |
 
-For a voice companion, **latency is quality** — and so is context room.
-Ollama's default balances both; Groq is the speed play when your
-conversations are light on tools.
+Create a key at
+[tokenfactory.nebius.com](https://tokenfactory.nebius.com/project/api-keys)
+and paste it into the first-run card or the model picker. With a key, the
+picker lists every tool-capable model your account can use — including
+Nemotron 3.5 Lightning, Nemotron 3.5 Super VL and Nemotron 3 Ultra.
 
-## Choosing the exact model
+Two things Yumii does for you on Token Factory:
 
-Two providers take a free-text model name in the dashboard:
+* **Reasoning is switched off** for every request. On a voice path a
+  reasoning pass costs seconds before the first spoken word (measured: Nano
+  0.8 s vs 8.4 s), and some models' thinking would otherwise be read aloud.
+* **The endpoint is warmed** with a one-token request when she boots and
+  when you start talking after a quiet spell — a cold serverless endpoint
+  took ~12 s to answer, a warm one about 1 s.
 
-* **Ollama model** — any model on your Ollama account (`minimax-m3`,
-  `gpt-oss:120b`, …). Note: some models need a paid Ollama subscription and
-  will refuse on the free tier.
-* **Groq model** — any Groq-hosted model. Each model has its own free-tier
-  quota bucket, so switching models also switches quotas.
+## Every provider
+
+| Provider | Key | Notes |
+|---|---|---|
+| **Nebius Token Factory** *(default)* | `NEBIUS_API_KEY` | NVIDIA Nemotron; live model list |
+| **Groq** | `GROQ_API_KEY` | Extremely fast inference, free tier; small request caps |
+| **Google Gemini** | `GEMINI_API_KEY` | Live model list straight from Google |
+| **OpenRouter** | `OPENROUTER_API_KEY` | Hundreds of models behind one key |
+| **DeepSeek · xAI · Together · Mistral · OpenCode** | their own keys | OpenAI-compatible |
+| **Ollama** | `OLLAMA_API_KEY` *(cloud only)* | Ollama Cloud, or your own local Ollama |
+| **OpenAI · Anthropic** | their own keys | |
+
+The picker only offers models that can use tools — Yumii's agent needs
+them for search, memory and email.
 
 ## Ollama: cloud or fully local
 
-* **Ollama Cloud** (default): create a key at
-  [ollama.com](https://ollama.com), paste it, done.
-* **Local Ollama**: run Ollama on your own hardware, set `OLLAMA_BASE_URL`
+* **Ollama Cloud:** create a key at [ollama.com](https://ollama.com), paste
+  it, pick a model.
+* **Local Ollama:** run Ollama on your own hardware, set `OLLAMA_BASE_URL`
   in `~/.yumii/config.json` to your server (e.g. `http://127.0.0.1:11434`),
   leave the key empty. This is the path to a *fully* offline Yumii — voice,
-  ears, and mind all local — if your machine can carry a capable model.
+  ears, and mind all local — if your machine can carry a capable model. She
+  knows which mind she's running on, so "do my conversations leave my
+  computer?" always gets a true answer.
 
-## Free tiers: what to expect
+## Free tiers and credits
 
-* **Quotas.** Ollama's free tier is a weekly allowance; Groq's is daily. A
-  heavy day (or a testing spree) can exhaust them — she says so with a clear
-  error card, and you can switch providers in the dashboard or wait for the
-  reset.
+* **Nebius Token Factory** gives new accounts trial credit; billing setup
+  needs a card (a $0 verification). Promo codes are applied under
+  *Billing → Top up → With promo code*.
+* **Quotas elsewhere.** Ollama's free tier is a weekly allowance; Groq's is
+  daily. If she hits a limit she says so with a clear error card — switch
+  providers in the model picker or wait for the reset.
 * **Request-size caps (Groq).** Groq's free tier caps a single request at
   roughly 8–12k tokens. Yumii budgets for it — compact tool loading,
-  truncated tool results, a bounded history window — but connecting several
-  toolkits at once is what breaks the budget first (see
-  [Tools](/guide/tools)). Ollama's 1M context makes this a non-issue there.
+  truncated tool results, a bounded history window.
 
 ## Behind the scenes
 
 * **Prompt caching.** Context is ordered so the static parts form a stable
-  prefix providers can cache — faster first tokens, every turn.
+  prefix providers can cache; the per-turn reminder (and the clock time)
+  sit after the conversation, so they never break it.
 * **Tool-call resilience.** Schemas are sanitized at bind time and malformed
   calls retried once, so a model hiccup degrades to a spoken apology, not a
   crashed turn.
-* **A second, cheaper call.** Memory review runs in the background on a
-  small fast model from your same provider — part of the same quota, not a
-  separate account.
+* **A second, cheaper call.** Memory review runs in the background on your
+  provider's small fast model (Nemotron Nano on Nebius) — same key, same
+  account.
