@@ -1,8 +1,9 @@
 """Tests for the request-size guards and history hygiene.
 
 Groq's free tier rejects any single request over 8-12k tokens, so Groq
-gets tight budgets (curated Composio subsets, aggressive truncation, a
-short history window). Every other provider gets generous budgets. The
+gets tight budgets (aggressive truncation, a short history window); every
+other provider gets generous ones. Composio toolkits load curated subsets
+everywhere — tool schemas ride along on every request. The
 window also repairs dangling tool calls so one interrupted turn can't
 poison the session.
 """
@@ -41,46 +42,43 @@ def test_other_providers_get_generous_budgets(monkeypatch):
     assert _request_budgets() == (_MAX_TOOL_RESULT_CHARS, _HISTORY_WINDOW)
 
 
-# ── Curated tool selection (Groq only) ─────────────────────────────────
+# ── Curated tool selection (every provider) ────────────────────────────
 
 
-def test_gmail_uses_curated_subset_when_curating():
-    slugs, whole = _resolve_tool_selection(["GMAIL"], None, curate=True)
+def test_gmail_uses_curated_subset():
+    slugs, whole = _resolve_tool_selection(["GMAIL"], None)
     assert slugs == _CURATED_TOOLS["GMAIL"]
     assert whole == []
 
 
-def test_no_curation_loads_whole_toolkit():
-    slugs, whole = _resolve_tool_selection(["GMAIL"], None, curate=False)
-    assert slugs == []
-    assert whole == ["GMAIL"]
+def test_curation_does_not_depend_on_provider(monkeypatch):
+    """The whole Gmail toolkit was ~26k tokens on every Nebius request."""
+    from yumii.core import config
+
+    for provider in ("nebius", "groq", "anthropic"):
+        monkeypatch.setattr(config.settings, "llm_provider", provider)
+        slugs, whole = _resolve_tool_selection(["GMAIL"], None)
+        assert slugs == _CURATED_TOOLS["GMAIL"]
+        assert whole == []
 
 
 def test_user_override_beats_curation():
     slugs, whole = _resolve_tool_selection(
-        ["GMAIL"], {"GMAIL": ["gmail_fetch_emails"]}, curate=True
-    )
-    assert slugs == ["GMAIL_FETCH_EMAILS"]
-    assert whole == []
-
-
-def test_user_override_applies_even_without_curation():
-    slugs, whole = _resolve_tool_selection(
-        ["GMAIL"], {"GMAIL": ["gmail_fetch_emails"]}, curate=False
+        ["GMAIL"], {"GMAIL": ["gmail_fetch_emails"]}
     )
     assert slugs == ["GMAIL_FETCH_EMAILS"]
     assert whole == []
 
 
 def test_unknown_toolkit_goes_to_whole_bucket():
-    slugs, whole = _resolve_tool_selection(["GMAIL", "SPOTIFY"], None, curate=True)
+    slugs, whole = _resolve_tool_selection(["GMAIL", "SPOTIFY"], None)
     assert "SPOTIFY" in whole
     assert slugs == _CURATED_TOOLS["GMAIL"]
 
 
 def test_bad_override_shape_falls_back():
     slugs, whole = _resolve_tool_selection(
-        ["SPOTIFY"], {"SPOTIFY": "not-a-list"}, curate=True
+        ["SPOTIFY"], {"SPOTIFY": "not-a-list"}
     )
     assert slugs == []
     assert whole == ["SPOTIFY"]

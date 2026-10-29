@@ -60,10 +60,11 @@ The core is a deliberately small LangGraph state machine:
   caching hits on nearly every turn. The old layout put a per-minute
   timestamp before the history and got 0% cache hits; this is why the order
   looks pedantic.
-* **Request budgets are enforced in code.** Free LLM tiers cap request sizes,
-  so toolkits load curated tool subsets, tool results are truncated before
-  entering history, and the model sees a bounded history window (the full
-  history stays in checkpoints).
+* **Request budgets are enforced in code.** Tool schemas ride along on every
+  request, so toolkits load curated tool subsets on every provider; tool
+  results are truncated before entering history, and the model sees a
+  bounded history window (the full history stays in checkpoints) — tighter
+  still under free-tier request caps.
 * **Tool schemas are sanitized at bind time.** Different models make
   different tool-calling mistakes (explicit nulls, string booleans);
   a schema-widening pass plus one retry absorbs them instead of crashing

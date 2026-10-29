@@ -65,16 +65,28 @@ def _tool_pass(content, with_tool_calls: bool = True) -> dict:
     )
     return {
         "event": "on_chain_end",
-        "name": "ChatOpenAI",
+        "name": "agent",
         "metadata": {"langgraph_node": "agent"},
         "data": {"output": {"messages": [msg], "input": "hi"}},
+    }
+
+
+def _router_end(route: str = "tools") -> dict:
+    """The tools_condition router's end event: real LangGraph emits it inside
+    the agent node (same langgraph_node metadata), just BEFORE the node's own
+    on_chain_end."""
+    return {
+        "event": "on_chain_end",
+        "name": "tools_condition",
+        "metadata": {"langgraph_node": "agent"},
+        "data": {"output": route},
     }
 
 
 def _final_pass(response_text: str) -> dict:
     return {
         "event": "on_chain_end",
-        "name": "ChatOpenAI",
+        "name": "agent",
         "metadata": {"langgraph_node": "agent"},
         "data": {
             "output": {
@@ -243,6 +255,33 @@ async def test_streamed_tool_pass_is_not_narrated_twice(stubbed_singletons):
     # and no sentence was spoken twice
     responses = [p["response"] for p in tts if "response" in p]
     assert len(responses) == len(set(responses))
+
+
+@pytest.mark.asyncio
+async def test_router_end_event_does_not_trigger_double_speak(stubbed_singletons):
+    """Real LangGraph order: streamed tokens → router end → node end. The
+    router's end event must not count as the pass end — it used to wipe the
+    record of what was streamed, and the node's end then spoke the same
+    pre-tool line a second time (heard live on Nemotron)."""
+    e, tts, sent = _reasoning_engine(
+        [
+            _token("Sure thing, one moment while I grab the headlines. "),
+            _router_end("tools"),
+            _tool_pass("Sure thing, one moment while I grab the headlines."),
+            _token("Here is the news. "),
+            _router_end("__end__"),
+            _final_pass("Here is the news."),
+        ]
+    )
+    e._sent_broadcasts = sent
+    await _run_turn(e)
+
+    responses = [p["response"] for p in tts if "response" in p]
+    assert responses == [
+        "Sure thing, one moment while I grab the headlines.",
+        "Here is the news.",
+    ]
+    assert [p["kind"] for p in tts] == ["stream_start", "stream_text", "stream_end"]
 
 
 @pytest.mark.asyncio

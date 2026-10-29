@@ -70,7 +70,8 @@ free tier caps a single request at 8–12k tokens depending on the model), so
 Yumii deliberately keeps tool loads lean:
 
 * Gmail connects with a **curated set of tools** (fetch, send) rather than the
-  full 20+ toolkit, so conversation still fits the budget.
+  full 60-tool toolkit, on every provider — the whole toolkit would add
+  ~26k tokens to every reply, which costs both speed and money.
 * Long tool results (a big inbox fetch) are truncated before entering her
   context.
 * You can override which tools load per toolkit with the `COMPOSIO_TOOLS` key

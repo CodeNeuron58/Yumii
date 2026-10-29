@@ -50,6 +50,11 @@ Hackathon).
 - Nemotron no longer crashes the backend on Windows (a missing native
   runtime package), and Moonshine no longer re-downloads forever.
 - After a tool call the model no longer sees your question twice.
+- She no longer says her "let me check" line twice before a tool call
+  (LangGraph's router event was mistaken for the end of her turn).
+- Gmail loads its curated tools (fetch, send) on every provider, not
+  just Groq: the whole 63-tool toolkit added 26.6k tokens to every
+  request — slower replies and most of the bill.
 - Deleting a chat now deletes its messages.
 - The dashboard can't silently switch your speech-to-text by saving.
 - Boot: Python imports 18.6s → 13.4s, Composio loads in the

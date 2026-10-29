@@ -23,8 +23,10 @@ _COMPOSIO_POLICY = ToolPolicy(
     requires_confirmation=True,
 )
 
-# Curated subsets only on free-tier-capped providers (Groq): a full toolkit's schemas
-# (~10k tokens) blow the request cap. Override per toolkit via COMPOSIO_TOOLS in config.json.
+# Curated subsets on every provider: every schema rides along on every request,
+# and the whole Gmail toolkit (63 tools) measured 26.6k tokens — seconds of
+# latency per spoken reply and most of the bill. Override per toolkit via
+# COMPOSIO_TOOLS in config.json.
 _CURATED_TOOLS: dict[str, list[str]] = {
     "GMAIL": [
         "GMAIL_FETCH_EMAILS",
@@ -32,28 +34,22 @@ _CURATED_TOOLS: dict[str, list[str]] = {
     ],
 }
 
-# Bound even when fetching a toolkit whole: tight providers (Groq) vs everyone else.
+# A toolkit with no curated list (and no override) loads at most this many tools.
 _UNCURATED_LIMIT = 8
-_FULL_TOOLKIT_LIMIT = 100
 
 # Names we registered — lets a reload replace only the Composio tools.
 _registered_composio_tools: set[str] = set()
 
 
-def _should_curate() -> bool:
-    """Curated subsets only make sense under free-tier request caps."""
-    return settings.llm_provider.lower() == "groq"
-
-
 def _resolve_tool_selection(
-    toolkits: list[str], overrides: dict | None, curate: bool = True
+    toolkits: list[str], overrides: dict | None
 ) -> tuple[list[str], list[str]]:
     """Split enabled toolkits into (explicit tool slugs, whole toolkits) by override/curated default."""
     overrides = overrides if isinstance(overrides, dict) else {}
     slugs: list[str] = []
     whole: list[str] = []
     for tk in toolkits:
-        chosen = overrides.get(tk) or (_CURATED_TOOLS.get(tk) if curate else None)
+        chosen = overrides.get(tk) or _CURATED_TOOLS.get(tk)
         if isinstance(chosen, list) and chosen:
             slugs.extend(str(s).upper() for s in chosen)
         else:
@@ -100,9 +96,7 @@ async def load_and_register_composio_tools(
 
     factory = client_factory or get_composio_client
     overrides = load_global_config().get("COMPOSIO_TOOLS")
-    curate = _should_curate()
-    slugs, whole = _resolve_tool_selection(toolkits, overrides, curate=curate)
-    fetch_limit = _UNCURATED_LIMIT if curate else _FULL_TOOLKIT_LIMIT
+    slugs, whole = _resolve_tool_selection(toolkits, overrides)
 
     def _load() -> list[Any]:
         client = factory()
@@ -112,7 +106,7 @@ async def load_and_register_composio_tools(
         for tk in whole:
             loaded.extend(
                 client.tools.get(
-                    user_id=USER_ID, toolkits=[tk], limit=fetch_limit
+                    user_id=USER_ID, toolkits=[tk], limit=_UNCURATED_LIMIT
                 )
             )
         return loaded
@@ -160,6 +154,5 @@ async def load_and_register_composio_tools(
         "composio_tools_registered",
         toolkits=toolkits,
         count=len(registered),
-        curated=curate,
     )
     return registered

@@ -1062,8 +1062,17 @@ class YumiiEngine:
                                 {"type": "tool_status", "tool": name, "status": "done"}
                             )
 
-                        # Capture the agent node's final output for TTS.
-                        elif kind == "on_chain_end" and event.get("metadata", {}).get("langgraph_node") == "agent":
+                        # Capture the agent node's final output for TTS. Match the
+                        # node's OWN end event by name: the tools_condition router
+                        # also ends inside the agent node (same langgraph_node
+                        # metadata) just before it, and treating that as the pass
+                        # end wiped pass_streamed — the node's real end then
+                        # re-narrated the already-spoken line (double-speak).
+                        elif (
+                            kind == "on_chain_end"
+                            and name == "agent"
+                            and event.get("metadata", {}).get("langgraph_node") == "agent"
+                        ):
                             output = event.get("data", {}).get("output")
                             if isinstance(output, dict) and output.get("response"):
                                 reasoning_result = output
@@ -1173,6 +1182,9 @@ class YumiiEngine:
 
                 if reasoning_result.get("response"):
                     self._last_reply_text = reasoning_result["response"]
+                    # The whole reply, once per turn (the speaker only sees it a
+                    # sentence at a time).
+                    log.info("yumii_response", text=reasoning_result["response"])
 
                 log.debug(
                     "reasoning_done",
@@ -1277,7 +1289,7 @@ class YumiiEngine:
 
                 if kind in ("stream_start", "utterance"):
                     self._arm_speaking_gate()
-                    log.info("yumii_response", text=response_text)
+                    log.debug("speech_start", kind=kind, text=response_text[:80])
 
                 if not response_text or not response_text.strip():
                     if kind == "utterance":
