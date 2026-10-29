@@ -39,15 +39,7 @@ jobs:
       run: uv run ruff check .
 
     - name: Test with pytest
-      shell: bash
-      run: |
-        set -o pipefail
-        uv run pytest tests/ -q -rfE 2>&1 | tee pytest-out.txt || {
-          # Surface each failure as an annotation — readable on the checks
-          # page (and via the API) without opening the raw log.
-          grep -E '^(FAILED|ERROR) ' pytest-out.txt | head -25 | sed 's/^/::error::/'
-          exit 1
-        }
+      run: uv run pytest tests/
 
   versions:
     name: Version consistency
