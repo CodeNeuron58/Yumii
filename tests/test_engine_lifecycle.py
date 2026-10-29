@@ -249,3 +249,72 @@ async def test_purge_session_checkpoints_removes_the_thread():
         assert await rows("writes", "s-keep") == 1
     finally:
         await conn.close()
+
+
+# ── LLM warm-up: a cold serverless endpoint wakes before the first turn ──
+
+
+class _FakeLLM:
+    def __init__(self, calls: list, fail: bool = False):
+        self.calls, self.fail = calls, fail
+
+    def bind(self, **kwargs):
+        self.calls.append(kwargs)
+        return self
+
+    async def ainvoke(self, text):
+        if self.fail:
+            raise ValueError("needs an API key")
+        return "ok"
+
+
+def _patch_llm(monkeypatch, calls: list, fail: bool = False) -> None:
+    import yumii.agent.llm as llm_module
+
+    monkeypatch.setattr(llm_module, "_build_base_llm", lambda temperature=0.0: _FakeLLM(calls, fail))
+
+
+async def _drain(e: YumiiEngine) -> None:
+    await asyncio.gather(*list(e._background_tasks), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_cold_mind_is_warmed_with_one_token(monkeypatch):
+    calls: list = []
+    _patch_llm(monkeypatch, calls)
+    e = YumiiEngine()
+
+    e._maybe_warm_llm()
+    e._maybe_warm_llm()  # already warming — no second request
+    await _drain(e)
+
+    assert calls == [{"max_tokens": 1}]
+    assert e._llm_last_used > 0 and e._llm_warming is False
+
+
+@pytest.mark.asyncio
+async def test_recently_used_mind_is_not_rewarmed(monkeypatch):
+    import time
+
+    calls: list = []
+    _patch_llm(monkeypatch, calls)
+    e = YumiiEngine()
+    e._llm_last_used = time.monotonic()  # a turn just ran
+
+    e._maybe_warm_llm()
+    await _drain(e)
+
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_warmup_failure_is_harmless(monkeypatch):
+    calls: list = []
+    _patch_llm(monkeypatch, calls, fail=True)
+    e = YumiiEngine()
+
+    e._maybe_warm_llm()
+    await _drain(e)
+
+    assert e._llm_last_used == 0.0      # not marked warm
+    assert e._llm_warming is False      # free to retry on the next speech

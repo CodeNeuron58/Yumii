@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 import uuid
 from contextlib import aclosing
 from typing import Any, Dict, List
@@ -35,6 +36,13 @@ _MEMORY_REVIEW_INTERVAL = 5
 # If the webui hasn't confirmed playback finished this long after audio_end,
 # assume it never will (closed tab / protocol drift) and disarm the gate.
 _PLAYBACK_FINISHED_TIMEOUT_SEC = 30.0
+
+# Serverless model endpoints go cold when idle: measured on Token Factory, a
+# cold Nemotron's first token took 12.6s vs ~0.5-1.6s warm. A one-token
+# warm-up at boot (hidden behind audio prep) and when speech starts after
+# this long idle absorbs that while the user is still talking.
+_LLM_IDLE_REWARM_SEC = 240.0
+_LLM_WARMUP_TIMEOUT_SEC = 60.0
 
 # Spoken when the model calls a tool with no text of its own — never leave dead air.
 _TOOL_NARRATION_FILLERS = (
@@ -196,6 +204,8 @@ class YumiiEngine:
         self.graph_app: Any | None = None
         self._conn: aiosqlite.Connection | None = None
         self._saver: AsyncSqliteSaver | None = None
+        self._llm_last_used = 0.0  # monotonic time of the last turn / warm-up
+        self._llm_warming = False
 
     async def _load_composio_background(self) -> None:
         """Boot-time Composio load, off the critical path: fetch, register,
@@ -236,6 +246,7 @@ class YumiiEngine:
         self._saver = AsyncSqliteSaver(self._conn)
         self.graph_app = await build_graph(checkpointer=self._saver)
         set_confirmation_hook(self._confirmation_hook)
+        self._maybe_warm_llm()
 
         # One-time backfill: copy pre-transcript checkpoint history so recall covers it.
         try:
@@ -815,10 +826,34 @@ class YumiiEngine:
 
         return False
 
+    def _maybe_warm_llm(self) -> None:
+        """Warm the mind's endpoint if it may have gone cold (fire-and-forget)."""
+        if self._llm_warming or time.monotonic() - self._llm_last_used < _LLM_IDLE_REWARM_SEC:
+            return
+        self._llm_warming = True
+        self._spawn(self._warm_llm())
+
+    async def _warm_llm(self) -> None:
+        try:
+            from yumii.agent.llm import _build_base_llm
+
+            llm = _build_base_llm(temperature=0.0)
+            await asyncio.wait_for(
+                llm.bind(max_tokens=1).ainvoke("hi"), timeout=_LLM_WARMUP_TIMEOUT_SEC
+            )
+            self._llm_last_used = time.monotonic()
+            log.info("llm_warmed")
+        except Exception as e:
+            # No key yet, offline, quota — the real turn will surface it properly.
+            log.info("llm_warmup_skipped", error=type(e).__name__)
+        finally:
+            self._llm_warming = False
+
     async def audio_listener_task(self) -> None:
         """Consume audio, trigger interrupts on speech, push transcriptions to the reasoning queue."""
 
         def on_speech_start() -> None:
+            self._maybe_warm_llm()  # STT runs while a cold endpoint wakes
             # Barge-in works in both states now: while she speaks, the
             # pipeline's gate only triggers after sustained high-confidence
             # speech (echo through AEC shouldn't survive it). A trigger during
@@ -932,6 +967,7 @@ class YumiiEngine:
 
                 # turn_id scopes message IDs: stable within a turn (dedupe), unique across turns.
                 turn_id = uuid.uuid4().hex
+                self._llm_last_used = time.monotonic()
                 initial_state = {
                     "input": user_text,
                     "turn_id": turn_id,
