@@ -16,6 +16,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.websockets import WebSocketState
 
 from yumii.agent.synthesizer import content_to_text
+from yumii.core import providers
 from yumii.core.engine import YumiiEngine
 from yumii.core.global_config import load_global_config
 from yumii.core.logging import get_logger
@@ -323,8 +324,9 @@ def _llm_provider_choices() -> list[str]:
 # Whitelist of writable preference keys — anything else is rejected.
 _SETTING_CHOICES: dict[str, list[str]] = {
     "LLM_PROVIDER": _llm_provider_choices(),
-    "TTS_PROVIDER": ["Kokoro", "ElevenLabs", "CAMB.ai"],
-    "STT_PROVIDER": ["nemotron", "nemotron-multi", "moonshine", "local", "groq", "vosk"],
+    # Speech providers come from the registry — never a hand-kept list.
+    "TTS_PROVIDER": providers.ids("tts"),
+    "STT_PROVIDER": providers.ids("stt"),
     "PERSONALITY": ["caring", "tsundere", "genki", "kuudere", "yandere", "dandere"],
     "WHISPER_MODEL_SIZE": ["tiny", "base", "small"],
     "KOKORO_VOICE": [
@@ -385,6 +387,8 @@ async def get_settings() -> dict[str, Any]:
     return {
         "preferences": preferences,
         "choices": _SETTING_CHOICES,
+        # Human labels for registry-driven choices (raw ids stay the values).
+        "labels": {"STT_PROVIDER": providers.labels("stt"), "TTS_PROVIDER": providers.labels("tts")},
         "text_settings": text_settings,
         "credentials": credentials,
     }

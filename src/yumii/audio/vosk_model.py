@@ -26,6 +26,13 @@ VOSK_MODELS = {
 _REQUIRED_ENTRIES = ("conf", "am")
 
 
+def is_present(model_size: str = "small") -> bool:
+    """True only when a COMPLETE model is on disk (no download)."""
+    info = VOSK_MODELS.get(model_size) or VOSK_MODELS["small"]
+    target_dir = Path.home() / ".yumii" / "models" / "vosk" / info["dir_name"]
+    return all((target_dir / f).exists() for f in _REQUIRED_ENTRIES)
+
+
 def get_vosk_model_path(model_size: str = "small") -> str:
     """Return the absolute path to the Vosk model directory, downloading it if necessary."""
     if model_size not in VOSK_MODELS:

@@ -1,38 +1,10 @@
 """Factory module for instantiating the configured Speech-to-Text provider."""
 
-from yumii.audio.stt_providers import GroqSTT, LocalSTT
+from yumii.core import providers
 from yumii.core.config import settings
 from yumii.core.interfaces import BaseSTTProvider
 
 
 def get_stt_provider() -> BaseSTTProvider:
-    """Instantiate the correct STT provider based on configuration."""
-    provider = settings.stt_provider.lower()
-
-    if provider == "groq":
-        return GroqSTT(api_key=settings.groq_api_key)
-    elif provider in ("nemotron", "nemotron-multi"):
-        from yumii.audio.nemotron_model import get_nemotron_model_dir
-        from yumii.audio.stt_providers import NemotronStreamingSTT
-
-        # get_nemotron_model_dir() downloads if missing (self-healing, like
-        # the whisper path) — the first launch also prefetches via models.py.
-        variant = "multi" if provider == "nemotron-multi" else "en"
-        return NemotronStreamingSTT(model_dir=get_nemotron_model_dir(variant))
-    elif provider == "moonshine":
-        from yumii.audio.moonshine_model import get_moonshine_model_dir
-        from yumii.audio.stt_providers import MoonshineStreamingSTT
-
-        return MoonshineStreamingSTT(model_dir=get_moonshine_model_dir())
-    elif provider == "vosk":
-        from yumii.audio.vosk_provider import VoskSTT
-        from yumii.audio.vosk_model import get_vosk_model_path
-
-        model_path = get_vosk_model_path(settings.vosk_model_size)
-        return VoskSTT(model_path=model_path)
-
-    # Default: local Whisper from the GitHub-mirrored dir (resolve, or fallback-download).
-    from yumii.audio.whisper_model import get_whisper_model_dir
-
-    model_dir = get_whisper_model_dir(settings.whisper_model_size)
-    return LocalSTT(model_size=settings.whisper_model_size, model_dir=model_dir)
+    """Instantiate the configured STT provider (unknown values fall back to local Whisper)."""
+    return providers.resolve("stt", settings.stt_provider).build()

@@ -277,8 +277,9 @@
             const prefRows = prefRowsEl;
             prefRows.innerHTML = '';
             for (const [key, label] of Object.entries(PREF_LABELS)) {
+                const names = (data.labels || {})[key] || {};
                 const opts = (data.choices[key] || []).map(v =>
-                    `<option value="${esc(v)}" ${v === data.preferences[key] ? 'selected' : ''}>${esc(v)}</option>`).join('');
+                    `<option value="${esc(v)}" ${v === data.preferences[key] ? 'selected' : ''}>${esc(names[v] || v)}</option>`).join('');
                 prefRows.insertAdjacentHTML('beforeend',
                     `<div class="row"><label>${esc(label)}</label><select data-pref="${esc(key)}">${opts}</select></div>`);
             }

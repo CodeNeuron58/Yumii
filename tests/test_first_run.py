@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import pytest
 
+from yumii.audio.providers import whisper as whisper_provider
 from yumii.core import models
 from yumii.core.engine import _classify_turn_error
+from yumii.tts.providers import kokoro as kokoro_provider
 
 
 # ── needs_download ─────────────────────────────────────────────────────
@@ -20,7 +22,7 @@ def test_needs_download_when_kokoro_missing(monkeypatch):
 
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "groq")
-    monkeypatch.setattr(models, "_kokoro_present", lambda: False)
+    monkeypatch.setattr(kokoro_provider, "present", lambda spec:False)
     assert models.needs_download() is True
 
 
@@ -29,8 +31,8 @@ def test_needs_download_when_local_whisper_missing(monkeypatch):
 
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "local")
-    monkeypatch.setattr(models, "_kokoro_present", lambda: True)
-    monkeypatch.setattr(models, "_whisper_present", lambda: False)
+    monkeypatch.setattr(kokoro_provider, "present", lambda spec:True)
+    monkeypatch.setattr(whisper_provider, "present", lambda spec:False)
     assert models.needs_download() is True
 
 
@@ -39,8 +41,8 @@ def test_no_download_when_all_present(monkeypatch):
 
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "local")
-    monkeypatch.setattr(models, "_kokoro_present", lambda: True)
-    monkeypatch.setattr(models, "_whisper_present", lambda: True)
+    monkeypatch.setattr(kokoro_provider, "present", lambda spec:True)
+    monkeypatch.setattr(whisper_provider, "present", lambda spec:True)
     assert models.needs_download() is False
 
 
@@ -62,7 +64,7 @@ def test_ensure_downloads_kokoro_with_progress(monkeypatch):
 
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "groq")
-    monkeypatch.setattr(models, "_kokoro_present", lambda: False)
+    monkeypatch.setattr(kokoro_provider, "present", lambda spec:False)
 
     def fake_paths(size, on_progress=None):
         if on_progress:
@@ -86,8 +88,8 @@ def test_ensure_downloads_local_whisper(monkeypatch):
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "local")
     monkeypatch.setattr(config.settings, "whisper_model_size", "base")
-    monkeypatch.setattr(models, "_kokoro_present", lambda: True)  # skip TTS
-    monkeypatch.setattr(models, "_whisper_present", lambda: False)
+    monkeypatch.setattr(kokoro_provider, "present", lambda spec:True)  # skip TTS
+    monkeypatch.setattr(whisper_provider, "present", lambda spec:False)
 
     import yumii.audio.whisper_model as wm
 
@@ -131,8 +133,8 @@ def test_unusable_model_purges_and_raises(monkeypatch):
 
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "local")
-    monkeypatch.setattr(models, "_kokoro_present", lambda: True)
-    monkeypatch.setattr(models, "_whisper_present", lambda: False)
+    monkeypatch.setattr(kokoro_provider, "present", lambda spec:True)
+    monkeypatch.setattr(whisper_provider, "present", lambda spec:False)
     monkeypatch.setattr(wm, "get_whisper_model_dir", lambda size, on_progress=None: "/fake/dir")
 
     purges: list[str] = []
@@ -163,8 +165,8 @@ def test_ensure_is_noop_when_present(monkeypatch):
 
     monkeypatch.setattr(config.settings, "tts_provider", "Kokoro")
     monkeypatch.setattr(config.settings, "stt_provider", "local")
-    monkeypatch.setattr(models, "_kokoro_present", lambda: True)
-    monkeypatch.setattr(models, "_whisper_present", lambda: True)
+    monkeypatch.setattr(kokoro_provider, "present", lambda spec:True)
+    monkeypatch.setattr(whisper_provider, "present", lambda spec:True)
     monkeypatch.setattr(models, "_prefetch_smart_turn", lambda report: None)
 
     stages: list[str] = []
