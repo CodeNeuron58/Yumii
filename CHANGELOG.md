@@ -5,6 +5,57 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] — 2026-10-30
+
+The Nemotron release — her mind runs on NVIDIA Nemotron through Nebius
+Token Factory, she sounds like a companion instead of a chatbot, and
+her ears grew new options (built for the Nebius x NVIDIA Global AI
+Hackathon).
+
+### Added
+- **NVIDIA Nemotron on Nebius Token Factory — the new default mind.**
+  Nemotron 3 Super handles every conversation turn and tool call;
+  Nemotron 3 Nano runs the background memory work. Reasoning is switched
+  off on the voice path (measured: 8.4s → 0.8s to the first word on Nano,
+  and no "thinking process" spoken aloud), a one-token warm-up absorbs
+  serverless cold starts (12.6s → ~1s), and the picker lists the live
+  tool-capable models a key can use.
+- **Tavily web search.** With a Tavily key, web search uses Tavily's
+  search API and its short synthesized answer — the right shape for a
+  spoken reply — falling back to DuckDuckGo without one.
+- **Companion-grade prompts, measured.** A research-backed rewrite of
+  the core prompt and all six personalities, tuned against a scripted
+  conversation suite on Nemotron: replies a third shorter, stacked
+  questions 6/11 → 2/11, the memory tool actually used (it used to
+  claim "I'll remember that" without saving), an honest answer to
+  "does my conversation leave my computer?", healthy goodbyes, and
+  tighter safety rails on the yandere persona. A short voice reminder
+  is restated after the conversation history every turn and carries the
+  clock time, so she never guesses the hour.
+- **New ears:** NVIDIA Nemotron Speech Streaming and Moonshine v2 via
+  sherpa-onnx (experimental), plus live partial transcripts on the
+  local Whisper path when the hardware can afford them.
+- **Onboarding wizard** in the installer: pick her mind, ears and voice
+  before anything downloads.
+- **Notch-style top bar** replaces the orb.
+- **Provider registry.** Speech and voice providers register
+  themselves; adding one is a single module, and the dashboard shows
+  readable provider names.
+
+### Fixed
+- She never speaks emojis, markdown or *stage directions* — cleaned in
+  code on the one path every spoken reply shares.
+- The default Whisper path no longer freezes the app for ~2s per turn
+  (the final decode ran on the event loop).
+- Nemotron no longer crashes the backend on Windows (a missing native
+  runtime package), and Moonshine no longer re-downloads forever.
+- After a tool call the model no longer sees your question twice.
+- Deleting a chat now deletes its messages.
+- The dashboard can't silently switch your speech-to-text by saving.
+- Boot: Python imports 18.6s → 13.4s, Composio loads in the
+  background, and the bar finds the backend on any port.
+- THIRD_PARTY_LICENSES covers every model Yumii downloads.
+
 ## [0.14.0] — 2026-10-03
 
 The voice release — she speaks while she thinks, you talk over her,
