@@ -1,5 +1,8 @@
-"""web_search — DuckDuckGo via the ddgs package (free, keyless), EXTERNAL policy.
+"""web_search — Tavily when TAVILY_API_KEY is set, else DuckDuckGo (ddgs); EXTERNAL policy.
 
+Tavily is built for agents: clean extracted content plus a short
+synthesized answer, which suits a reply that is spoken aloud. Without a
+key — or if Tavily fails — the free, keyless ddgs path answers instead.
 Modeled on Hermes Agent's ddgs provider: the blocking search runs in a
 disposable worker thread under a hard wall-clock timeout, failures come
 back as plain text the model can voice, and results are normalized.
@@ -8,6 +11,9 @@ back as plain text the model can voice, and results are normalized.
 from __future__ import annotations
 
 import concurrent.futures as _cf
+import json
+import os
+import urllib.request
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
@@ -23,6 +29,8 @@ log = get_logger(__name__)
 _SEARCH_TIMEOUT_SEC = 20
 _MAX_RESULTS = 5
 _SNIPPET_CHARS = 300
+_TAVILY_URL = "https://api.tavily.com/search"
+_TAVILY_TIMEOUT_SEC = 15
 
 
 class WebSearchInput(BaseModel):
@@ -57,13 +65,40 @@ def _run_search(query: str, limit: int) -> list[dict]:
     return hits
 
 
-def _format_results(query: str, hits: list[dict]) -> str:
-    if not hits:
+def _run_tavily(query: str, limit: int, api_key: str) -> tuple[str | None, list[dict]]:
+    """Blocking Tavily search → (short answer, normalized hits). Runs in a worker thread."""
+    payload = json.dumps(
+        {"query": query, "max_results": limit, "search_depth": "basic", "include_answer": True}
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        _TAVILY_URL,
+        data=payload,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=_TAVILY_TIMEOUT_SEC) as resp:
+        data = json.load(resp)
+    hits = [
+        {
+            "title": str(h.get("title", "")).strip(),
+            "url": str(h.get("url", "")).strip(),
+            "snippet": str(h.get("content", "")).strip(),
+        }
+        for h in (data.get("results") or [])[:limit]
+    ]
+    answer = str(data.get("answer") or "").strip() or None
+    return answer, hits
+
+
+def _format_results(query: str, hits: list[dict], answer: str | None = None) -> str:
+    if not hits and not answer:
         return (
             f"No results found for '{query}'. It may have been phrased "
             "unusually — try different words."
         )
-    lines = [f"Top web results for '{query}':"]
+    lines = []
+    if answer:
+        lines.append(f"Quick answer: {answer}")
+    lines.append(f"Top web results for '{query}':")
     for i, h in enumerate(hits, 1):
         lines.append(f"{i}. {h['title']}\n   {h['snippet'][:_SNIPPET_CHARS]}\n   ({h['url']})")
     return "\n".join(lines)
@@ -81,6 +116,21 @@ def web_search(query: str) -> str:
     query = (query or "").strip()
     if not query:
         return "Empty search query — say what to look for."
+
+    tavily_key = (os.environ.get("TAVILY_API_KEY") or "").strip()
+    if tavily_key:
+        pool = _cf.ThreadPoolExecutor(max_workers=1)
+        try:
+            answer, hits = pool.submit(_run_tavily, query, _MAX_RESULTS, tavily_key).result(
+                timeout=_TAVILY_TIMEOUT_SEC + 2
+            )
+            log.info("web_search_done", engine="tavily", query=query[:80], results=len(hits))
+            return _format_results(query, hits, answer)
+        except Exception as exc:
+            # Never the key, never raw internals — fall back to the free engine.
+            log.warning("tavily_search_failed_falling_back", query=query[:80], error=type(exc).__name__)
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     # Fresh single-worker pool per call: a timed-out ddgs call can't be
     # cancelled, and a shared pool would queue every later search behind it.
@@ -107,7 +157,7 @@ def web_search(query: str) -> str:
         # Abandon a hung worker instead of joining it; it shares no state.
         pool.shutdown(wait=False, cancel_futures=True)
 
-    log.info("web_search_done", query=query[:80], results=len(hits))
+    log.info("web_search_done", engine="ddgs", query=query[:80], results=len(hits))
     return _format_results(query, hits)
 
 
