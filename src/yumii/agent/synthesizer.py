@@ -250,6 +250,42 @@ _THINK_BLOCK = re.compile(
     r"<think(?:ing)?>.*?</think(?:ing)?>\s*", re.DOTALL | re.IGNORECASE
 )
 
+# Everything she says is synthesized to speech, and models ignore "no emojis /
+# no markdown" often enough (Nemotron 3 Super did on a 9-scenario baseline)
+# that the voice path cleans it in code instead of trusting the prompt.
+_EMOJI = re.compile(
+    "[\U0001F000-\U0001FAFF☀-➿⬀-⯿⌀-⏿"
+    "︎️‍⃣‼⁉™ℹ〰〽]"
+)
+_BOLD = re.compile(r"(\*\*|__)(.+?)\1", re.DOTALL)
+# *stage direction* standing alone (start/after a sentence, before end/punctuation)…
+_STAGE_DIRECTION = re.compile(r"(^|(?<=[.!?\n])\s*)\*[^*\n]{1,60}\*(?=\s*(?:$|[.!?\n]|\s+[A-Z]))")
+# …vs *emphasis* inside a sentence, which keeps its word.
+_EMPHASIS = re.compile(r"\*([^*\n]{1,60})\*")
+_LINK = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+_LINE_MARKER = re.compile(r"^\s*(?:#{1,6}\s+|[-*•]\s+|\d+[.)]\s+)")
+
+
+def clean_for_speech(text: str) -> str:
+    """Make model text speakable: no emojis, markdown, asterisk actions or list layout."""
+    text = _EMOJI.sub("", text or "")
+    text = _LINK.sub(r"\1", text)
+    text = _BOLD.sub(r"\2", text)
+    text = _STAGE_DIRECTION.sub(r"\1", text)
+    text = _EMPHASIS.sub(r"\1", text)
+    text = text.replace("`", "")
+    # A list / headings / line-broken reply becomes separate spoken sentences.
+    sentences = []
+    for line in text.splitlines():
+        line = _LINE_MARKER.sub("", line).strip()
+        if not line:
+            continue
+        if line[-1] not in ".!?,;:…—-":
+            line += "."
+        sentences.append(line)
+    spoken = re.sub(r"\s{2,}", " ", " ".join(sentences))
+    return re.sub(r"\s+([.!?,;:])", r"\1", spoken).strip()  # "you !" after an emoji went
+
 
 def synthesize(agent_text: str, personality: str | None = None) -> YumiiResponse:
     """Convert agent text into a YumiiResponse (deterministic; empty text → safe default).
@@ -265,6 +301,8 @@ def synthesize(agent_text: str, personality: str | None = None) -> YumiiResponse
             expression="normal",
             motion="idle",
         )
+    # Tone is read from the raw text (punctuation, words); what is SPOKEN
+    # is the cleaned text — empty if the model sent only an emoji.
     expression = _expression_for(text)
     if personality:
         for label, pattern in _PERSONA_EXPRESSION_OVERRIDES.get(
@@ -274,7 +312,7 @@ def synthesize(agent_text: str, personality: str | None = None) -> YumiiResponse
                 expression = label
                 break
     return YumiiResponse(
-        response_text=text,
+        response_text=clean_for_speech(text),
         expression=expression,
         motion=_motion_for(text),
     )
@@ -286,6 +324,7 @@ __all__ = [
     "MotionLabel",
     "VALID_EXPRESSIONS",
     "VALID_MOTIONS",
+    "clean_for_speech",
     "content_to_text",
     "synthesize",
     "_expression_for",
