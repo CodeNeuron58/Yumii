@@ -5,6 +5,16 @@ All notable changes to Yumii will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.15.1] — 2026-10-30
+
+### Fixed
+- **She no longer pretends she checked.** The prompt scripted a "give me
+  a sec, checking" line for slow tools, and Nemotron 3 Super often said it
+  and then invented the result instead of calling the tool — made-up news,
+  weather or inbox contents, and no approval card. The tool call now comes
+  first: measured on Nemotron, web-search requests called the tool 12/12
+  (was 6/9) and "remember this" requests saved the fact 7/8 (was 5/8).
+
 ## [0.15.0] — 2026-10-30
 
 The Nemotron release — her mind runs on NVIDIA Nemotron through Nebius

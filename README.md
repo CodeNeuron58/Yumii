@@ -11,7 +11,7 @@ and remembers your life together. her memory lives on your machine;
 her mind is **NVIDIA Nemotron on Nebius Token Factory** — or a local
 model, if you'd rather nothing leave it at all.
 
-[![Version](https://img.shields.io/badge/version-0.15.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.15.1-orange.svg)](CHANGELOG.md)
 [![CI](https://github.com/CodeNeuron58/Yumii/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/CodeNeuron58/Yumii/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![Mind: NVIDIA Nemotron](https://img.shields.io/badge/mind-NVIDIA%20Nemotron-76B900.svg)](#built-with-nvidia-nemotron-on-nebius-token-factory)

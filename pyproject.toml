@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yumii"
-version = "0.15.0"
+version = "0.15.1"
 description = "Yumii — a private, voice-first AI companion for your desktop. Talks in real time, does things, remembers you — her memory stays on your machine."
 readme = "README.md"
 license = { file = "LICENSE" }
