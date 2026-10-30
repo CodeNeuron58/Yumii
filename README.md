@@ -18,7 +18,9 @@ model, if you'd rather nothing leave it at all.
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/CodeNeuron58/Yumii?style=social)](https://github.com/CodeNeuron58/Yumii)
 
-<video src="https://github.com/user-attachments/assets/f7a2a3c7-651d-4b08-ab42-e7e7adb0f48e" width="100%" controls></video>
+<a href="https://youtu.be/JdwEOSf0rU0"><img src="https://img.youtube.com/vi/JdwEOSf0rU0/maxresdefault.jpg" alt="Watch the 90-second demo: Yumii on NVIDIA Nemotron + Nebius Token Factory" width="100%"></a>
+
+**[▶ Watch the 90-second demo](https://youtu.be/JdwEOSf0rU0)**
 
 **Experimental preview.** Windows-first; expect rough edges.
 
