@@ -29,7 +29,7 @@ Today, she can:
 - Listen locally via Whisper or at cloud speed via Groq
 - Remember you across restarts — facts about your life, every past conversation, and what was going on last time, stored on your machine
 - Do things for you — search the web, read your email, check your calendar — with your permission
-- Live on your desktop as a small bar at the top of your screen — with a desktop pet and an expressive Live2D avatar as the dreams ahead
+- Live on your desktop as a small island at the top of your screen — with a desktop pet and an expressive Live2D avatar as the dreams ahead
 - Switch personality modes to match your mood or workflow
 
 ---

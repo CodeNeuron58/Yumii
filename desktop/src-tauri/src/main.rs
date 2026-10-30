@@ -174,10 +174,10 @@ fn open_dashboard(app: tauri::AppHandle) {
     show_dashboard(&app);
 }
 
-/// Restart the Python backend. The orb calls this after first-run
+/// Restart the Python backend. The island calls this after first-run
 /// onboarding saves the API key: the backend reads credentials once at
 /// import, so a fresh key only takes effect on a restart. Kill the old
-/// child, spawn a new one, swap it into managed state. The orb then
+/// child, spawn a new one, swap it into managed state. The island then
 /// polls /health until it's back and re-checks /api/status.
 #[tauri::command]
 fn restart_backend(app: tauri::AppHandle) {

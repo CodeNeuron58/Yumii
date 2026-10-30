@@ -95,7 +95,7 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# Allowlisted sign-in pages the orb may open — never an arbitrary URL.
+# Allowlisted sign-in pages the island may open — never an arbitrary URL.
 _EXTERNAL_LINKS = {
     "nebius": "https://tokenfactory.nebius.com/project/api-keys",
     "ollama": "https://ollama.com/settings/keys",
@@ -121,7 +121,7 @@ async def open_external(body: dict[str, Any]) -> dict[str, Any]:
 
 @app.get("/api/status")
 async def status() -> dict[str, Any]:
-    """First-run status for the orb: LLM key configured + local model state."""
+    """First-run status for the island: LLM key configured + local model state."""
     from yumii.core.config import settings
     from yumii.core.credential_store import get_credential
     from yumii.core.model_catalog import get_wiring
@@ -337,7 +337,7 @@ _SETTING_CHOICES: dict[str, list[str]] = {
         "bf_emma", "am_michael", "bm_george",
     ],
     "HITL_MODE": ["external", "always", "never"],
-    # Island behaviour — read by the bar, applied live.
+    # Island behaviour — read by the island, applied live.
     "UI_HIDE_AFTER": ["2", "4", "6", "8", "never"],
     "UI_SHOW_REPLY": ["on", "off"],
 }
@@ -433,7 +433,7 @@ async def put_settings(body: dict[str, Any]) -> dict[str, Any]:
         if key not in _SETTING_CHOICES:
             raise HTTPException(status_code=400, detail=f"Unknown preference: {key}")
         if key == "LLM_PROVIDER":
-            # The picker stores lowercase catalog ids; the orb's onboarding
+            # The picker stores lowercase catalog ids; the island's onboarding
             # sends the legacy 'Ollama'. Canonicalize instead of rejecting.
             from yumii.core.model_catalog import canonical_provider
 

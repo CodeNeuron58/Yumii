@@ -12,6 +12,7 @@ her mind is **NVIDIA Nemotron on Nebius Token Factory** — or a local
 model, if you'd rather nothing leave it at all.
 
 [![Version](https://img.shields.io/badge/version-0.15.0-orange.svg)](CHANGELOG.md)
+[![CI](https://github.com/CodeNeuron58/Yumii/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/CodeNeuron58/Yumii/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://python.org)
 [![Mind: NVIDIA Nemotron](https://img.shields.io/badge/mind-NVIDIA%20Nemotron-76B900.svg)](#built-with-nvidia-nemotron-on-nebius-token-factory)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -20,6 +21,8 @@ model, if you'd rather nothing leave it at all.
 <video src="https://github.com/user-attachments/assets/f7a2a3c7-651d-4b08-ab42-e7e7adb0f48e" width="100%" controls></video>
 
 **Experimental preview.** Windows-first; expect rough edges.
+
+**[Docs](https://yumii.me/docs)** · **[Install](#install)** · **[Changelog](CHANGELOG.md)**
 
 </div>
 

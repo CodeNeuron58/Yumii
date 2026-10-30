@@ -19,9 +19,10 @@ See [`CHANGELOG.md`](CHANGELOG.md) for the full list.
   shorter spoken replies, fewer stacked questions, honest answers, healthy
   goodbyes; emojis/markdown never spoken (cleaned in code)
 - **Tavily web search**; new experimental ears (NVIDIA Nemotron Speech,
-  Moonshine); installer onboarding wizard; notch-style top bar
+  Moonshine); installer onboarding wizard; **the island** — a new
+  top-of-screen UI and dashboard, with tool approvals answered by voice
 - **Provider registry** for speech and voice; a long list of fixes
-- **501 tests** total
+- **531 tests** total
 
 ## ✅ Shipped — 0.14.0 (October 2026)
 
@@ -211,7 +212,7 @@ The first public release.
   at what you're looking at and help with it, using a multimodal model
   (Nemotron 3.5 Super VL is a candidate).
 - **The desktop pet.** A pixel-art companion skin that sits on the taskbar
-  and talks in a thought bubble, beside the top bar.
+  and talks in a thought bubble, beside the island.
 
 ---
 

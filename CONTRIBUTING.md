@@ -85,10 +85,10 @@ src/yumii/
   tools/          # tool registry + permission policy; web search, memory, past-conversation search
   assets/
     prompts/      # _core.txt + personality files
-    webui/        # top bar (index.html) + dashboard.html; archived Live2D UI
+    webui/        # the island (index.html) + dashboard.html over ui/ modules; archived Live2D UI
   cli.py          # `yumii server` launcher
 
-desktop/          # Tauri v2 desktop app (Rust) — renders the bar, launches the backend
+desktop/          # Tauri v2 desktop app (Rust) — renders the island, launches the backend
 ```
 
 > User-provided Live2D models (for the future companion mode) go in
