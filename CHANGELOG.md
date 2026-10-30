@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   weather or inbox contents, and no approval card. The tool call now comes
   first: measured on Nemotron, web-search requests called the tool 12/12
   (was 6/9) and "remember this" requests saved the fact 7/8 (was 5/8).
+- **The island shows her answer after a tool runs.** It kept showing the
+  "Let me check that for you." line while she spoke the result; the
+  answer's own text now replaces it.
 
 ## [0.15.0] — 2026-10-30
 

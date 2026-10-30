@@ -29,6 +29,7 @@ const S = {
     question: '',            // what she's answering
     partial: '',             // live words while they talk
     reply: '',               // her words so far
+    replyFromAudio: false,   // reply came from an utterance's audio_start, not reply_text
     tool: null,              // tool running right now
     approval: null,          // { id, tool, args, deadline, question }
     approvedTools: new Set(),
@@ -511,6 +512,7 @@ function onEvent(d) {
             }, 4000);
             return;
         case 'reply_text':
+            S.replyFromAudio = false;
             if (S.phase === 'thinking' || S.phase === 'speaking') {
                 S.reply = d.text || '';
                 if (turn) turn.a = S.reply;
@@ -562,7 +564,14 @@ function onEvent(d) {
             S.lingering = false;
             S.phase = 'speaking';
             S.partial = '';
-            if (!S.reply && d.text) S.reply = d.text;
+            // An utterance's text shows until reply_text takes over. After a tool
+            // runs, the answer is a new utterance: it must replace the "let me
+            // check" line, not hide behind it.
+            if (d.text && (!S.reply || S.replyFromAudio)) {
+                S.reply = d.text;
+                S.replyFromAudio = true;
+                if (turn) turn.a = S.reply;
+            }
             break;
         case 'interrupt':
             // Barge-in or "stop". A pending approval stays up until it's answered.
