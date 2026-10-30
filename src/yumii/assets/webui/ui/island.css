@@ -25,7 +25,7 @@ body.preview { background: #000; }
 
 .sliver {
     width: 96px;
-    height: 4px;
+    height: 6px;
     background: #1b1c1e;
     border-radius: 0 0 4px 4px;
     transition: background 0.15s;
