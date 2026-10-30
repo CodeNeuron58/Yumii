@@ -1,12 +1,12 @@
 ---
 title: "HTTP API & WebSocket"
-description: "The local backend's REST endpoints and the realtime protocol the orb speaks."
+description: "The local backend's REST endpoints and the realtime protocol the island speaks."
 sidebarTitle: "Interfaces"
 ---
 
 The backend serves a local API on `http://127.0.0.1:8000` — it prefers port
 8000 and walks up to 8011 if that's taken, writing its choice to
-`~/.yumii/backend.port`. It's what the orb and dashboard use — and yours to
+`~/.yumii/backend.port`. It's what the island and dashboard use — and yours to
 script against. It binds to localhost only; browsers are held to an origin
 allowlist and a loopback-only Host allowlist (extendable via
 `YUMII_ALLOWED_ORIGINS` / `YUMII_ALLOWED_HOSTS`).
@@ -24,7 +24,7 @@ GET /api/status                → {configured, provider, audio_ready, models}
 ### Sessions
 
 ```
-GET    /api/sessions                     list (newest first: id, name, timestamps, message_count)
+GET    /api/sessions                     list (newest first: id, name, timestamps, message_count, active)
 POST   /api/sessions?name=…              create
 POST   /api/sessions/{id}/resume         make {id} the live conversation
 PUT    /api/sessions/{id}                rename       body: {"name": "…"}
@@ -72,32 +72,40 @@ The realtime channel: raw microphone audio up, JSON events down.
 {"type": "session_select", "action": "resume", "session_id": "…"}
 ```
 
-Then: **binary frames** of 16 kHz mono PCM16 microphone audio, plus two JSON
-frame types —
+Then: **binary frames** of 16 kHz mono PCM16 microphone audio, plus these
+JSON frames —
 
 ```json
-{"type": "command", "command": "…"}                              // inject text as a spoken turn
+{"type": "command", "command": "…"}          // typed text: a turn, a command, or a yes/no to a pending approval
 {"type": "confirmation_response", "request_id": "…", "approve": true}
+{"type": "mic_mute", "muted": true}          // stop listening (audio is dropped server-side too)
+{"type": "speak", "text": "…"}               // say a line again (Replay) — speech only, never a turn
+{"type": "playback_finished", "seq": 3}      // her audio actually finished playing
 ```
 
 **Server → client** events, in the order a turn produces them:
 
 | Event | Meaning |
 |---|---|
-| `partial_transcript` | Live words-as-you-speak (Vosk backend only) |
-| `thinking_start` / `thinking_delta` / `thinking_end` | The LLM is working; deltas carry tokens |
-| `tool_status` | `{tool, status: running}` — she's using a tool |
-| `confirmation_request` | `{request_id, tool, args}` — show Approve/Deny; reply with `confirmation_response` |
-| `confirmation_timeout` | The prompt expired (counts as deny) |
-| `audio_start` | `{text, expression, sampleRate}` — her reply text + emotion; audio follows |
+| `partial_transcript` | Live words-as-you-speak (streaming ears) |
+| `thinking_start` | `{text}` — a turn began; `text` is what she's answering |
+| `thinking_delta` / `thinking_end` | Tokens as they stream; the turn's reasoning finished |
+| `reply_text` | `{text}` — her reply so far, sentence by sentence |
+| `tool_status` | `{tool, status: running \| done}` — she's using a tool |
+| `tool_result` | `{tool, ok, emails?}` — `ok` only when the tool reports it (else `null`); an inbox read lists sender / subject / time |
+| `confirmation_request` | `{request_id, tool, args, timeout_seconds}` — ask; reply with `confirmation_response`, or the user can say "yes" / "no" |
+| `confirmation_resolved` | `{request_id, approved}` — answered by voice or typed text |
+| `confirmation_timeout` | The prompt expired, or was superseded (counts as deny) |
+| `audio_start` | `{text, expression, sampleRate, seq}` — audio follows |
 | `audio_chunk` | `{data}` — base64 PCM16 at `sampleRate`; play back-to-back |
-| `audio_end` | The reply is fully delivered |
+| `audio_end` | The reply is fully delivered (send `playback_finished` when it has played) |
 | `interrupt` | You barged in — stop playback immediately |
+| `mic_state` | `{muted}` — mute changed (button, voice or typed command) |
 | `error` | `{kind, message}` — kind is `auth` / `quota` / `network` / `generic`; she stays alive |
 
 A minimal client is therefore: open WS → send `session_select` → stream mic
-PCM16 → render events. The orb (`src/yumii/assets/webui/index.html`) is the
-reference implementation and is a single readable file.
+PCM16 → render events. The island (`src/yumii/assets/webui/ui/voice.js` for
+the link, `island.js` for the states) is the reference implementation.
 
 <Callout type="warning" title="One conversation at a time">
 The backend hosts a single live conversation. A second WebSocket connection

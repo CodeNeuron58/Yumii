@@ -73,6 +73,17 @@ on first use.
 
 ---
 
+## Interface assets
+
+| Asset | Where | License |
+|-------|-------|---------|
+| **Geist** and **Geist Mono** (Vercel, with basement.studio) | Bundled: `src/yumii/assets/webui/ui/fonts/` — the full license ships beside them as `OFL.txt` | SIL Open Font License 1.1 |
+| **Lucide** icons (paths inlined in `ui/icons.js`) | Bundled | ISC |
+
+The fonts are bundled so the interface makes no network request.
+
+---
+
 Speech models run on [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
 (Apache-2.0). The full MIT, Apache-2.0 and BSD-2-Clause license texts are
 available at <https://opensource.org/license/mit>,

@@ -5,13 +5,13 @@ sidebarTitle: "Internals"
 ---
 
 Yumii is two processes: a **Python backend** (the brain — FastAPI + LangGraph)
-and a **Tauri shell** (Rust — the orb window, tray, hotkey) that launches and
+and a **Tauri shell** (Rust — the island window, tray, hotkey) that launches and
 supervises it. They talk over a localhost WebSocket.
 
 ## The pipeline
 
 ```
-mic (orb window)
+mic (island window)
   │  16 kHz PCM16 over WebSocket
   ▼
 Silero VAD ──── local ONNX, every frame; detects speech start/end
@@ -25,7 +25,7 @@ LangGraph agent  ── personality + date + memory facts + history
 TTS ─────────── Kokoro (local ONNX) | ElevenLabs | CAMB — sentence-streamed
   │  base64 PCM chunks over WebSocket
   ▼
-orb ─────────── plays audio, pulses, tints with emotion
+island ──────── plays audio; shows hearing / thinking / speaking / approvals
 ```
 
 Three asyncio tasks run this as a loop — `audio_listener`,
@@ -40,7 +40,8 @@ The core is a deliberately small LangGraph state machine:
 
 * **Tools** live in a registry with a policy each (read-only vs. external).
   External tools route through the **human-in-the-loop gate**: the graph
-  pauses, the orb shows Approve/Deny, and the tool runs only on approval —
+  pauses, the island shows Allow / Deny (or takes a spoken "yes" / "no"),
+  and the tool runs only on approval —
   a denial is fed back to the model as a normal message so she responds
   gracefully.
 * **Emotion is not model output.** The LLM speaks plain text; a fast
@@ -103,7 +104,7 @@ src/yumii/
   tts/        Kokoro / ElevenLabs / CAMB speakers (+ model fetcher)
   tools/      tool registry, policies, Composio loader
   core/       engine orchestrator, config, credential store, memory/session managers
-  assets/     personality prompts, orb + dashboard HTML, bundled VAD model
+  assets/     personality prompts, island + dashboard (webui/ui/*), bundled VAD model
 desktop/
   src-tauri/  the Rust shell: window, tray, hotkey, backend sidecar
 ```

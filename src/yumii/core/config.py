@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # hitl_mode: never (no gate) | external (gate EXTERNAL tools) | always (gate all).
     hitl_mode: str = Field(default="external", alias="HITL_MODE")
     hitl_timeout_seconds: float = Field(default=30.0, alias="HITL_TIMEOUT_SECONDS")
+    # The island: seconds an answer stays up after she finishes ("never" =
+    # until dismissed), and whether her reply text shows under the strip.
+    ui_hide_after: str = Field(default="4", alias="UI_HIDE_AFTER")
+    ui_show_reply: str = Field(default="on", alias="UI_SHOW_REPLY")
     project_root: str = Field(default=".", description="Root directory of the project")
 
     # No env_file — a project-local .env must never shadow user config.

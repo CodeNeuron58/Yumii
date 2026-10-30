@@ -6,7 +6,7 @@ sidebarTitle: "Daily Use"
 
 ## The conversation model
 
-Yumii listens **continuously** while the orb is active — no wake word, no
+Yumii listens **continuously** while she's running — no wake word, no
 button. The loop:
 
 1. **You speak.** Local voice detection (Silero, on your CPU) notices when
@@ -24,15 +24,28 @@ button. The loop:
 mid-word, doesn't matter — her unspoken words are dropped and she listens.
 Conversations flow much better once you stop treating her turns as sacred.
 
-## The window
+## The island
 
-* **Drag the orb itself** to move her anywhere on screen. The window is
-  frameless, always-on-top, and skips the taskbar — a presence, not an app.
-* The **mic button** beside the orb mutes her ears; the **⚙ gear** opens
-  the mode menu and dashboard.
-* **`Ctrl+Shift+Space`** toggles her from anywhere.
+She lives in a slim **island** at the top-centre of your screen. Tucked
+away it's a 96-pixel sliver; it grows only when there's something to read.
+
+| You see | Meaning |
+|---|---|
+| A thin sliver | She's idle and listening. Hover it to peek: status, the hotkey, mute, Recent, dashboard |
+| Green wave + your words | She's hearing you (live words with streaming ears) |
+| Spinner + your question + **Stop** | She's thinking, or using a tool ("Searching the web…") |
+| Lime wave + her reply | She's speaking. A thin line drains when she's done, then the island tucks away |
+| Amber **Needs your OK** | A tool wants permission — click **Allow**/**Deny**, or just say **"yes"** or **"no"** |
+| Red **Muted** pill | Her ears are off — click the pill to unmute |
+
+* **Hover** an answer to keep it open; **pin** it to keep it until you close it.
+* **Recent** (the chevron) lists this conversation's answers — replay any
+  of them aloud, copy them, or type to her instead of talking.
+* **`Ctrl+Shift+Space`** shows or hides her from anywhere.
 * The **tray icon** has Show/Hide, Dashboard, and Quit — quitting also shuts
   the backend down cleanly.
+* How long answers stay up, and whether her reply text shows at all, are in
+  **Dashboard → Behaviour**.
 
 ## Sessions: conversations that persist
 

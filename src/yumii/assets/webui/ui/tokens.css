@@ -1,0 +1,88 @@
+/* Yumii design tokens — shared by the island (index.html) and the dashboard.
+   Fonts are bundled (OFL, see fonts/OFL.txt): no request leaves the machine. */
+
+@font-face {
+    font-family: "Geist";
+    src: url("fonts/Geist-Variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: block;
+}
+@font-face {
+    font-family: "Geist Mono";
+    src: url("fonts/GeistMono-Variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: block;
+}
+
+:root {
+    color-scheme: dark;
+
+    /* surfaces */
+    --page: #0a0b0d;
+    --window: #101112;
+    --island: #131415;
+    --card: #0d0e10;
+    --inset: #0a0b0c;
+    --raised: #19191c;
+    --row-hover: #151618;
+    --fill: #1d1f21;
+    --hover: #232528;
+    --hover-strong: #2d3033;
+
+    /* lines */
+    --border: #25272a;
+    --border-soft: #222427;
+    --border-strong: #2d3033;
+    --chip-border: #292b2e;
+    --divider: #1c1f21;
+    --divider-soft: #1b1c1f;
+
+    /* text */
+    --text: #ececee;
+    --text-soft: #cacdcf;
+    --text-body: #d7d9db;
+    --text-2: #8d9092;
+    --icon: #a9acaf;
+    --muted: #787b7e;
+    --faint: #56595c;
+    --ghost: #4b4e51;
+
+    /* meaning */
+    --primary: #8fd4a4;          /* listening / go */
+    --primary-hover: #a9e2ba;
+    --on-primary: #0a120d;
+    --primary-bg: #16211b;
+    --speak: #c3dd8f;            /* she's talking */
+    --warn: #f0cf8a;             /* needs your OK */
+    --warn-bg: #22201a;
+    --danger: #f2a7a0;           /* muted / failed */
+    --danger-bg: #1f1416;
+    --danger-bg-hover: #26171a;
+    --danger-border: #40262a;
+
+    /* type */
+    --font: "Geist", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --mono: "Geist Mono", "Cascadia Mono", ui-monospace, monospace;
+
+    /* shape */
+    --island-radius: 16px;
+    --card-radius: 12px;
+    --shadow-island: 0 12px 30px rgba(0, 0, 0, 0.55);
+    --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+* { box-sizing: border-box; }
+
+@keyframes wv { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

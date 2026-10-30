@@ -37,7 +37,22 @@ Hackathon).
   local Whisper path when the hardware can afford them.
 - **Onboarding wizard** in the installer: pick her mind, ears and voice
   before anything downloads.
-- **Notch-style top bar** replaces the orb.
+- **The island** — a new top-of-screen UI replacing the orb: a sliver
+  when idle, a 36px strip that shows your words as you talk, a spinner
+  with your question and Stop while she thinks, her reply below while she
+  speaks (then a draining line, and it tucks away — hover or pin to keep
+  it). Approvals show what will happen ("Search the web for…", an email
+  draft with recipient, subject and body) with a countdown; an inbox read
+  shows what she read; Recent lists answers to replay, copy, or type to.
+- **Say "yes" or "no" to an approval.** Speaking used to deny a pending
+  approval on the spot (any speech counted as a barge-in), so "yes"
+  meant no. Now exact yes/no phrases answer it; anything else denies it
+  and becomes the next turn.
+- **A new dashboard** — her pipeline left to right (Hear → Think →
+  Speak, each marked on-device or cloud), voices, personality, island
+  behaviour, tools, chats, memory, every key (Nebius and Tavily were
+  missing from the old one), and a Privacy tab that says what leaves the
+  machine, built from your actual settings. Each control saves on its own.
 - **Provider registry.** Speech and voice providers register
   themselves; adding one is a single module, and the dashboard shows
   readable provider names.
@@ -55,6 +70,9 @@ Hackathon).
 - Gmail loads its curated tools (fetch, send) on every provider, not
   just Groq: the whole 63-tool toolkit added 26.6k tokens to every
   request — slower replies and most of the bill.
+- The mute button follows "mute" said out loud; a reconnect after a
+  backend restart shows model downloads instead of looking ready; a
+  barge-in can no longer turn her next reply into static.
 - Deleting a chat now deletes its messages.
 - The dashboard can't silently switch your speech-to-text by saving.
 - Boot: Python imports 18.6s → 13.4s, Composio loads in the

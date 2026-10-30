@@ -327,3 +327,24 @@ def test_delete_other_session_succeeds(client, monkeypatch):
     r = client.delete("/api/sessions/sess-old")
     assert r.status_code == 200
     assert purged == ["sess-old"]
+
+
+def test_dashboard_assets_are_served_as_runnable_modules(client: TestClient) -> None:
+    """Windows can map .js to text/plain; a module served that way never runs."""
+    r = client.get("/ui/dashboard.js")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/javascript")
+    assert client.get("/ui/tokens.css").headers["content-type"].startswith("text/css")
+    assert client.get("/ui/fonts/Geist-Variable.woff2").status_code == 200
+
+
+def test_settings_carry_island_prefs_and_personality_descriptions(client: TestClient) -> None:
+    body = client.get("/api/settings").json()
+
+    assert body["preferences"]["UI_HIDE_AFTER"] == "4"
+    assert body["preferences"]["UI_SHOW_REPLY"] == "on"
+    assert set(body["descriptions"]["PERSONALITY"]) == set(body["choices"]["PERSONALITY"])
+
+    r = client.put("/api/settings", json={"preferences": {"UI_HIDE_AFTER": "never"}})
+    assert r.status_code == 200
+    assert r.json()["restart_required"] is False  # the island applies it live

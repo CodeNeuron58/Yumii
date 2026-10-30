@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 import uuid
 from contextlib import aclosing
@@ -59,6 +60,82 @@ _MUTE_PHRASES = {"mute", "mute yourself"}
 _UNMUTE_PHRASES = {"unmute", "unmute yourself", "you can listen"}
 _NEW_CHAT_PHRASES = {"new chat", "new session", "new conversation"}
 _REPEAT_PHRASES = {"repeat", "repeat that", "say that again", "come again"}
+
+# Spoken answers to a pending tool approval — exact phrases only, so a
+# misheard sentence can never approve an action. Anything else denies it
+# and becomes the next turn (the person moved on).
+_APPROVE_PHRASES = {
+    "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "yes please",
+    "do it", "go ahead", "send", "send it", "approve", "allow", "allow it",
+    "confirm", "sounds good",
+}
+_DENY_PHRASES = {
+    "no", "nope", "nah", "no thanks", "don't", "dont", "do not", "don't send",
+    "dont send", "don't do it", "cancel", "cancel it", "deny", "stop",
+    "never mind", "nevermind", "wait",
+}
+
+
+def _approval_answer(text: str) -> bool | None:
+    """True / False for a spoken yes / no to a tool approval; None for anything else."""
+    normalized = " ".join(re.sub(r"[^\w\s']", " ", text.lower()).split())
+    if normalized in _APPROVE_PHRASES:
+        return True
+    if normalized in _DENY_PHRASES:
+        return False
+    return None
+
+
+def _email_summaries(data: Any, limit: int = 5) -> list[dict[str, str]]:
+    """Sender / subject / time of the messages an inbox read returned (display only)."""
+
+    def find(node: Any, depth: int = 0) -> list | None:
+        if depth > 4:
+            return None
+        if isinstance(node, list) and node and all(isinstance(x, dict) for x in node[:3]):
+            if any("subject" in x for x in node[:3]):
+                return node
+        if isinstance(node, dict):
+            for value in node.values():
+                hit = find(value, depth + 1)
+                if hit:
+                    return hit
+        return None
+
+    out = []
+    for m in (find(data) or [])[:limit]:
+        sender = str(m.get("sender") or m.get("from") or "")
+        name = sender.split("<")[0].strip().strip('"') or sender
+        out.append(
+            {
+                "from": name[:60],
+                "subject": str(m.get("subject") or "(no subject)")[:120],
+                "time": str(m.get("messageTimestamp") or m.get("date") or "")[:40],
+            }
+        )
+    return out
+
+
+def _tool_result_event(name: str, output: Any) -> dict[str, Any]:
+    """What the island shows when a tool finishes: whether it worked (when the
+    tool says so — Composio reports ``successful``), and for an inbox read,
+    what it read. Never claims success it can't see: ``ok`` is None then."""
+    content = getattr(output, "content", output)
+    data: Any = content
+    if isinstance(content, str):
+        try:
+            data = json.loads(content)
+        except (ValueError, TypeError):
+            data = None
+    ok = None
+    if isinstance(data, dict) and isinstance(data.get("successful"), bool):
+        ok = data["successful"]
+    event: dict[str, Any] = {"type": "tool_result", "tool": name, "ok": ok}
+    if name.upper().startswith("GMAIL_FETCH") and data is not None:
+        emails = _email_summaries(data)
+        if emails:
+            event["emails"] = emails
+    return event
 
 
 def _derive_tool_narration(output: Any, *, allow_filler: bool = True) -> str | None:
@@ -529,6 +606,9 @@ class YumiiEngine:
                     break
             await self.audio_input_queue.put(None)
         log.info("mic_mute_set", muted=muted)
+        # Keep the island's mute control truthful — "mute" by voice or typed
+        # command changes this too, not just the button.
+        await self.broadcast_payload({"type": "mic_state", "muted": muted})
 
     # ------------------------------------------------------------------
     # Session lifecycle
@@ -748,6 +828,56 @@ class YumiiEngine:
         future.set_result(approved)
         return True
 
+    def _open_confirmations(self) -> list[str]:
+        """Request ids still waiting for an answer."""
+        return [rid for rid, f in self.pending_confirmations.items() if not f.done()]
+
+    async def answer_pending_approval(self, text: str) -> bool:
+        """Let an utterance answer a pending tool approval. True when consumed.
+
+        "yes" / "no" (exact phrases) resolve it and are consumed. Anything
+        else denies it — they moved on — and is NOT consumed, so it becomes
+        the next turn once this one wraps up.
+        """
+        open_ids = self._open_confirmations()
+        if not open_ids:
+            return False
+        answer = _approval_answer(text)
+        approved = answer is True
+        for request_id in open_ids:
+            if self.resolve_confirmation(request_id, approved):
+                await self.broadcast_payload(
+                    {
+                        "type": "confirmation_resolved",
+                        "request_id": request_id,
+                        "approved": approved,
+                    }
+                )
+        log.info("approval_by_voice", approved=approved, answered=answer is not None)
+        return answer is not None
+
+    async def deliver_utterance(self, text: str) -> None:
+        """Hand finished speech or typed text to the reasoning loop — unless it
+        was the answer to a pending tool approval."""
+        if await self.answer_pending_approval(text):
+            return
+        await self.transcription_queue.put(text)
+
+    async def speak_text(self, text: str) -> None:
+        """Say a line again (the island's Replay) — speech only, never an LLM turn."""
+        text = (text or "").strip()[:2000]
+        if not text:
+            return
+        generation = self._cancel_speech()
+        while not self.tts_queue.empty():
+            try:
+                self.tts_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        await self.tts_queue.put(
+            {"kind": "utterance", "gen": generation, "response": text}
+        )
+
     async def broadcast_payload(self, payload: Dict[str, Any]) -> None:
         """Push a JSON payload to all currently connected WebSocket clients.
 
@@ -856,39 +986,32 @@ class YumiiEngine:
         finally:
             self._llm_warming = False
 
+    def _on_speech_start(self) -> None:
+        """They started talking: stop her, and interrupt the turn in flight."""
+        self._maybe_warm_llm()  # STT runs while a cold endpoint wakes
+        # Barge-in works in both states now: while she speaks, the
+        # pipeline's gate only triggers after sustained high-confidence
+        # speech (echo through AEC shouldn't survive it). A trigger during
+        # playback stops her mid-sentence; the utterance keeps capturing
+        # and becomes the next turn.
+        if self.is_speaking:
+            log.info("barge_in_accepted")
+        else:
+            log.debug("speech_started_interrupt")
+        self._disarm_speaking_gate()
+        self._cancel_speech()
+        if self._open_confirmations():
+            # An approval is waiting: what they SAY decides it ("yes",
+            # "no", or something else — see deliver_utterance). An onset
+            # alone (a cough, a breath) must not deny it.
+            self._spawn(self.broadcast_payload({"type": "interrupt"}))
+            return
+        self.interrupt_event.set()
+        self._spawn(self.broadcast_payload({"type": "interrupt"}))
+
     async def audio_listener_task(self) -> None:
         """Consume audio, trigger interrupts on speech, push transcriptions to the reasoning queue."""
-
-        def on_speech_start() -> None:
-            self._maybe_warm_llm()  # STT runs while a cold endpoint wakes
-            # Barge-in works in both states now: while she speaks, the
-            # pipeline's gate only triggers after sustained high-confidence
-            # speech (echo through AEC shouldn't survive it). A trigger during
-            # playback stops her mid-sentence; the utterance keeps capturing
-            # and becomes the next turn.
-            was_speaking = self.is_speaking
-            if was_speaking:
-                log.info("barge_in_accepted")
-            else:
-                log.debug("speech_started_interrupt")
-            self._disarm_speaking_gate()
-            self._cancel_speech()
-            self.interrupt_event.set()
-            # A barge-in denies any pending tool approval NOW — the orb's
-            # modal must close instead of hanging for the 30s timeout while
-            # she answers the new utterance.
-            for request_id, future in list(self.pending_confirmations.items()):
-                if not future.done():
-                    future.set_result(False)
-                    self._spawn(
-                        self.broadcast_payload(
-                            {
-                                "type": "confirmation_timeout",
-                                "request_id": request_id,
-                            }
-                        )
-                    )
-            self._spawn(self.broadcast_payload({"type": "interrupt"}))
+        on_speech_start = self._on_speech_start
 
         log.info("listener_task_started")
         while True:
@@ -905,7 +1028,7 @@ class YumiiEngine:
                     )
                     if transcribed_text and transcribed_text.strip():
                         log.info("transcription_complete", text=transcribed_text)
-                        await self.transcription_queue.put(transcribed_text)
+                        await self.deliver_utterance(transcribed_text)
                 else:
                     audio_segment = await self.pipeline.stream_capture(
                         self.audio_input_queue, on_speech_start
@@ -919,7 +1042,7 @@ class YumiiEngine:
                             )
                             if transcribed_text and transcribed_text.strip():
                                 log.info("transcription_complete", text=transcribed_text)
-                                await self.transcription_queue.put(transcribed_text)
+                                await self.deliver_utterance(transcribed_text)
             except Exception as e:
                 log.error("audio_listener_crash", error=str(e), exc_info=True)
                 await asyncio.sleep(1)
@@ -970,7 +1093,8 @@ class YumiiEngine:
 
                 facts = await memory_manager.get_facts_raw()
 
-                await self.broadcast_payload({"type": "thinking_start"})
+                # Carries their words: the island shows what it's answering.
+                await self.broadcast_payload({"type": "thinking_start", "text": user_text})
 
                 # turn_id scopes message IDs: stable within a turn (dedupe), unique across turns.
                 turn_id = uuid.uuid4().hex
@@ -1060,6 +1184,9 @@ class YumiiEngine:
                         elif kind == "on_tool_end":
                             await self.broadcast_payload(
                                 {"type": "tool_status", "tool": name, "status": "done"}
+                            )
+                            await self.broadcast_payload(
+                                _tool_result_event(name, event.get("data", {}).get("output"))
                             )
 
                         # Capture the agent node's final output for TTS. Match the

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import mimetypes
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.websockets import WebSocketState
 
+from yumii.agent.personality_manager import PERSONALITY_DESCRIPTIONS
 from yumii.agent.synthesizer import content_to_text
 from yumii.core import providers
 from yumii.core.engine import YumiiEngine
@@ -170,6 +172,7 @@ async def list_sessions() -> list[dict[str, Any]]:
             "created_at": r.created_at,
             "last_active_at": r.last_active_at,
             "message_count": r.message_count,
+            "active": r.id == engine.active_session_id,
         }
         for r in rows
     ]
@@ -334,6 +337,9 @@ _SETTING_CHOICES: dict[str, list[str]] = {
         "bf_emma", "am_michael", "bm_george",
     ],
     "HITL_MODE": ["external", "always", "never"],
+    # Island behaviour — read by the bar, applied live.
+    "UI_HIDE_AFTER": ["2", "4", "6", "8", "never"],
+    "UI_SHOW_REPLY": ["on", "off"],
 }
 _TEXT_SETTINGS: dict[str, str] = {
     "GROQ_MODEL": "qwen/qwen3.6-27b",
@@ -389,6 +395,7 @@ async def get_settings() -> dict[str, Any]:
         "choices": _SETTING_CHOICES,
         # Human labels for registry-driven choices (raw ids stay the values).
         "labels": {"STT_PROVIDER": providers.labels("stt"), "TTS_PROVIDER": providers.labels("tts")},
+        "descriptions": {"PERSONALITY": dict(PERSONALITY_DESCRIPTIONS)},
         "text_settings": text_settings,
         "credentials": credentials,
     }
@@ -863,7 +870,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         # coerce and cap it (WS frames are otherwise unbounded).
                         cmd = str(payload.get("command", "")).strip()[:4000]
                         if cmd:
-                            await engine.transcription_queue.put(cmd)
+                            await engine.deliver_utterance(cmd)
+
+                    elif msg_type == "speak":
+                        # The island's Replay: say a past answer again.
+                        await engine.speak_text(str(payload.get("text", "")))
 
                     elif msg_type == "mic_mute":
                         await engine.set_mic_muted(
@@ -897,10 +908,18 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 # ---------------------------------------------------------------------------
 # Static files
 # ---------------------------------------------------------------------------
-# The backend serves one page — dashboard.html for the shell's dashboard window.
+# The backend serves one page — dashboard.html for the shell's dashboard
+# window — plus the shared UI assets it loads from /ui (styles, modules, fonts).
 
 _pkg_dir = Path(__file__).parent.parent
 _webui_dir = _pkg_dir / "assets" / "webui"
+
+# Windows can map .js to text/plain in the registry, and browsers refuse to
+# run a module script served that way — pin the types the UI needs.
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
+mimetypes.add_type("font/woff2", ".woff2")
+app.mount("/ui", StaticFiles(directory=_webui_dir / "ui"), name="ui")
 
 
 def _find_avatar_dir() -> str | None:

@@ -6,8 +6,8 @@ conversation (STT → LLM → TTS), tools, persistent memory, and 6 switchable
 personalities. Memory lives locally in SQLite; API keys live in
 `~/.yumii/auth.json` (owner-only file, the Claude Code / opencode model).
 
-**The product is a native desktop app** (Tauri) with a notch-style **top bar**
-UI. The Python "brain" (engine, agent, audio, memory) runs as a backend the
+**The product is a native desktop app** (Tauri) with a notch-style **island**
+UI at the top of the screen. The Python "brain" (engine, agent, audio, memory) runs as a backend the
 desktop shell launches. The animated **Live2D companion/avatar** is a
 long-term goal with no timeline; a pixel-art **desktop pet** skin is planned
 (`checklists/checklist-ui-bar-and-pet.md`). **Proactiveness** (she speaks
@@ -29,11 +29,18 @@ runs on Nemotron 3 Nano.
 - **Package manager:** `uv` (NOT pip — `uv.lock` is the source of truth; CI
   runs `uv sync --locked`)
 - **Backend:** FastAPI + Uvicorn + WebSocket (127.0.0.1 only; port 8000–8011)
-- **Frontend:** single-file vanilla HTML/CSS/JS **top bar**
-  (`src/yumii/assets/webui/index.html`) + `dashboard.html`. The old Live2D UI
-  is archived (not served) as `_companion_live2d.reference.html`.
+- **Frontend:** vanilla HTML/CSS + native ES modules, **no build step**
+  (`src/yumii/assets/webui/`): `index.html` (the island) and `dashboard.html`
+  are thin shells over `ui/` — `tokens.css` (design tokens, bundled Geist
+  fonts), `backend.js` (port discovery, REST, shell IPC), `voice.js`
+  (WebSocket, mic, playback), `island.js` (one state object → `view()` →
+  render), `dashboard.js`. Every dynamic string goes through `esc()` or a
+  `[data-text]` slot. Design-review any island state with
+  `index.html?preview=<view>`. The old Live2D UI is archived (not served) as
+  `_companion_live2d.reference.html`.
 - **Desktop shell:** **Tauri v2** (`desktop/src-tauri/`) — frameless,
-  transparent, always-on-top bar; tray + global hotkey; launches the backend
+  transparent, always-on-top island the page sizes via `set_island_size`;
+  tray + global hotkey; launches the backend
   (`python -m yumii server`, or the installed `yumii server`) as a managed child.
 - **AI framework:** LangChain + LangGraph (`langgraph>=1.2`)
 - **LLM providers:** 12, data-driven via `core/model_catalog.py`
@@ -70,7 +77,7 @@ src/yumii/
                   # manage_memory, search_past_conversations, Composio loader
   assets/
     prompts/      # _core.txt + 6 personality .txt files
-    webui/        # index.html (bar) + dashboard.html + archived Live2D page
+    webui/        # index.html (island) + dashboard.html + ui/ modules, styles, fonts
     model_catalog.json, models/silero_vad.onnx
   cli.py          # bare launcher: `yumii server`
 
@@ -106,8 +113,8 @@ checklists/         # owner's planning notes (gitignored)
 - WebSocket: `ws://127.0.0.1:<port>/ws` (binary PCM16 audio in, JSON events out;
   first frame must be `session_select`)
 - Health probe: `GET /health`; first-run state: `GET /api/status`
-- The backend serves ONLY `/dashboard.html`; the bar is rendered by the Tauri
-  shell from its own assets.
+- The backend serves ONLY `/dashboard.html` and its `/ui` assets; the island
+  is rendered by the Tauri shell from its own copy of the same folder.
 
 ---
 

@@ -160,14 +160,15 @@ fn show_dashboard(app: &tauri::AppHandle) {
                 tauri::WebviewUrl::External(url),
             )
             .title("Yumii — Dashboard")
-            .inner_size(840.0, 640.0)
+            .inner_size(1040.0, 720.0)
+            .min_inner_size(760.0, 560.0)
+            .theme(Some(tauri::Theme::Dark))
             .build();
         }
     });
 }
 
-/// The orb page calls this via IPC when the user picks "Dashboard"
-/// from the gear menu.
+/// The island calls this via IPC from its Dashboard button.
 #[tauri::command]
 fn open_dashboard(app: tauri::AppHandle) {
     show_dashboard(&app);
@@ -192,24 +193,26 @@ fn restart_backend(app: tauri::AppHandle) {
     });
 }
 
-/// Resize the bar window and keep it top-center of the primary monitor.
-/// The webview calls this to grow into the panel and shrink back to the
-/// tucked lip; the setup hook uses it to land the bar on first boot.
-fn set_bar_height(app: &tauri::AppHandle, height: f64) {
+/// Size the island window and anchor it top-centre of the monitor it's on.
+/// The island is only as big as what it shows — a small hover zone when
+/// tucked, the island plus its shadow otherwise. Positioned in physical
+/// pixels from the monitor's own origin, so a second screen works too.
+fn place_island(app: &tauri::AppHandle, width: f64, height: f64) {
     if let Some(win) = app.get_webview_window("main") {
-        let _ = win.set_size(tauri::LogicalSize::new(560.0, height));
+        let _ = win.set_size(tauri::LogicalSize::new(width, height));
         if let Ok(Some(monitor)) = win.current_monitor() {
             let scale = monitor.scale_factor();
-            let monitor_w = monitor.size().width as f64 / scale;
-            let x = ((monitor_w - 560.0) / 2.0).max(0.0);
-            let _ = win.set_position(tauri::LogicalPosition::new(x, 6.0));
+            let origin = monitor.position();
+            let monitor_w = monitor.size().width as f64;
+            let x = origin.x as f64 + ((monitor_w - width * scale) / 2.0).max(0.0);
+            let _ = win.set_position(tauri::PhysicalPosition::new(x.round() as i32, origin.y));
         }
     }
 }
 
 #[tauri::command]
-fn set_bar_height_cmd(app: tauri::AppHandle, height: f64) {
-    set_bar_height(&app, height);
+fn set_island_size(app: tauri::AppHandle, width: f64, height: f64) {
+    place_island(&app, width.clamp(40.0, 800.0), height.clamp(4.0, 900.0));
 }
 
 fn main() {
@@ -230,7 +233,7 @@ fn main() {
                 .build(),
         )
         .manage(Backend(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![open_dashboard, restart_backend, set_bar_height_cmd])
+        .invoke_handler(tauri::generate_handler![open_dashboard, restart_backend, set_island_size])
         .setup(move |app| {
             // 1. Launch the Python brain in the background.
             let child = spawn_backend(app.handle());
@@ -256,8 +259,8 @@ fn main() {
             // 3. Register the global hotkey (handler was set on the plugin above).
             app.global_shortcut().register(toggle_shortcut)?;
 
-            // 4. Land the bar top-center at its resting height.
-            set_bar_height(app.handle(), 64.0);
+            // 4. Land the island top-centre, sized for "waking her up".
+            place_island(app.handle(), 560.0, 80.0);
 
             Ok(())
         })
