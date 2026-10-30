@@ -74,7 +74,7 @@ export default function TopNav({ sections }: { sections: NavSection[] }) {
             </button>
             <Link href="/introduction" className="docs-logo" aria-label="Yumii docs home">
               <img
-                src="/docs/images/orb-logo.png"
+                src="/docs/images/yumii-icon.png"
                 alt=""
                 width={24}
                 height={24}
